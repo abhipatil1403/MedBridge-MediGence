@@ -1,0 +1,5 @@
+.auth-page { display: grid; place-items: center; min-height: 55vh; padding-block: 60px 100px; }
+.auth-card { width: min(100%, 600px); padding: clamp(28px, 5vw, 54px); border: 1px solid #b6c9bb; background: #eef3eb; }
+.auth-card h1 { margin: 10px 0 14px; font-size: clamp(30px, 4vw, 44px); letter-spacing: -.04em; }
+.auth-card p:not(.eyebrow) { color: #486056; line-height: 1.6; }
+.auth-card__action { display: inline-block; margin-top: 12px; padding: 11px 16px; background: var(--deep); color: white; font-weight: 700; text-decoration: none; }

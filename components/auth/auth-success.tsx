@@ -1,0 +1,34 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { createClient } from '@supabase/supabase-js';
+
+export function AuthSuccess({ next }: { next: string }) {
+  const [verified, setVerified] = useState(false);
+
+  useEffect(() => {
+    let timer: number | undefined;
+    let active = true;
+    const failure = `/auth/failure?next=${encodeURIComponent(next)}`;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) { window.location.replace(failure); return; }
+
+    const client = createClient(url, key, { auth: { detectSessionInUrl: false, persistSession: true } });
+    void client.auth.getUser().then(({ data, error }) => {
+      if (!active) return;
+      if (error || !data.user) { window.location.replace(failure); return; }
+      setVerified(true);
+      timer = window.setTimeout(() => window.location.replace(next), 3000);
+    }).catch(() => { if (active) window.location.replace(failure); });
+
+    return () => { active = false; if (timer) window.clearTimeout(timer); };
+  }, [next]);
+
+  return <main id="main-content" className="auth-page container"><section className="auth-card" role="status">
+    <p className="eyebrow">MEDBRIDGE ACCOUNT</p><h1>{verified ? 'You’re signed in' : 'Confirming your session'}</h1>
+    <p>{verified ? 'Your email link worked. We’ll take you back to where you started.' : 'Please wait while we verify your account.'}</p>
+    {verified && <Link className="auth-card__action" href={next}>Continue now →</Link>}
+  </section></main>;
+}

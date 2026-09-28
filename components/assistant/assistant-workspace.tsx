@@ -16,8 +16,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
   const auth = useMemo(() => url && key ? createClient(url, key) : null, []);
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [codeSent, setCodeSent] = useState(false);
+  const [linkSent, setLinkSent] = useState(false);
   const [content, setContent] = useState('');
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [caseId, setCaseId] = useState<string>('');
@@ -79,15 +78,11 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
     if (!auth) return;
     setNotice(''); setBusy(true);
     try {
-      if (!codeSent) {
-        const { error } = await auth.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}/assistant` } });
-        if (error) throw error;
-        setCodeSent(true); setNotice('Check your email for a sign-in link or code.');
-      } else {
-        const { error } = await auth.auth.verifyOtp({ email, token: code.trim(), type: 'email' });
-        if (error) throw error;
-        setNotice('');
-      }
+      const callback = new URL('/auth/callback', window.location.origin);
+      callback.searchParams.set('next', `${window.location.pathname}${window.location.search}${window.location.hash}`);
+      const { error } = await auth.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: callback.toString() } });
+      if (error) throw error;
+      setLinkSent(true); setNotice('Check your email and open the sign-in link. You do not need a code.');
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Sign-in failed.'); }
     finally { setBusy(false); }
   }
@@ -135,9 +130,8 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
 
   if (!session) return <section className="assistant-state assistant-signin"><div><p className="eyebrow">PRIVATE WORKSPACE</p><h2>Sign in to begin</h2>
     <p>Your conversations are saved to your account. Case information is used only when you select a case and grant assistant consent.</p></div>
-    <form onSubmit={signIn}><label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>
-      {codeSent && <label>Email code<input value={code} onChange={(event) => setCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" required /></label>}
-      <button type="submit" className="button" disabled={busy}>{codeSent ? 'Verify code' : 'Send sign-in code'}</button>
+    <form onSubmit={signIn}><label>Email address<input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setLinkSent(false); }} autoComplete="email" required /></label>
+      <button type="submit" className="button" disabled={busy}>{linkSent ? 'Send another sign-in link' : 'Send sign-in link'}</button>
       {notice && <p role="status">{notice}</p>}</form></section>;
 
   const selectedCase = cases.find((item) => item.id === caseId);
