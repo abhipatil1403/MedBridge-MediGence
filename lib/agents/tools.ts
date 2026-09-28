@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { CatalogRecord, CatalogRepository } from '@/types/catalog';
-import type { DiscoveryResults, ResultType } from '@/types/discovery';
+import type { DiscoveryFilters, DiscoveryResults, ResultType } from '@/types/discovery';
 import { catalogRepository } from '@/lib/catalog/repository';
 import { searchService } from '@/lib/discovery/search-service';
 import { getComparison } from '@/lib/catalog/comparison-service';
@@ -8,7 +8,16 @@ import { agents } from './registry';
 import { AgentError } from './errors';
 import { toolResultSchema, type AgentId, type Finding, type ToolName, type ToolResult } from './schemas';
 
-const searchInput = z.object({ query: z.string().trim().min(2).max(240), country: z.string().max(80).describe('Catalog country slug, e.g. india').optional(), city: z.string().max(80).optional(), treatment: z.string().max(100).describe('Catalog treatment slug, e.g. knee-replacement').optional(), specialty: z.string().max(100).optional() }).strict();
+const searchInput = z.object({
+  query: z.string().trim().min(2).max(240),
+  country: z.string().max(80).describe('Catalog country slug, e.g. india').optional(),
+  city: z.string().max(80).optional(),
+  treatment: z.string().max(100).describe('Catalog treatment slug, e.g. knee-replacement').optional(),
+  specialty: z.string().max(100).optional(),
+  hospital: z.string().max(100).describe('Catalog hospital slug').optional(),
+  mode: z.enum(['video', 'in-person']).optional(),
+  verification: z.enum(['verified', 'demo']).optional(),
+}).strict();
 const slugInput = z.object({ slug: z.string().regex(/^[a-z0-9-]{2,100}$/) }).strict();
 const comparisonInput = z.object({ treatment: slugInput.shape.slug, firstCountry: slugInput.shape.slug, secondCountry: slugInput.shape.slug }).strict();
 const caseInput = z.object({ caseId: z.uuid() }).strict();
@@ -75,7 +84,7 @@ export interface ToolContext {
 }
 export interface ToolDependencies {
   repository: CatalogRepository;
-  search: (query: string, type: ResultType, filters: {country?: string; city?: string; treatment?: string; specialty?: string}) => Promise<DiscoveryResults>;
+  search: (query: string, type: ResultType, filters: Pick<DiscoveryFilters, 'country' | 'city' | 'treatment' | 'specialty' | 'hospital' | 'mode'>) => Promise<DiscoveryResults>;
   compare: typeof getComparison;
 }
 
@@ -102,10 +111,15 @@ const hrefKinds: Record<string, string> = { treatments: 'treatments', hospitals:
 function toFinding(kind: string, record: CatalogRecord): Finding {
   const facts: Record<string, string | number | null> = {};
   const item = record as unknown as Record<string, unknown>;
-  for (const key of ['city', 'country', 'specialty', 'hospitalName', 'samplePriceUsd', 'sampleBaseCostUsd', 'verification', 'travelNote']) {
+  for (const key of ['city', 'country', 'specialty', 'hospitalName', 'samplePriceUsd', 'sampleBaseCostUsd', 'durationDays', 'verification', 'travelNote', 'consultationMode']) {
     const value = item[key];
     if (typeof value === 'string' || typeof value === 'number') facts[key] = value;
   }
+  if (Array.isArray(item.specialties)) facts.specialties = item.specialties.join(', ');
+  if (Array.isArray(item.treatmentSlugs)) facts.treatments = item.treatmentSlugs.join(', ');
+  if (Array.isArray(item.inclusions)) facts.inclusions = item.inclusions.join('; ');
+  if (Array.isArray(item.exclusions)) facts.exclusions = item.exclusions.join('; ');
+  if (kind === 'packages') facts.currency = 'USD';
   return {
     kind, slug: record.slug, title: record.name, detail: record.description,
     href: hrefKinds[kind] ? `/${hrefKinds[kind]}/${record.slug}` : undefined,
@@ -129,8 +143,10 @@ export async function executeTool(name: ToolName, rawInput: unknown, context: To
   const input = validated.data as Record<string, string>;
   if (name in searchKinds) {
     const kind = searchKinds[name as keyof typeof searchKinds];
-    const result = await dependencies.search(input.query, kind, { country: input.country, city: input.city, treatment: input.treatment, specialty: input.specialty });
-    return { findings: result.sections[kind].slice(0, 5).map(({item}) => toFinding(kind, item)), note: result.total === 0 ? 'No matching catalog records were found.' : undefined };
+    const result = await dependencies.search(input.query, kind, { country: input.country, city: input.city, treatment: input.treatment, specialty: input.specialty,
+      hospital: input.hospital, mode: input.mode as DiscoveryFilters['mode'] });
+    const matches = result.sections[kind].filter(({ item }) => !input.verification || (input.verification === 'demo' ? item.sourceKind === 'synthetic' : item.sourceKind !== 'synthetic'));
+    return { findings: matches.slice(0, 5).map(({item}) => toFinding(kind, item)), note: matches.length === 0 ? 'No matching catalog records were found.' : undefined };
   }
   if (name in getKinds) {
     const kind = getKinds[name as keyof typeof getKinds];

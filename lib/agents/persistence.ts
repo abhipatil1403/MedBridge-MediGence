@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Json } from '@/types/database';
 import { AgentError } from './errors';
+import { cloudflareConfigured } from './cloudflare-provider';
 import type { AgentId, AgentResponse, AgentTaskView, ToolName, ToolResult } from './schemas';
 import type { CaseAccess } from './tools';
 
@@ -19,7 +20,7 @@ function config() {
   return { url, publicKey, secret };
 }
 export function isAgentConfigured() {
-  return Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL && process.env.SUPABASE_SECRET_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  return Boolean(cloudflareConfigured() && process.env.SUPABASE_SECRET_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 export function createUserClient(token: string): Db {
   const { url, publicKey } = config();

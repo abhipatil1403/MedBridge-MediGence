@@ -105,6 +105,12 @@ describe('controlled agent tools', () => {
     await expect(executeTool('search_doctors', { query: '' }, context, dependencies)).rejects.toMatchObject({ code: 'TOOL_INPUT_INVALID' });
     await expect(executeTool('create_case', { title: 'Test' }, context, dependencies)).rejects.toMatchObject({ code: 'TOOL_DENIED' });
   });
+  it('returns an honest empty result for a location absent from the catalog', async () => {
+    const result = await executeTool('search_hospitals', { query: 'knee replacement', city: 'Atlantis' },
+      { agent: 'discovery', userId: id(2000), caseAccess }, dependencies);
+    expect(result.findings).toEqual([]);
+    expect(result.note).toMatch(/No matching catalog records/);
+  });
   it('isolates case tools to the selected authorized case', async () => {
     const context = { agent: 'treatment_planning' as const, userId: id(2000), caseId: id(3000), caseAccess };
     await expect(executeTool('get_case_context', { caseId: id(3001) }, context, dependencies)).rejects.toMatchObject({ code: 'CASE_SCOPE_DENIED' });
@@ -179,11 +185,37 @@ describe('agent integration scenarios', () => {
     expect(result.tasks.map((task) => task.tool)).toEqual(['search_hospitals', 'get_hospital']);
     expect(result.tasks.every((task) => task.status === 'completed')).toBe(true);
   });
+  it('keeps the first agent permission boundary when a later model turn suggests another agent', async () => {
+    const first = plan('discovery', [step('search_hospitals', { query: 'knee replacement Mumbai' })]);
+    const second = plan('hospital_matching', [step('get_hospital', { slug: 'mumbai-demo' })]);
+    let planningCalls = 0;
+    const provider: LLMProvider = { generateStructured: (async (request: { purpose: string }) => {
+      if (request.purpose === 'synthesis') return { summary: 'A matching catalog option is available.', nextSteps: [], question: null };
+      planningCalls++;
+      return planningCalls === 1 ? first : second;
+    }) as LLMProvider['generateStructured'] };
+    const store = new MemoryStore();
+    const result = await runAgent({ content: 'Find a hospital for knee replacement in Mumbai.' }, { userId: id(2000), store, provider, caseAccess, tools: dependencies });
+    expect(result.status).toBe('completed');
+    expect(result.agent).toBe('discovery');
+    expect(result.tasks.map((task) => task.tool)).toEqual(['search_hospitals', 'get_hospital']);
+  });
   it('awaits one missing answer rather than failing', async () => {
     const operation = run('Find care options for my father.', plan('treatment_planning', [], 'Which country would you prefer?'));
     const result = await operation.promise;
     expect(result.status).toBe('awaiting_user_input');
     expect(result.question).toBe('Which country would you prefer?');
+  });
+  it('returns found catalog matches without requiring an optional refinement answer', async () => {
+    const operation = run('Find knee replacement hospitals in Mumbai.', plan('discovery', [
+      step('search_hospitals', { query: 'knee replacement Mumbai', city: 'Mumbai' }),
+      step('request_user_information', { question: 'Would you like to refine by budget?' }),
+    ], 'Would you like to refine by budget?'));
+    const result = await operation.promise;
+    expect(result.status).toBe('completed');
+    expect(result.question).toBeNull();
+    expect(result.findings.some((item) => item.kind === 'hospitals')).toBe(true);
+    expect(operation.store.actions).toEqual([{ tool: 'search_hospitals', status: 'completed' }]);
   });
   it('blocks unauthorized case access before calling a model', async () => {
     const operation = run('Plan knee care in my case.', plan('treatment_planning', []), { caseId: id(3000), access: deniedCaseAccess });

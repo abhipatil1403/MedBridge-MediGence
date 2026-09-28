@@ -92,19 +92,22 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
     finally { setBusy(false); }
   }
 
-  async function send(event: FormEvent) {
-    event.preventDefault();
-    if (!content.trim() || busy) return;
+  async function submitRequest(text: string) {
+    if (!text || busy) return;
     setBusy(true); setNotice('');
-    const text = content.trim();
     try {
       const result: AgentResponse = await api('/api/assistant', { method: 'POST', body: JSON.stringify({ content: text, conversationId, caseId: caseId || undefined }) });
       setConversationId(result.conversationId);
       setLatest(result);
-      setContent('');
+      setContent(result.status === 'failed' ? text : '');
       await refresh(result.conversationId);
     } catch (error) { setNotice(error instanceof Error ? error.message : 'The assistant could not run.'); }
     finally { setBusy(false); }
+  }
+
+  async function send(event: FormEvent) {
+    event.preventDefault();
+    await submitRequest(content.trim());
   }
 
   async function changeConsent(selectedCase: Case) {
@@ -127,7 +130,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
   }
 
   if (!configured) return <section className="assistant-state" role="status"><h2>Assistant configuration needed</h2>
-    <p>Care workspace runs require server-side <code>OPENAI_API_KEY</code>, <code>OPENAI_MODEL</code>, and <code>SUPABASE_SECRET_KEY</code>, plus the conversation migration. Add these in your local or deployment environment, then reload this page.</p>
+    <p>Care workspace runs require server-side <code>CLOUDFLARE_ACCOUNT_ID</code>, <code>CLOUDFLARE_API_TOKEN</code>, and <code>SUPABASE_SECRET_KEY</code>, plus the conversation migration. Add these in your local or deployment environment, then reload this page.</p>
     <Link href="/discover">Explore the catalog meanwhile →</Link></section>;
 
   if (!session) return <section className="assistant-state assistant-signin"><div><p className="eyebrow">PRIVATE WORKSPACE</p><h2>Sign in to begin</h2>
@@ -138,6 +141,8 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
       {notice && <p role="status">{notice}</p>}</form></section>;
 
   const selectedCase = cases.find((item) => item.id === caseId);
+  const latestRequest = [...messages].reverse().find((message) => message.role === 'user')?.content;
+  const sources = latest ? [...new Map(latest.findings.map((finding) => [finding.provenance.table, finding.provenance])).values()] : [];
   return <div className="assistant-shell">
     <aside className="assistant-rail" aria-label="Conversations"><div className="assistant-rail__head"><h2>Workspace</h2>
       <button type="button" onClick={() => { setConversationId(undefined); setCaseId(''); setMessages([]); setLatest(null); setNotice(''); }}>New conversation</button></div>
@@ -154,7 +159,8 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
         {messages.map((message) => <article key={message.id} className={`assistant-message assistant-message--${message.role}`}>
           <span>{message.role === 'user' ? 'You' : 'MedBridge'}</span>
           {message.role === 'assistant' && message.metadata?.response ? <ResponseBlocks response={message.metadata.response} approvalStatus={message.metadata.approvalStatus}
-            onDecision={decideApproval} disabled={busy} /> : <p>{message.content}</p>}
+            onDecision={decideApproval} onRetry={latest?.runId === message.metadata.response.runId && latestRequest ? () => { void submitRequest(latestRequest); } : undefined}
+            disabled={busy} /> : <p>{message.content}</p>}
         </article>)}
         {busy && <div className="assistant-working" role="status">Working on your request. Results and recorded task states will appear when the run finishes.</div>}
       </div>
@@ -170,11 +176,15 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
       {selectedCase && <><p>{selectedCase.agentConsent ? 'Assistant access granted for this case.' : 'Case owner consent is needed before the assistant reads this case.'}</p>
         {selectedCase.canManageConsent && <button type="button" disabled={busy} onClick={() => changeConsent(selectedCase)}>{selectedCase.agentConsent ? 'Revoke assistant consent' : 'Grant assistant consent'}</button>}</>}
       <small>Case information stays within the selected conversation. Document contents are not sent to the assistant.</small></div>
+      <div className="assistant-context__panel"><p className="eyebrow">CURRENT REQUEST</p><p>{busy ? content.trim() : latestRequest || 'Describe what you want to explore.'}</p></div>
       <div className="assistant-context__panel"><p className="eyebrow">CURRENT PLAN</p><h2>{latest ? agentsLabel(latest.agent) : 'No run yet'}</h2>
         {latest ? <ol className="assistant-task-list">{latest.tasks.map((task) => <li key={task.id}><strong>{task.objective}</strong><span>{task.status.replaceAll('_', ' ')}</span></li>)}</ol>
           : <p>Actual tasks appear here after a request runs.</p>}</div>
       <div className="assistant-context__panel"><p className="eyebrow">FINDINGS</p><strong>{latest?.findings.length ?? 0} sourced records</strong>
         <p>Source labels reflect each catalog record. Synthetic records are demo data.</p></div>
+      <div className="assistant-context__panel"><p className="eyebrow">SOURCES</p>{sources.length ? <ul className="assistant-source-list">{sources.map((source) =>
+        <li key={source.table}>{source.label} · {source.table}{source.sourceKind === 'synthetic' ? ' · Demo data' : ''}</li>)}</ul> : <p>Sources appear with retrieved results.</p>}</div>
+      {latest?.nextSteps.length ? <div className="assistant-context__panel"><p className="eyebrow">NEXT ACTIONS</p><ul className="assistant-source-list">{latest.nextSteps.map((step) => <li key={step}>{step}</li>)}</ul></div> : null}
     </aside>
   </div>;
 }
@@ -183,13 +193,15 @@ function agentsLabel(agent: AgentResponse['agent']) {
   return ({ discovery: 'Discovery agent', treatment_planning: 'Treatment planning agent', hospital_matching: 'Hospital matching agent', comparison: 'Comparison agent' })[agent];
 }
 
-function ResponseBlocks({ response, approvalStatus, onDecision, disabled }: { response: AgentResponse; approvalStatus?: string;
-  onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; disabled: boolean }) {
+function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disabled }: { response: AgentResponse; approvalStatus?: string;
+  onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; onRetry?: () => void; disabled: boolean }) {
   return <div className="assistant-response"><div><small>WHAT I UNDERSTOOD</small><p>{response.understanding}</p></div>
     <div><small>FINDINGS</small><p>{response.summary}</p>
+      {response.status === 'failed' && <div className="assistant-recovery">{onRetry && <button type="button" disabled={disabled} onClick={onRetry}>Retry this request</button>}
+        <Link href="/discover">Continue with standard catalog search →</Link></div>}
       {response.findings.length > 0 && <div className="assistant-finding-grid">{response.findings.map((item) => <article key={item.provenance.recordId} className="assistant-finding">
         <span>{item.kind.replaceAll('_', ' ')}</span><h3>{item.href ? <Link href={item.href}>{item.title}</Link> : item.title}</h3><p>{item.detail}</p>
-        {Object.entries(item.facts).slice(0, 4).map(([key, value]) => <div className="assistant-fact" key={key}><strong>{key.replace(/([A-Z])/g, ' $1')}</strong><span>{value}</span></div>)}
+        {Object.entries(item.facts).slice(0, item.kind === 'packages' ? 8 : 5).map(([key, value]) => <div className="assistant-fact" key={key}><strong>{key.replace(/([A-Z])/g, ' $1')}</strong><span>{value}</span></div>)}
         <footer>{item.provenance.sourceKind === 'synthetic' ? 'Demo data' : item.provenance.sourceKind === 'external' ? 'External catalog data' : 'MedBridge data'} · {item.provenance.label} · Record {item.provenance.recordId.slice(0, 8)} · Retrieved {new Date(item.provenance.retrievedAt).toLocaleDateString()}</footer>
       </article>)}</div>}</div>
     {response.question && <div className="assistant-response__question"><small>WHAT I NEED FROM YOU</small><p>{response.question}</p></div>}

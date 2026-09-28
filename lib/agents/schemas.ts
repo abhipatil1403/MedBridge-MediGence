@@ -63,8 +63,8 @@ export interface ToolResult {
   approvalRequired?: string;
 }
 
-const provenanceSchema = z.object({ kind: z.literal('catalog'), table: z.string(), recordId: z.uuid(),
-  sourceRecordId: z.uuid().nullable(), label: z.string(), sourceKind: z.enum(['synthetic', 'external', 'first_party']), retrievedAt: z.iso.datetime() });
+const provenanceSchema = z.object({ kind: z.literal('catalog'), table: z.string(), recordId: z.guid(),
+  sourceRecordId: z.guid().nullable(), label: z.string(), sourceKind: z.enum(['synthetic', 'external', 'first_party']), retrievedAt: z.iso.datetime() });
 const findingSchema = z.object({ kind: z.string(), slug: z.string().optional(), title: z.string(), detail: z.string(),
   href: z.string().optional(), facts: z.record(z.string(), z.union([z.string(), z.number(), z.null()])), provenance: provenanceSchema });
 export const toolResultSchema = z.object({ findings: z.array(findingSchema).max(30), note: z.string().optional(),

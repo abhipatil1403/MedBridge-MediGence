@@ -66,6 +66,7 @@ export function searchDoctors(catalog: CatalogSnapshot, parsed: ParsedQuery, fil
   const country = resolvedCountry(parsed, filters);
   const results = catalog.doctors.filter((item) =>
     (!country || item.country === country) && (!filters.specialty || item.specialty === filters.specialty) &&
+    (!filters.city || normalize(item.city) === normalize(filters.city)) &&
     (!filters.hospital || item.hospitalSlug === filters.hospital) &&
     (!filters.mode || item.consultationMode === "both" || item.consultationMode === filters.mode) &&
     (!filters.treatment || item.treatmentSlugs.includes(filters.treatment)),

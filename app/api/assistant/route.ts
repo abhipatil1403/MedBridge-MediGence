@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { OpenAIProvider } from '@/lib/agents/openai-provider';
+import { CloudflareProvider } from '@/lib/agents/cloudflare-provider';
 import { AgentError } from '@/lib/agents/errors';
 import { createAdminClient, createUserClient, isAgentConfigured, SupabaseAgentStore, SupabaseCaseAccess, verifyUser } from '@/lib/agents/persistence';
 import { runAgent } from '@/lib/agents/runtime';
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       caseAccess: new SupabaseCaseAccess(userDb),
       store: new SupabaseAgentStore(createAdminClient(), userDb),
-      provider: new OpenAIProvider(process.env.OPENAI_MODEL!, process.env.OPENAI_API_KEY!),
+      provider: new CloudflareProvider(),
     });
     return NextResponse.json(response);
   } catch (error) { return errorResponse(error); }

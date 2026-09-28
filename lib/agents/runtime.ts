@@ -62,8 +62,12 @@ async function planRequest(provider: LLMProvider, content: string, caseContext?:
             findings: followUp.findings.map(({ kind, slug, title, facts }) => ({ kind, slug, title, facts })) } : undefined,
           correction: attempt ? 'Previous plan was invalid. Use only tools allowed for the selected agent and valid inputs.' : undefined }),
         schema: planSchema, maxOutputTokens: 1300, timeoutMs: AGENT_LIMITS.modelTimeoutMs });
-      const plan = planSchema.parse(raw);
-      if (followUp && plan.agent !== followUp.agent) throw new AgentError('PLAN_AGENT_CHANGED', 'The assistant changed agents unexpectedly.');
+      const generated = planSchema.parse(raw);
+      // The selected agent is fixed for a run. A later model turn may suggest a
+      // different specialist, but only the original agent's allowlist can execute.
+      const hasCatalogRead = generated.steps.some((step) => step.tool.startsWith('search_') || step.tool.startsWith('get_'));
+      const steps = hasCatalogRead ? generated.steps.filter((step) => step.tool !== 'request_user_information') : generated.steps;
+      const plan = followUp ? { ...generated, agent: followUp.agent, steps } : { ...generated, steps };
       if (plan.steps.some((step) => !agents[plan.agent].allowedTools.includes(step.tool))) throw new AgentError('PLAN_TOOL_DENIED', 'The assistant selected an unavailable action.');
       for (const step of plan.steps) {
         let input: unknown;
@@ -125,7 +129,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
     const used = new Set<string>();
     for (let iteration = 0; iteration < AGENT_LIMITS.maxPlanIterations; iteration++) {
       const steps = activePlan.steps.slice(0, AGENT_LIMITS.maxToolCalls - tasks.length)
-        .filter((step) => !used.has(`${step.tool}:${step.input}`));
+        .filter((step) => !used.has(`${step.tool}:${step.input}`) && !(findings.length && step.tool === 'request_user_information'));
       const offset = tasks.length;
       for (const step of steps) {
         used.add(`${step.tool}:${step.input}`);
@@ -168,13 +172,13 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
         }
       }
       if (status !== 'completed') break;
-      if (activePlan.missingInformation) { status = 'awaiting_user_input'; question = activePlan.missingInformation; break; }
+      if (activePlan.missingInformation && findings.length === 0) { status = 'awaiting_user_input'; question = activePlan.missingInformation; break; }
       if (iteration + 1 >= AGENT_LIMITS.maxPlanIterations || tasks.length >= AGENT_LIMITS.maxToolCalls || findings.length === 0) break;
       activePlan = await planRequest(context.provider, request.content, caseContext, {
         agent: plan.agent, findings, usedTools: results.map((item) => item.tool),
       });
       if (!activePlan.steps.some((step) => !used.has(`${step.tool}:${step.input}`))) {
-        if (activePlan.missingInformation) { status = 'awaiting_user_input'; question = activePlan.missingInformation; }
+        if (activePlan.missingInformation && findings.length === 0) { status = 'awaiting_user_input'; question = activePlan.missingInformation; }
         break;
       }
     }
@@ -197,7 +201,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
       }));
       validateSynthesis(synthesis.summary, synthesis.nextSteps, synthesis.question);
       summary = synthesis.summary; nextSteps = synthesis.nextSteps;
-      if (synthesis.question && !question) { question = synthesis.question; status = 'awaiting_user_input'; }
+      if (synthesis.question && !question && findings.length === 0) { question = synthesis.question; status = 'awaiting_user_input'; }
     }
     const unique = [...new Map(findings.map((item) => [item.provenance.recordId, item])).values()];
     const response: AgentResponse = { conversationId, runId, agent: plan.agent, status, understanding: plan.understanding,

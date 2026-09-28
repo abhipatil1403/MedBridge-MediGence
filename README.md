@@ -1,6 +1,6 @@
 # MedBridge
 
-MedBridge is a healthcare discovery and care coordination prototype. Its searchable catalog is stored in PostgreSQL and contains explicitly synthetic records. The authenticated `/assistant` workspace uses a server-side OpenAI planner and controlled MedBridge tools. It does **not** contain live providers, clinical advice, confirmed bookings, payments, or external record sharing.
+MedBridge is a healthcare discovery and care coordination prototype. Its searchable catalog is stored in PostgreSQL and contains explicitly synthetic records. The authenticated `/assistant` workspace uses server-side Cloudflare Workers AI and controlled MedBridge tools. It does **not** contain live providers, clinical advice, confirmed bookings, payments, or external record sharing.
 
 ## Start locally
 
@@ -22,7 +22,7 @@ npm run dev
 
 Open `http://localhost:3000`. Try a search such as `knee surgery`, `hospitals in India`, `cardiologist`, or `second opinion`. Discovery supports suggestions, intent parsing, entity matching, filtering, sorting and links into detail pages. Treatment planning, consultation, second opinion, medical travel and recovery routes show the next step with clear demo boundaries. The file picker for reports keeps files in the browser and does not upload them.
 
-To use `/assistant`, set `OPENAI_API_KEY`, `OPENAI_MODEL`, and `SUPABASE_SECRET_KEY` in the ignored `.env.local`. Set the same three server-only variables in Vercel for a deployed assistant. `SUPABASE_SECRET_KEY` is the project's secret server key and must never have a `NEXT_PUBLIC_` prefix. Add the public Supabase URL/key to Vercel as well. Apply `20260928100000_agent_conversations.sql` with `supabase db push` before using the workspace. Without the server keys, `/assistant` displays a configuration state and makes no model call. The project must have Supabase Email OTP enabled; the workspace accepts the emailed sign-in link or code.
+To use `/assistant`, set `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_AI_MODEL` (default `@cf/zai-org/glm-4.7-flash`), and `SUPABASE_SECRET_KEY` in the ignored `.env.local`. Set the same server-only variables in Vercel for a deployed assistant. `SUPABASE_SECRET_KEY` is the project's secret server key and must never have a `NEXT_PUBLIC_` prefix. Add the public Supabase URL/key to Vercel as well. Apply `20260928100000_agent_conversations.sql` with `supabase db push` before using the workspace. Without the server keys, `/assistant` displays a configuration state and makes no model call. The project must have Supabase Email OTP enabled; the workspace accepts the emailed sign-in link or code.
 
 The assistant stores conversations and actual run/task/action/output records. Catalog searches remain deterministic. Case information requires sign-in, an accessible case, and explicit `agent_case_processing` consent from the case owner. Proposed case changes need a separate click to approve; external sharing, bookings, payments, travel purchases, and visa submissions stop at a pending approval boundary because those integrations are not connected. The assistant does not read document contents.
 

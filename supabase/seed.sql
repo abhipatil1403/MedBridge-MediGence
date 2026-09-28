@@ -972,4 +972,16 @@ insert into public.price_estimates(id, treatment_id, country_id, currency, estim
 insert into public.price_estimates(id, treatment_id, country_id, currency, estimated_min, estimated_max, pricing_type, verification_status, publication_status, source_kind, source_record_id) values ('9e59a7a7-6d19-73af-9221-5f8bf81490db', (select id from public.treatments where slug = 'dental-implants'), (select id from public.countries where slug = 'united-kingdom'), 'USD', 47400, 56900, 'estimate', 'unverified', 'published', 'synthetic', '00000000-0000-0000-0000-000000000001') on conflict (id) do nothing;
 insert into public.price_estimates(id, treatment_id, country_id, currency, estimated_min, estimated_max, pricing_type, verification_status, publication_status, source_kind, source_record_id) values ('11a3f3bf-b0a8-9acc-aa1b-9a78694a0da1', (select id from public.treatments where slug = 'dental-implants'), (select id from public.countries where slug = 'germany'), 'USD', 46100, 55300, 'estimate', 'unverified', 'published', 'synthetic', '00000000-0000-0000-0000-000000000001') on conflict (id) do nothing;
 insert into public.price_estimates(id, treatment_id, country_id, currency, estimated_min, estimated_max, pricing_type, verification_status, publication_status, source_kind, source_record_id) values ('c8200adb-fba0-ab74-04af-e6ab64788d6f', (select id from public.treatments where slug = 'dental-implants'), (select id from public.countries where slug = 'south-korea'), 'USD', 38500, 46200, 'estimate', 'unverified', 'published', 'synthetic', '00000000-0000-0000-0000-000000000001') on conflict (id) do nothing;
+-- Synthetic Mumbai cardiology entry for public doctor-discovery demonstrations.
+insert into public.doctors(slug, name, description, aliases, home_city_id, experience_years, languages, consultation_mode, qualifications_note, verification_status, source_kind, publication_status, source_record_id)
+values ('demo-cardiology-mumbai', 'Demo Cardiology Clinician Mumbai', 'Synthetic cardiology profile for exploring consultation options in Mumbai. No live clinician or availability is represented.', array['cardiologist', 'cardiology', 'heart care']::text[],
+  (select ci.id from public.cities ci join public.countries co on co.id = ci.country_id where ci.slug = 'mumbai' and co.slug = 'india'), null,
+  array['English', 'Hindi']::text[], 'both', 'No credential evidence is attached to this demo profile.', 'draft', 'synthetic', 'published', '00000000-0000-0000-0000-000000000001')
+on conflict (slug) do nothing;
+insert into public.doctor_specialties(doctor_id, specialty_id, is_primary)
+values ((select id from public.doctors where slug = 'demo-cardiology-mumbai'), (select id from public.specialties where slug = 'cardiology'), true)
+on conflict do nothing;
+insert into public.hospital_doctors(hospital_id, doctor_id, is_primary, source_record_id)
+values ((select id from public.hospitals where slug = 'demo-care-mumbai'), (select id from public.doctors where slug = 'demo-cardiology-mumbai'), true, '00000000-0000-0000-0000-000000000001')
+on conflict do nothing;
 commit;
