@@ -1,33 +1,15 @@
-/** Boundaries for future provider adapters. No model or patient data is connected. */
-export type ToolSideEffect = "read" | "propose" | "write";
+import type { z } from 'zod';
 
-export interface ModelRequest {
-  purpose: string;
-  messages: ReadonlyArray<{ role: "system" | "user" | "assistant"; content: string }>;
+export interface ModelRequest<T extends z.ZodType> {
+  purpose: 'plan' | 'synthesis';
+  system: string;
+  input: string;
+  schema: T;
   maxOutputTokens: number;
+  timeoutMs: number;
 }
 
-export interface ModelResponse {
-  content: string;
-  provider: string;
-  model: string;
-  requestId: string;
-}
-
+/** Provider-neutral, validated structured output. A provider can add streaming later. */
 export interface LLMProvider {
-  generate(request: ModelRequest): Promise<ModelResponse>;
-}
-
-export interface ToolContext {
-  actorId: string;
-  caseId?: string;
-  purpose: string;
-  traceId: string;
-}
-
-export interface AgentTool<Input, Output> {
-  name: string;
-  version: string;
-  sideEffect: ToolSideEffect;
-  execute(input: Input, context: ToolContext): Promise<Output>;
+  generateStructured<T extends z.ZodType>(request: ModelRequest<T>): Promise<z.infer<T>>;
 }

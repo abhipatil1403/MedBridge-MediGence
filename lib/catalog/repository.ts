@@ -57,11 +57,13 @@ const loadSnapshot = cache(async () => {
   const hospitalById = new Map(hospitalRows.map((item) => [item.id, item]));
 
   const countries: Country[] = countryRows.map((item) => ({
+    recordId: item.id, sourceRecordId: item.source_record_id,
     slug: item.slug, name: item.name, description: item.description, aliases: item.aliases,
     demo: item.source_kind === 'synthetic', sourceKind: sourceKind(item.source_kind),
     code: item.iso_code.trim(), travelNote: item.travel_note,
   }));
   const estimates: PriceEstimate[] = priceRows.filter((item) => item.currency === 'USD').map((item) => ({
+    recordId: item.id, sourceRecordId: item.source_record_id,
     treatmentSlug: required(treatmentById.get(item.treatment_id), 'price treatment').slug,
     countrySlug: required(countryById.get(item.country_id), 'price country').slug,
     estimatedMinUsd: item.estimated_min, estimatedMaxUsd: item.estimated_max,
@@ -70,6 +72,7 @@ const loadSnapshot = cache(async () => {
   const treatments: Treatment[] = treatmentRows.map((item) => {
     const treatmentPrices = priceRows.filter((price) => price.treatment_id === item.id && price.currency === 'USD');
     return {
+      recordId: item.id, sourceRecordId: item.source_record_id,
       slug: item.slug, name: item.name, description: item.description, aliases: item.aliases,
       demo: item.source_kind === 'synthetic', sourceKind: sourceKind(item.source_kind),
       specialty: required(specialtyById.get(item.specialty_id), 'treatment specialty').name,
@@ -85,6 +88,7 @@ const loadSnapshot = cache(async () => {
   const hospitals: Hospital[] = hospitalRows.map((item) => {
     const city = required(cityById.get(item.city_id), 'hospital city');
     return {
+      recordId: item.id, sourceRecordId: item.source_record_id,
       slug: item.slug, name: item.name, description: item.description, aliases: item.aliases,
       demo: item.source_kind === 'synthetic', sourceKind: sourceKind(item.source_kind),
       city: city.name, country: required(countryById.get(city.country_id), 'hospital country').slug,
@@ -105,6 +109,7 @@ const loadSnapshot = cache(async () => {
     const specialtyLink = doctorSpecialtyRows.find((link) => link.doctor_id === item.id && link.is_primary)
       ?? doctorSpecialtyRows.find((link) => link.doctor_id === item.id);
     return {
+      recordId: item.id, sourceRecordId: item.source_record_id,
       slug: item.slug, name: item.name, description: item.description, aliases: item.aliases,
       demo: item.source_kind === 'synthetic', sourceKind: sourceKind(item.source_kind),
       specialty: specialtyLink ? required(specialtyById.get(specialtyLink.specialty_id), 'doctor specialty').name : '',
@@ -119,6 +124,7 @@ const loadSnapshot = cache(async () => {
     };
   });
   const packages: Package[] = packageRows.map((item) => ({
+    recordId: item.id, sourceRecordId: item.source_record_id,
     slug: item.slug, name: item.name, description: item.description, aliases: item.aliases,
     demo: item.source_kind === 'synthetic', sourceKind: sourceKind(item.source_kind),
     treatmentSlug: required(treatmentById.get(item.treatment_id), 'package treatment').slug,
@@ -131,6 +137,7 @@ const loadSnapshot = cache(async () => {
     benefits: item.benefits,
   }));
   const services: Service[] = serviceRows.map((item) => ({
+    recordId: item.id, sourceRecordId: item.source_record_id,
     slug: item.slug, name: item.name, description: item.description, aliases: item.aliases,
     demo: item.source_kind === 'synthetic', sourceKind: sourceKind(item.source_kind),
     href: item.href, category: item.category === 'plan' || item.category === 'recover' ? item.category : 'treat',

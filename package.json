@@ -6,8 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint app components lib scripts types eslint.config.mjs next.config.ts",
+    "lint": "eslint app components lib scripts types tests eslint.config.mjs next.config.ts vitest.config.mjs",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "smoke": "node scripts/smoke-discovery.mjs"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
     "next": "16.3.6",
+    "openai": "^7.23.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-hook-form": "^7.65.0",
@@ -35,6 +37,7 @@
     "eslint": "^9.36.0",
     "eslint-config-next": "16.3.6",
     "tailwindcss": "4.3.3",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.2"
   }
 }

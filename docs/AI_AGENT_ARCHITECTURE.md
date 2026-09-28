@@ -1,6 +1,14 @@
 # Agentic AI architecture
 
-The AI layer is an auditable assistive workflow around clinical and commercial systems. It is not a clinical decision maker. The foundation defines boundaries; no model provider is wired until a real use case, data-processing agreement, evaluation set and deployment region are approved.
+The AI layer is an auditable assistive workflow around clinical and commercial systems. It is not a clinical decision maker. This milestone implements a server-side OpenAI adapter, the four initial agents, controlled tools, and the `/assistant` workspace against explicitly synthetic catalog data. Production patient use still requires a separate privacy, clinical, and operational review.
+
+The current runtime lives in `lib/agents/`. It validates a model-generated plan, checks the selected agent's allowlist and each tool's Zod schema, executes catalog tools through the existing deterministic services, optionally plans a second bounded iteration, then validates synthesis. The run is limited to eight tool calls and two planning iterations. Provider calls have a timeout and one SDK retry. No model has direct SQL or Supabase credentials.
+
+`conversations`, `conversation_messages`, `agent_runs`, `agent_tasks`, `agent_actions`, `agent_outputs`, and `agent_approvals` persist workspace state. The agent tables are private to the server. Authenticated users read only their own conversations through RLS. Case reads use a verified user token and RLS, then require the latest case-specific `agent_case_processing` consent. User-facing source cards show record IDs and synthetic/first-party/external source state; estimates retain their own source record IDs.
+
+Case creation, title updates, and ongoing task proposals remain pending until the user reviews and approves the exact proposal. The approval endpoint rechecks conversation ownership, case access, consent, and the input schema before executing a user-scoped case write. External actions record a pending boundary and have no execution integration. Tool logs contain hashes, durations, result counts, and catalog IDs rather than document contents or raw search queries.
+
+The table below is the longer-term agent roadmap. The currently implemented agents are DiscoveryAgent, TreatmentPlanningAgent, HospitalMatchingAgent, and ComparisonAgent; other listed agents are design targets.
 
 ```text
 User / staff action
@@ -50,7 +58,7 @@ Every tool declaration has `name`, `version`, `purpose`, `inputSchema`, `outputS
 
 ## Provider abstraction and retrieval
 
-- `LLMProvider.generate(request): Promise<StructuredResult>` and `LLMProvider.stream` are adapter interfaces. No provider-specific prompts, tokens or tool messages leak into domain services. Credentials stay server-side.
+- `LLMProvider.generateStructured(request): Promise<StructuredResult>` is the current provider-neutral interface. OpenAI Responses supplies validated structured output. Streaming is deferred; the workspace renders a completed persisted run and its real task states. Credentials stay server-side.
 - Retrieval indexes only approved, versioned content and published provider facts, with access-scoped patient documents in a separate private index. Each chunk points to source entity/version and review date. No web answer is promoted into the catalog automatically.
 - Ranking begins with deterministic eligibility (service, location, verified credential, budget/offer currency, availability) followed by explainable weights. LLM synthesis may explain candidates but cannot change eligibility or fabricate score inputs.
 - Evaluation uses de-identified test cases: intent accuracy, abstention, source attribution, tool authorization, PHI leakage, false price/provider claims, clinical safety and reviewer edit rate. A shadow rollout precedes any patient-facing automation.

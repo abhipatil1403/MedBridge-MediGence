@@ -1,10 +1,10 @@
 import { catalogRepository } from "./repository";
-import type { Country } from "@/types/catalog";
+import type { CatalogRepository, Country } from "@/types/catalog";
 
-export async function getComparison(procedureSlug: string, firstSlug: string, secondSlug: string) {
+export async function getComparison(procedureSlug: string, firstSlug: string, secondSlug: string, repository: CatalogRepository = catalogRepository) {
   const [treatments, countries, hospitals, doctors, packages, estimates] = await Promise.all([
-    catalogRepository.listTreatments(), catalogRepository.listCountries(), catalogRepository.listHospitals(),
-    catalogRepository.listDoctors(), catalogRepository.listPackages(), catalogRepository.listPriceEstimates(),
+    repository.listTreatments(), repository.listCountries(), repository.listHospitals(),
+    repository.listDoctors(), repository.listPackages(), repository.listPriceEstimates(),
   ]);
   const treatment = treatments.find((item) => item.slug === procedureSlug);
   const first = countries.find((item) => item.slug === firstSlug);
@@ -15,6 +15,7 @@ export async function getComparison(procedureSlug: string, firstSlug: string, se
     const estimate = estimates.find((item) => item.treatmentSlug === procedureSlug && item.countrySlug === country.slug);
     return {
       country,
+      estimate,
       sampleCostUsd: estimate?.estimatedMinUsd,
       sampleCostMaxUsd: estimate?.estimatedMaxUsd,
       hospitals: hospitals.filter((item) => item.country === country.slug && item.treatmentSlugs.includes(procedureSlug)),

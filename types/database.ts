@@ -134,6 +134,7 @@ export type Database = {
           metadata: Json;
           created_at: string;
           updated_at: string;
+          conversation_id: string | null;
         };
         Insert: {
           id?: string;
@@ -149,6 +150,7 @@ export type Database = {
           metadata?: Json;
           created_at?: string;
           updated_at?: string;
+          conversation_id?: string | null;
         };
         Update: {
           id?: string;
@@ -164,6 +166,7 @@ export type Database = {
           metadata?: Json;
           created_at?: string;
           updated_at?: string;
+          conversation_id?: string | null;
         };
         Relationships: [];
       };
@@ -178,6 +181,12 @@ export type Database = {
           due_at: string | null;
           created_at: string;
           updated_at: string;
+          tool_name: string | null;
+          input_summary: Json;
+          output_summary: Json;
+          started_at: string | null;
+          completed_at: string | null;
+          error_code: string | null;
         };
         Insert: {
           id?: string;
@@ -189,6 +198,12 @@ export type Database = {
           due_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          tool_name?: string | null;
+          input_summary?: Json;
+          output_summary?: Json;
+          started_at?: string | null;
+          completed_at?: string | null;
+          error_code?: string | null;
         };
         Update: {
           id?: string;
@@ -200,6 +215,12 @@ export type Database = {
           due_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          tool_name?: string | null;
+          input_summary?: Json;
+          output_summary?: Json;
+          started_at?: string | null;
+          completed_at?: string | null;
+          error_code?: string | null;
         };
         Relationships: [];
       };
@@ -485,6 +506,69 @@ export type Database = {
           source?: string;
           metadata?: Json;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      conversation_messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          run_id: string | null;
+          role: string;
+          visibility: string;
+          content: string;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          run_id?: string | null;
+          role: string;
+          visibility?: string;
+          content: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          conversation_id?: string;
+          run_id?: string | null;
+          role?: string;
+          visibility?: string;
+          content?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      conversations: {
+        Row: {
+          id: string;
+          owner_id: string;
+          case_id: string | null;
+          title: string;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          case_id?: string | null;
+          title?: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          case_id?: string | null;
+          title?: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };

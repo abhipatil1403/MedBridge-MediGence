@@ -2,6 +2,8 @@ export type CatalogKind = "treatments" | "hospitals" | "doctors" | "packages" | 
 export type ConsultationMode = "video" | "in-person" | "both";
 
 export interface CatalogRecord {
+  readonly recordId: string;
+  readonly sourceRecordId: string | null;
   readonly slug: string;
   readonly name: string;
   readonly description: string;
@@ -78,6 +80,8 @@ export interface Service extends CatalogRecord {
 }
 
 export interface PriceEstimate {
+  readonly recordId: string;
+  readonly sourceRecordId: string | null;
   readonly treatmentSlug: string;
   readonly countrySlug: string;
   readonly estimatedMinUsd: number;
