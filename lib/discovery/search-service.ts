@@ -1,5 +1,5 @@
 import { catalogRepository } from "@/lib/catalog/repository";
-import type { CatalogRepository, Country, Doctor, Hospital, Package, Service, Treatment } from "@/types/catalog";
+import type { CatalogKind, CatalogRepository, Country, Doctor, Hospital, Package, Service, Treatment } from "@/types/catalog";
 import type { DiscoveryFilters, DiscoveryResults, Matched, ParsedQuery, SearchSuggestion } from "@/types/discovery";
 import { QueryParser } from "./query-parser";
 import { SearchRankingService } from "./search-ranking-service";
@@ -107,13 +107,17 @@ export class SearchService {
   async search(filters: DiscoveryFilters): Promise<DiscoveryResults> {
     const catalog = await loadCatalog(this.repository);
     const understanding = QueryParser.parse(filters.q, catalog);
+    const shouldQueryDatabase = Boolean(understanding.tokens.length || understanding.entities.procedure || understanding.entities.specialty || understanding.entities.countries.length || understanding.entities.city || understanding.entities.service);
+    const candidates = shouldQueryDatabase ? await this.repository.findCandidateSlugs(understanding) : undefined;
+    const fromDatabase = <T extends { slug: string }>(kind: CatalogKind, results: Matched<T>[]): Matched<T>[] =>
+      candidates ? results.filter(({ item }) => candidates[kind].has(item.slug)) : results;
     const sections = {
-      treatments: filters.type === "all" || filters.type === "treatments" ? searchTreatments(catalog, understanding, filters) : [],
-      hospitals: filters.type === "all" || filters.type === "hospitals" ? searchHospitals(catalog, understanding, filters) : [],
-      doctors: filters.type === "all" || filters.type === "doctors" ? searchDoctors(catalog, understanding, filters) : [],
-      packages: filters.type === "all" || filters.type === "packages" ? searchPackages(catalog, understanding, filters) : [],
-      countries: filters.type === "all" || filters.type === "countries" ? searchCountries(catalog, understanding, filters) : [],
-      services: filters.type === "all" || filters.type === "services" ? searchServices(catalog, understanding, filters) : [],
+      treatments: filters.type === "all" || filters.type === "treatments" ? fromDatabase("treatments", searchTreatments(catalog, understanding, filters)) : [],
+      hospitals: filters.type === "all" || filters.type === "hospitals" ? fromDatabase("hospitals", searchHospitals(catalog, understanding, filters)) : [],
+      doctors: filters.type === "all" || filters.type === "doctors" ? fromDatabase("doctors", searchDoctors(catalog, understanding, filters)) : [],
+      packages: filters.type === "all" || filters.type === "packages" ? fromDatabase("packages", searchPackages(catalog, understanding, filters)) : [],
+      countries: filters.type === "all" || filters.type === "countries" ? fromDatabase("countries", searchCountries(catalog, understanding, filters)) : [],
+      services: filters.type === "all" || filters.type === "services" ? fromDatabase("services", searchServices(catalog, understanding, filters)) : [],
     };
     return { understanding, filters, sections, total: Object.values(sections).reduce((sum, results) => sum + results.length, 0) };
   }

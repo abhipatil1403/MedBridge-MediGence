@@ -6,6 +6,8 @@ import { ReportPicker } from "@/components/discovery/report-picker";
 import { SearchBox } from "@/components/discovery/search-box";
 import { getHomepageCatalog } from "@/lib/catalog/homepage-service";
 
+export const dynamic = "force-dynamic";
+
 const examples = [
   "I need a second opinion for spine surgery",
   "Find hospitals for knee replacement in India",

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { ServiceLanding } from "@/components/service-landing";
+
+export const dynamic = "force-dynamic";
 import { detailMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = detailMetadata("Medical travel", "Understand the steps of coordinating travel around a treatment plan.", "/medical-travel");

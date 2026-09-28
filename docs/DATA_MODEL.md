@@ -1,6 +1,15 @@
 # Data model and trust boundaries
 
-Target PostgreSQL on Supabase. This is a normalized conceptual model, not a migration claiming all tables exist. Create tables when their workflow ships; keep an initial migration small. Use `uuid` primary keys, `created_at`/`updated_at` timestamptz, explicit status enums or checked text, foreign keys, unique constraints, and immutable event records. Store money as integer minor units plus ISO currency and estimate basis. Patient data is private by default.
+The implemented foundation is in `supabase/migrations/`: 35 PostgreSQL tables, two lifecycle enums, directory search, source records, and RLS. `supabase/seed.sql` adds explicitly synthetic discovery data. The current catalog uses `treatments`, `hospital_doctors`, `price_estimates`, `packages`, and related join tables; estimates are numeric ranges with currency and provenance. Profiles, cases, memberships, consent events, document metadata, agent execution, workflows, and audit events are persistence foundations only. Patient data is private by default. The sections below describe future extensions and should not be read as tables already deployed.
+
+## Implemented access model
+
+- Public directory reads require publication status; real provider records also require verified status. Synthetic records stay visibly labeled.
+- A profile belongs to its Supabase Auth user. Cases are readable by owners and active caregivers/authorized family members; only owners can add or revoke members.
+- Consent events are append-only for the subject. Documents and case history are readable by authorized case members. Agent execution, workflow internals, source records, and audit events have no direct patient mutation grant.
+- External or first-party catalog records require a source record. `source_records` captures source name, URL/identifier, retrieval date, extraction method, verification and validity metadata.
+
+## Future extensions
 
 ## Identity and access
 

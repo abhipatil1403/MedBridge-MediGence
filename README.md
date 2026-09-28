@@ -1,10 +1,19 @@
 # MedBridge
 
-MedBridge is a healthcare discovery, treatment planning, medical travel and recovery prototype. The application has a searchable synthetic catalog and connected product journeys. It does **not** contain live providers, clinical advice, booking, payment, authentication, or AI services yet.
+MedBridge is a healthcare discovery, treatment planning, medical travel and recovery prototype. Its searchable catalog is stored in PostgreSQL and contains explicitly synthetic records. It does **not** contain live providers, clinical advice, booking, payment, patient account screens, or AI services yet.
 
 ## Start locally
 
-Requires Node.js 22 or newer and npm.
+Requires Node.js 22 or newer, npm, and a Supabase project with the migrations and seed applied. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to that project's public URL and publishable/anon key. Do not use a service-role key.
+
+With the Supabase CLI and a linked project, apply the versioned schema and synthetic catalog:
+
+```bash
+supabase link --project-ref YOUR_PROJECT_REF
+supabase db push --include-seed
+```
+
+The Supabase CLI can also run the project locally with Docker using `supabase start`. `supabase/seed.sql` is idempotent and explicitly synthetic. Applying it to an existing database leaves matching slugs in place.
 
 ```bash
 npm install
@@ -13,7 +22,7 @@ npm run dev
 
 Open `http://localhost:3000`. Try a search such as `knee surgery`, `hospitals in India`, `cardiologist`, or `second opinion`. Discovery supports suggestions, intent parsing, entity matching, filtering, sorting and links into detail pages. Treatment planning, consultation, second opinion, medical travel and recovery routes show the next step with clear demo boundaries. The file picker for reports keeps files in the browser and does not upload them.
 
-No Supabase or LLM credentials are required. Set `NEXT_PUBLIC_SITE_URL` for the deployment origin when publishing the prototype. Never place service-role or LLM secrets in `NEXT_PUBLIC_*` variables.
+Set `NEXT_PUBLIC_SITE_URL` for the deployment origin when publishing the prototype. Never place service-role or LLM secrets in `NEXT_PUBLIC_*` variables.
 
 ## Validate
 
@@ -23,9 +32,9 @@ npm run typecheck
 npm run build
 ```
 
-With a local server running, `npm run smoke` checks the demo inventory, example searches, filtering, sorting, suggestions, empty/error responses and linked routes. Set `MEDBRIDGE_TEST_ORIGIN` if the server uses a port other than 3000.
+After migrations and seed, regenerate database types from a migrated PostgreSQL database by setting `MEDBRIDGE_TYPES_DB_URL` and running `node scripts/generate-db-types.mjs`. With a local server running, `npm run smoke` checks the catalog inventory, searches, filtering, sorting, suggestions, empty/error responses and linked routes. Set `MEDBRIDGE_TEST_ORIGIN` if the server uses a port other than 3000. `scripts/validate-rls.sql` exercises anonymous directory access, case ownership, caregiver revocation, unauthorized access and private agent/audit tables against a test database.
 
-`GET /api/health` returns a generic status. `GET /api/discover` returns ranked synthetic catalog results; `GET /api/discover/suggestions` provides search suggestions. Neither API needs credentials or contains patient information.
+`GET /api/health` returns a generic status. `GET /api/discover` returns ranked synthetic catalog results from PostgreSQL; `GET /api/discover/suggestions` provides search suggestions. Neither API accepts patient information.
 
 ## Architecture
 
@@ -39,7 +48,7 @@ With a local server running, `npm run smoke` checks the demo inventory, example 
 
 ## Code layout
 
-`app/` holds App Router pages, metadata, states and route handlers. `components/` holds reusable UI and site shell. `data/` contains explicitly synthetic treatments, hospitals, clinicians, countries, packages and services. `lib/catalog/` exposes a repository adapter, while `lib/discovery/` contains the deterministic parser, ranker and search service. `types/` holds shared TypeScript types. Supabase migrations and live integrations are deferred.
+`app/` holds App Router pages, metadata, states and route handlers. `components/` holds reusable UI and site shell. `lib/catalog/` maps normalized database rows to the existing catalog model; `lib/discovery/` contains the deterministic parser, ranker and search service. `supabase/migrations/` holds schema, search and security changes. `supabase/seed.sql` holds the synthetic catalog. `types/database.ts` is generated from the migrated schema.
 
 The button primitive follows the shadcn/ui composition style and `components.json` is ready for future component additions. Tailwind CSS 4 is configured through `postcss.config.mjs` and the token theme in `app/globals.css`.
 
