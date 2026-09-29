@@ -3,10 +3,12 @@ import { zodTextFormat } from 'openai/helpers/zod';
 vi.mock('server-only', () => ({}));
 
 import { SearchService } from '@/lib/discovery/search-service';
+import { QueryNormalizer } from '@/lib/discovery/query-normalizer';
 import { getComparison } from '@/lib/catalog/comparison-service';
 import { executeTool, toolRegistry, toolSchemas, type CaseAccess, type ToolDependencies } from '@/lib/agents/tools';
 import { runAgent, AGENT_LIMITS } from '@/lib/agents/runtime';
 import { agents } from '@/lib/agents/registry';
+import { AgentError } from '@/lib/agents/errors';
 import type { AgentStore } from '@/lib/agents/persistence';
 import type { LLMProvider } from '@/lib/ai/contracts';
 import type { AgentPlan, AgentResponse, AgentTaskView, ToolName } from '@/lib/agents/schemas';
@@ -18,10 +20,14 @@ const base = (last: number, slug: string, name: string) => ({ recordId: id(last)
   description: `${name} demo catalog record`, aliases: [], demo: true, sourceKind: 'synthetic' as const });
 const treatment: Treatment = { ...base(1, 'knee-replacement', 'Knee replacement'), specialty: 'Orthopedics', category: 'Surgery', overview: '', procedure: '',
   indications: '', diagnostics: '', recovery: '', typicalStayDays: 8, sampleBaseCostUsd: 5000, countries: ['india', 'turkey'], faqs: [] };
+const brainTreatment: Treatment = { ...treatment, ...base(11, 'brain-and-spine-surgery', 'Brain & Spine Surgery'),
+  aliases: ['brain surgery', 'spine surgery'], specialty: 'Neurology', countries: ['turkey'] };
+const spinalTreatment: Treatment = { ...treatment, ...base(12, 'spinal-fusion', 'Spinal Fusion'),
+  aliases: ['spine fusion'], specialty: 'Neurology', countries: ['india'] };
 const india: Country = { ...base(2, 'india', 'India'), code: 'IN', travelNote: 'Travel planning varies by patient.' };
 const turkey: Country = { ...base(3, 'turkey', 'Turkey'), code: 'TR', travelNote: 'Check current travel requirements.' };
 const mumbai: Hospital = { ...base(4, 'mumbai-demo', 'Mumbai Demo Hospital'), city: 'Mumbai', country: 'india', specialties: ['Orthopedics'],
-  treatmentSlugs: ['knee-replacement'], sampleBedCount: 20, sampleAccreditation: 'No credential listed', verification: 'Demo — unverified', infrastructure: [] };
+  treatmentSlugs: ['knee-replacement', 'spinal-fusion'], sampleBedCount: 20, sampleAccreditation: 'No credential listed', verification: 'Demo — unverified', infrastructure: [] };
 const istanbul: Hospital = { ...base(5, 'istanbul-demo', 'Istanbul Demo Hospital'), city: 'Istanbul', country: 'turkey', specialties: ['Orthopedics'],
   treatmentSlugs: ['knee-replacement'], sampleBedCount: 20, sampleAccreditation: 'No credential listed', verification: 'Demo — unverified', infrastructure: [] };
 const doctor: Doctor = { ...base(6, 'cardiologist-demo', 'Demo Cardiologist'), specialty: 'Cardiology', hospitalSlug: 'mumbai-demo',
@@ -35,10 +41,10 @@ const estimates: PriceEstimate[] = [
   { recordId: id(10), sourceRecordId: id(110), treatmentSlug: 'knee-replacement', countrySlug: 'turkey', estimatedMinUsd: 6000, estimatedMaxUsd: 9000, sourceKind: 'synthetic' },
 ];
 const repository: CatalogRepository = {
-  listTreatments: async () => [treatment], listHospitals: async () => [mumbai, istanbul], listDoctors: async () => [doctor],
+  listTreatments: async () => [treatment, brainTreatment, spinalTreatment], listHospitals: async () => [mumbai, istanbul], listDoctors: async () => [doctor],
   listPackages: async () => [pkg], listCountries: async () => [india, turkey], listServices: async () => [service],
   listPriceEstimates: async () => estimates,
-  findCandidateSlugs: async () => ({ treatments: new Set([treatment.slug]), hospitals: new Set([mumbai.slug, istanbul.slug]),
+  findCandidateSlugs: async () => ({ treatments: new Set([treatment.slug, brainTreatment.slug, spinalTreatment.slug]), hospitals: new Set([mumbai.slug, istanbul.slug]),
     doctors: new Set([doctor.slug]), packages: new Set([pkg.slug]), countries: new Set([india.slug, turkey.slug]), services: new Set([service.slug]) }),
 };
 const searchService = new SearchService(repository);
@@ -54,6 +60,7 @@ class MemoryStore implements AgentStore {
   messages: string[] = [];
   output?: AgentResponse;
   runStatus?: string;
+  diagnostics?: Record<string, string | boolean | null>;
   async createConversation() { return id(1000); }
   async assertConversation(conversationId: string) { if (conversationId !== id(1000)) throw new Error('denied'); }
   async addMessage(_conversationId: string, _role: 'user' | 'assistant', content: string) { this.messages.push(content); }
@@ -62,7 +69,9 @@ class MemoryStore implements AgentStore {
   async updateTask(taskId: string, status: AgentTaskView['status']) { this.tasks.set(taskId, status); }
   async recordAction(_runId: string, _taskId: string, tool: ToolName, status: 'completed' | 'failed' | 'proposed') { this.actions.push({ tool, status }); return status === 'proposed' ? id(1200) : undefined; }
   async saveOutput(_runId: string, response: AgentResponse) { this.output = response; }
-  async finishRun(_runId: string, status: AgentResponse['status']) { this.runStatus = status; }
+  async finishRun(_runId: string, status: AgentResponse['status'], _errorCode?: string, diagnostics?: Record<string, string | boolean | null>) {
+    this.runStatus = status; this.diagnostics = diagnostics;
+  }
 }
 class MockProvider implements LLMProvider {
   calls: string[] = [];
@@ -181,7 +190,7 @@ describe('agent integration scenarios', () => {
       return planningCalls === 1 ? first : second;
     }) as LLMProvider['generateStructured'] };
     const store = new MemoryStore();
-    const result = await runAgent({ content: 'Find a hospital for knee replacement in Mumbai.' }, { userId: id(2000), store, provider, caseAccess, tools: dependencies });
+    const result = await runAgent({ content: 'Find a hospital for knee replacement in Mumbai.', caseId: id(3000) }, { userId: id(2000), store, provider, caseAccess, tools: dependencies });
     expect(result.tasks.map((task) => task.tool)).toEqual(['search_hospitals', 'get_hospital']);
     expect(result.tasks.every((task) => task.status === 'completed')).toBe(true);
   });
@@ -195,7 +204,7 @@ describe('agent integration scenarios', () => {
       return planningCalls === 1 ? first : second;
     }) as LLMProvider['generateStructured'] };
     const store = new MemoryStore();
-    const result = await runAgent({ content: 'Find a hospital for knee replacement in Mumbai.' }, { userId: id(2000), store, provider, caseAccess, tools: dependencies });
+    const result = await runAgent({ content: 'Find a hospital for knee replacement in Mumbai.', caseId: id(3000) }, { userId: id(2000), store, provider, caseAccess, tools: dependencies });
     expect(result.status).toBe('completed');
     expect(result.agent).toBe('discovery');
     expect(result.tasks.map((task) => task.tool)).toEqual(['search_hospitals', 'get_hospital']);
@@ -231,12 +240,14 @@ describe('agent integration scenarios', () => {
     expect(operation.store.actions).toEqual([{ tool: 'search_doctors', status: 'failed' }]);
     expect(operation.store.runStatus).toBe('failed');
   });
-  it('retries invalid model plans and never executes them', async () => {
+  it('recovers from invalid model plans with a validated catalog search', async () => {
     const operation = run('Find doctors in India.', { agent: 'discovery', steps: [{ tool: 'create_case', input: '{}', objective: 'oops' }], understanding: 'x', missingInformation: null });
     const result = await operation.promise;
-    expect(result.status).toBe('failed');
+    expect(result.status).toBe('completed');
     expect(operation.provider.calls).toHaveLength(AGENT_LIMITS.maxPlanningAttempts);
-    expect(operation.store.actions).toHaveLength(0);
+    expect(operation.store.actions).toEqual([{ tool: 'search_doctors', status: 'completed' }]);
+    expect(result.summary).not.toMatch(/invalid action|schema error/i);
+    expect(operation.store.diagnostics).toMatchObject({ modelPlanError: 'PLAN_TOOL_DENIED', recoveryAttempted: true, recoveryResult: 'completed' });
   });
   it('rejects plans beyond the tool call limit', async () => {
     const operation = run('Find options.', plan('discovery', Array.from({ length: AGENT_LIMITS.maxToolCalls + 1 }, () => step('search_doctors', { query: 'doctors India' }))));
@@ -255,9 +266,98 @@ describe('agent integration scenarios', () => {
     const provider: LLMProvider = { generateStructured: (async (request: { purpose: string }) => request.purpose === 'plan'
       ? selected : { summary: 'This is the best hospital with a guaranteed outcome.', nextSteps: [], question: null }) as LLMProvider['generateStructured'] };
     const store = new MemoryStore();
-    const result = await runAgent({ content: 'Find a cardiologist in India.' }, { userId: id(2000), store, provider, caseAccess, tools: dependencies });
+    const result = await runAgent({ content: 'Find some care options.' }, { userId: id(2000), store, provider, caseAccess, tools: dependencies });
     expect(result.status).toBe('failed');
     expect(result.summary).not.toContain('best hospital');
     expect(store.runStatus).toBe('failed');
+  });
+});
+
+describe('discovery reliability', () => {
+  const catalog = { treatments: [treatment, brainTreatment, spinalTreatment], hospitals: [mumbai, istanbul],
+    doctors: [doctor], countries: [india, turkey], services: [service] };
+
+  it.each([
+    ['I need a heart doctor in Mumbai', 'Cardiology', 'Mumbai'],
+    ['Find cardiologists in Mumbai', 'Cardiology', 'Mumbai'],
+    ['Find cancer doctors in Mumbai', 'Oncology', 'Mumbai'],
+    ['Find hospitals in Pune', undefined, 'Pune'],
+  ])('normalizes %s', (query, specialty, city) => {
+    const normalized = QueryNormalizer.normalize(query, catalog);
+    expect(normalized.entities.specialty).toBe(specialty);
+    expect(normalized.entities.city).toBe(city);
+  });
+
+  it.each(['Find hospitals for underwater brain surgery in Mumbai', 'Underwater brain surgery in Mumbai'])
+  ('does not promote a broad brain-surgery alias into an underwater procedure match: %s', async (query) => {
+    const normalized = QueryNormalizer.normalize(query, catalog);
+    expect(normalized.entities.procedure).toBeUndefined();
+    expect(normalized.entities.relatedProcedure).toBe('brain-and-spine-surgery');
+    expect(normalized.entities.procedureMatchType).toBe('related');
+    const result = await searchService.search({ q: normalized.query, type: 'all', sort: 'relevance' });
+    expect(result.total).toBe(0);
+    const store = new MemoryStore();
+    const provider: LLMProvider = { generateStructured: (async () => ({ agent: 'discovery', understanding: 'x', missingInformation: null,
+      steps: [{ tool: 'search_hospitals', input: '{bad json', objective: 'Invalid' }] })) as LLMProvider['generateStructured'] };
+    const response = await runAgent({ content: normalized.query }, { userId: id(2000), store, provider, caseAccess, tools: dependencies });
+    expect(response.status).toBe('completed');
+    expect(response.findings.map((item) => item.title)).toEqual(['Brain & Spine Surgery']);
+    expect(response.findings[0].matchType).toBe('related');
+    expect(response.findings.every((item) => item.kind !== 'hospitals')).toBe(true);
+    expect(response.discovery?.matchType).toBe('none');
+    expect(response.summary).toMatch(/couldn't find an exact catalog match/i);
+    expect(response.summary).not.toMatch(/spinal fusion|invalid action/i);
+    expect(store.actions).toEqual([{ tool: 'search_treatments', status: 'completed' }, { tool: 'get_treatment', status: 'completed' }]);
+    expect(store.diagnostics).toMatchObject({ modelPlanError: 'PLAN_INPUT_INVALID', recoveryResult: 'completed' });
+  });
+
+  it.each(['Find me a hospital for surgery', 'Find a hospital'])('asks for the missing procedure in %s', async (query) => {
+    const operation = run(query, plan('discovery', []));
+    const response = await operation.promise;
+    expect(response.status).toBe('awaiting_user_input');
+    expect(response.question).toMatch(/surgery or procedure/i);
+    expect(operation.provider.calls).toEqual([]);
+  });
+
+  it('searches cardiology doctors in Mumbai without a locality question', async () => {
+    const operation = run('I need a heart doctor in Mumbai', plan('discovery', [
+      step('request_user_information', { question: 'Which Mumbai locality?' }),
+    ], 'Which Mumbai locality?'));
+    const response = await operation.promise;
+    expect(response.status).toBe('completed');
+    expect(response.question).toBeNull();
+    expect(response.findings.map((item) => item.title)).toEqual(['Demo Cardiologist']);
+    expect(response.findings[0].matchType).toBe('exact');
+    expect(operation.store.actions).toEqual([{ tool: 'search_doctors', status: 'completed' }]);
+  });
+
+  it('filters knee hospitals and packages by treatment and Mumbai', async () => {
+    const single = await run('Find knee replacement hospitals in Mumbai', plan('discovery', [])).promise;
+    expect(single.findings.map((item) => item.title)).toEqual(['Mumbai Demo Hospital']);
+    expect(single.findings[0].matchReason).toMatch(/explicitly linked/i);
+    const multiOperation = run('Find knee replacement hospitals in Mumbai and show me relevant packages', plan('discovery', []));
+    const multi = await multiOperation.promise;
+    expect(multiOperation.store.actions.map((item) => item.tool)).toEqual(['search_hospitals', 'search_packages']);
+    expect(multi.findings.map((item) => item.kind)).toEqual(['hospitals', 'packages']);
+    expect(multi.findings.every((item) => item.matchType === 'exact' && item.provenance.sourceKind === 'synthetic')).toBe(true);
+  });
+
+  it('returns honest zero results for Pune and for unsupported procedures', async () => {
+    const pune = await run('Find hospitals in Pune', plan('discovery', [])).promise;
+    expect(pune.findings).toEqual([]);
+    expect(pune.discovery?.matchType).toBe('none');
+    const unsupported = await run('Find hospitals for quantum transplant surgery in Mumbai', plan('discovery', [])).promise;
+    expect(unsupported.findings).toEqual([]);
+    expect(unsupported.summary).toMatch(/exact catalog match/i);
+  });
+
+  it('keeps basic catalog search available when the model is unavailable', async () => {
+    const provider: LLMProvider = { generateStructured: async () => { throw new AgentError('MODEL_UNAVAILABLE', 'AI unavailable'); } };
+    const store = new MemoryStore();
+    const response = await runAgent({ content: 'Find cardiologists in Mumbai' }, { userId: id(2000), store, provider, caseAccess, tools: dependencies });
+    expect(response.status).toBe('completed');
+    expect(response.findings.map((item) => item.title)).toEqual(['Demo Cardiologist']);
+    expect(response.discovery?.recovered).toBe(true);
+    expect(store.diagnostics).toMatchObject({ modelPlanError: 'MODEL_UNAVAILABLE', recoveryResult: 'completed' });
   });
 });

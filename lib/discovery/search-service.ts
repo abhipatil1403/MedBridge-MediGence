@@ -1,36 +1,29 @@
 import { catalogRepository } from "@/lib/catalog/repository";
-import type { CatalogKind, CatalogRepository, Country, Doctor, Hospital, Package, Service, Treatment } from "@/types/catalog";
+import type { CatalogKind, CatalogRepository, CatalogSnapshot, Country, Doctor, Hospital, Package, Service, Treatment } from "@/types/catalog";
 import type { DiscoveryFilters, DiscoveryResults, Matched, ParsedQuery, SearchSuggestion } from "@/types/discovery";
 import { QueryParser } from "./query-parser";
 import { SearchRankingService } from "./search-ranking-service";
 import { normalize } from "./normalize";
 
-interface CatalogSnapshot {
-  treatments: readonly Treatment[];
-  hospitals: readonly Hospital[];
-  doctors: readonly Doctor[];
-  packages: readonly Package[];
-  countries: readonly Country[];
-  services: readonly Service[];
-}
-
 async function loadCatalog(repository: CatalogRepository): Promise<CatalogSnapshot> {
-  const [treatments, hospitals, doctors, packages, countries, services] = await Promise.all([
+  if (repository.loadSnapshot) return repository.loadSnapshot();
+  const [treatments, hospitals, doctors, packages, countries, services, estimates] = await Promise.all([
     repository.listTreatments(), repository.listHospitals(), repository.listDoctors(),
-    repository.listPackages(), repository.listCountries(), repository.listServices(),
+    repository.listPackages(), repository.listCountries(), repository.listServices(), repository.listPriceEstimates(),
   ]);
-  return { treatments, hospitals, doctors, packages, countries, services };
+  return { treatments, hospitals, doctors, packages, countries, services, estimates };
 }
 
 function matched<T extends { name: string; slug: string; aliases: readonly string[] }>(
   kind: "treatments" | "hospitals" | "doctors" | "packages" | "countries" | "services",
   items: readonly T[], parsed: ParsedQuery,
-  details: (item: T) => { specialty?: string; country?: string; treatmentSlugs?: readonly string[]; searchText?: string } = () => ({}),
+  details: (item: T) => { specialty?: string; country?: string; city?: string; treatmentSlugs?: readonly string[]; searchText?: string } = () => ({}),
 ): Matched<T>[] {
   return items.map((item) => {
     const itemDetails = details(item);
-    return { item, score: SearchRankingService.score(kind, item, parsed, itemDetails), reason: SearchRankingService.reason(kind, parsed, itemDetails) };
-  }).filter((result) => result.score > 0);
+    return { item, score: SearchRankingService.score(kind, item, parsed, itemDetails),
+      reason: SearchRankingService.reason(kind, parsed, itemDetails), matchType: SearchRankingService.matchType(kind, item, parsed, itemDetails) };
+  }).filter((result) => result.score > 0 && result.matchType !== 'none') as Matched<T>[];
 }
 
 function resolvedCountry(parsed: ParsedQuery, filters: DiscoveryFilters): string | undefined {
@@ -42,7 +35,7 @@ export function searchTreatments(catalog: CatalogSnapshot, parsed: ParsedQuery, 
   const results = catalog.treatments.filter((item) =>
     (!filters.specialty || item.specialty === filters.specialty) &&
     (!country || item.countries.includes(country)) &&
-    (!filters.treatment || item.slug === filters.treatment),
+    (!(filters.treatment || parsed.entities.procedure) || item.slug === (filters.treatment || parsed.entities.procedure)),
   );
   return SearchRankingService.sort(matched("treatments", results, parsed, (item) => ({ specialty: item.specialty, treatmentSlugs: [item.slug], searchText: item.category })), filters.sort, (item, key) => key === "price" ? item.sampleBaseCostUsd : undefined);
 }
@@ -52,12 +45,12 @@ export function searchHospitals(catalog: CatalogSnapshot, parsed: ParsedQuery, f
   const city = filters.city || parsed.entities.city;
   const results = catalog.hospitals.filter((item) =>
     (!country || item.country === country) && (!city || normalize(item.city) === normalize(city)) &&
-    (!filters.specialty || item.specialties.includes(filters.specialty)) &&
+    (!(filters.specialty || (!parsed.entities.procedure && parsed.entities.specialty)) || item.specialties.includes(filters.specialty || parsed.entities.specialty!)) &&
     (!filters.accreditation || (filters.accreditation === "sample" ? item.sampleAccreditation === "Sample credential listed" : item.sampleAccreditation === "No sample credential")) &&
-    (!filters.treatment || item.treatmentSlugs.includes(filters.treatment)),
+    (!(filters.treatment || parsed.entities.procedure) || item.treatmentSlugs.includes(filters.treatment || parsed.entities.procedure!)),
   );
   return SearchRankingService.sort(matched("hospitals", results, parsed, (item) => ({
-    country: item.country, treatmentSlugs: item.treatmentSlugs, specialty: item.specialties.includes(parsed.entities.specialty ?? "") ? parsed.entities.specialty : undefined,
+    country: item.country, city: item.city, treatmentSlugs: item.treatmentSlugs, specialty: item.specialties.includes(parsed.entities.specialty ?? "") ? parsed.entities.specialty : undefined,
     searchText: item.treatmentSlugs.map((slug) => catalog.treatments.find((treatment) => treatment.slug === slug)?.name ?? "").join(" "),
   })), filters.sort, (item, key) => key === "location" ? `${item.country} ${item.city}` : undefined);
 }
@@ -65,26 +58,29 @@ export function searchHospitals(catalog: CatalogSnapshot, parsed: ParsedQuery, f
 export function searchDoctors(catalog: CatalogSnapshot, parsed: ParsedQuery, filters: DiscoveryFilters): Matched<Doctor>[] {
   const country = resolvedCountry(parsed, filters);
   const results = catalog.doctors.filter((item) =>
-    (!country || item.country === country) && (!filters.specialty || item.specialty === filters.specialty) &&
-    (!filters.city || normalize(item.city) === normalize(filters.city)) &&
+    (!country || item.country === country) && (!(filters.specialty || parsed.entities.specialty) || item.specialty === (filters.specialty || parsed.entities.specialty)) &&
+    (!(filters.city || parsed.entities.city) || normalize(item.city) === normalize(filters.city || parsed.entities.city!)) &&
     (!filters.hospital || item.hospitalSlug === filters.hospital) &&
     (!filters.mode || item.consultationMode === "both" || item.consultationMode === filters.mode) &&
-    (!filters.treatment || item.treatmentSlugs.includes(filters.treatment)),
+    (!(filters.treatment || parsed.entities.procedure) || item.treatmentSlugs.includes(filters.treatment || parsed.entities.procedure!)),
   );
   return SearchRankingService.sort(matched("doctors", results, parsed, (item) => ({
-    country: item.country, specialty: item.specialty, treatmentSlugs: item.treatmentSlugs,
+    country: item.country, city: item.city, specialty: item.specialty, treatmentSlugs: item.treatmentSlugs,
     searchText: item.treatmentSlugs.map((slug) => catalog.treatments.find((treatment) => treatment.slug === slug)?.name ?? "").join(" "),
   })), filters.sort, (item, key) => key === "experience" ? item.sampleExperienceYears : key === "location" ? `${item.country} ${item.city}` : undefined);
 }
 
 export function searchPackages(catalog: CatalogSnapshot, parsed: ParsedQuery, filters: DiscoveryFilters): Matched<Package>[] {
   const country = resolvedCountry(parsed, filters);
+  const city = filters.city || parsed.entities.city;
   const results = catalog.packages.filter((item) =>
-    (!country || item.country === country) && (!filters.treatment || item.treatmentSlug === filters.treatment) &&
+    (!country || item.country === country) && (!(filters.treatment || parsed.entities.procedure) || item.treatmentSlug === (filters.treatment || parsed.entities.procedure)) &&
+    (!filters.hospital || item.hospitalSlug === filters.hospital) &&
+    (!city || catalog.hospitals.some((hospital) => hospital.slug === item.hospitalSlug && normalize(hospital.city) === normalize(city))) &&
     (!filters.budget || item.samplePriceUsd <= filters.budget),
   );
   return SearchRankingService.sort(matched("packages", results, parsed, (item) => ({
-    country: item.country, treatmentSlugs: [item.treatmentSlug],
+    country: item.country, city: catalog.hospitals.find((hospital) => hospital.slug === item.hospitalSlug)?.city, treatmentSlugs: [item.treatmentSlug],
     searchText: catalog.treatments.find((treatment) => treatment.slug === item.treatmentSlug)?.name,
   })), filters.sort, (item, key) => key === "price" ? item.samplePriceUsd : undefined);
 }
@@ -108,7 +104,10 @@ export class SearchService {
   async search(filters: DiscoveryFilters): Promise<DiscoveryResults> {
     const catalog = await loadCatalog(this.repository);
     const understanding = QueryParser.parse(filters.q, catalog);
-    const shouldQueryDatabase = Boolean(understanding.tokens.length || understanding.entities.procedure || understanding.entities.specialty || understanding.entities.countries.length || understanding.entities.city || understanding.entities.service);
+    const unsupportedProcedure = Boolean(understanding.entities.procedurePhrase && ['related', 'none'].includes(understanding.entities.procedureMatchType ?? ''));
+    if (unsupportedProcedure) return { understanding, filters, sections: { treatments: [], hospitals: [], doctors: [], packages: [], countries: [], services: [] }, total: 0 };
+    const hasStructuredEntity = Boolean(understanding.entities.procedure || understanding.entities.specialty || understanding.entities.city || understanding.entities.country);
+    const shouldQueryDatabase = !hasStructuredEntity && Boolean(understanding.tokens.length || understanding.entities.service);
     const candidates = shouldQueryDatabase ? await this.repository.findCandidateSlugs(understanding) : undefined;
     const fromDatabase = <T extends { slug: string }>(kind: CatalogKind, results: Matched<T>[]): Matched<T>[] =>
       candidates ? results.filter(({ item }) => candidates[kind].has(item.slug)) : results;

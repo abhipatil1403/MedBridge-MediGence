@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizedDiscoveryQuerySchema } from '@/lib/discovery/query-normalizer';
 
 export const agentIdSchema = z.enum(['discovery', 'treatment_planning', 'hospital_matching', 'comparison']);
 export type AgentId = z.infer<typeof agentIdSchema>;
@@ -51,6 +52,8 @@ export interface Finding {
   detail: string;
   href?: string;
   facts: Record<string, string | number | null>;
+  matchType: 'exact' | 'related';
+  matchReason: string;
   provenance: Provenance;
 }
 
@@ -66,10 +69,21 @@ export interface ToolResult {
 const provenanceSchema = z.object({ kind: z.literal('catalog'), table: z.string(), recordId: z.guid(),
   sourceRecordId: z.guid().nullable(), label: z.string(), sourceKind: z.enum(['synthetic', 'external', 'first_party']), retrievedAt: z.iso.datetime() });
 const findingSchema = z.object({ kind: z.string(), slug: z.string().optional(), title: z.string(), detail: z.string(),
-  href: z.string().optional(), facts: z.record(z.string(), z.union([z.string(), z.number(), z.null()])), provenance: provenanceSchema });
+  href: z.string().optional(), facts: z.record(z.string(), z.union([z.string(), z.number(), z.null()])),
+  matchType: z.enum(['exact', 'related']), matchReason: z.string().min(1), provenance: provenanceSchema });
 export const toolResultSchema = z.object({ findings: z.array(findingSchema).max(30), note: z.string().optional(),
   comparison: z.record(z.string(), z.unknown()).optional(), caseContext: z.record(z.string(), z.unknown()).optional(),
   requestedInformation: z.string().optional(), approvalRequired: z.string().optional() });
+
+export const discoveryResultSchema = z.object({
+  query: z.string(), normalizedQuery: z.string(), intent: z.string(),
+  entities: normalizedDiscoveryQuerySchema.shape.entities,
+  results: z.array(findingSchema).max(30), relatedResults: z.array(findingSchema).max(10),
+  matchType: z.enum(['exact', 'related', 'none']), matchReason: z.string().min(1),
+  missingEntities: z.array(z.string()), sources: z.array(provenanceSchema),
+  nextActions: z.array(z.string()), recovered: z.boolean(),
+}).strict();
+export type DiscoveryResult = z.infer<typeof discoveryResultSchema>;
 
 export interface AgentTaskView {
   id: string;
@@ -92,6 +106,7 @@ export interface AgentResponse {
   nextSteps: string[];
   question: string | null;
   tasks: AgentTaskView[];
+  discovery?: { normalizedQuery: string; matchType: 'exact' | 'related' | 'none'; matchReason: string; recovered: boolean };
   approvalId?: string;
   approvalProposal?: { action: string; detail: string };
 }

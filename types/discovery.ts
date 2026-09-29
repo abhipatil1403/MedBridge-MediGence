@@ -10,6 +10,9 @@ export interface ParsedQuery {
   tokens: readonly string[];
   entities: {
     procedure?: string;
+    procedurePhrase?: string;
+    relatedProcedure?: string;
+    procedureMatchType?: 'exact' | 'related' | 'none' | 'unspecified';
     specialty?: string;
     condition?: string;
     country?: string;
@@ -37,6 +40,7 @@ export interface Matched<T> {
   item: T;
   score: number;
   reason: string;
+  matchType: 'exact' | 'related';
 }
 
 export interface DiscoveryResults {

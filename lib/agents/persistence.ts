@@ -77,7 +77,7 @@ export interface AgentStore {
   updateTask(taskId: string, status: AgentTaskView['status'], errorCode?: string, output?: ToolResult): Promise<void>;
   recordAction(runId: string, taskId: string, tool: ToolName, status: 'completed' | 'failed' | 'proposed', durationMs: number, input: unknown, output?: ToolResult, errorCode?: string): Promise<string | undefined>;
   saveOutput(runId: string, response: AgentResponse): Promise<void>;
-  finishRun(runId: string, status: AgentResponse['status'], errorCode?: string): Promise<void>;
+  finishRun(runId: string, status: AgentResponse['status'], errorCode?: string, diagnostics?: Record<string, string | boolean | null>): Promise<void>;
 }
 
 export class SupabaseAgentStore implements AgentStore {
@@ -147,8 +147,8 @@ export class SupabaseAgentStore implements AgentStore {
     });
     if (error) throw new AgentError('DATABASE_FAILURE', 'The assistant result could not be saved.');
   }
-  async finishRun(runId: string, status: AgentResponse['status'], errorCode?: string) {
-    const { error } = await this.admin.from('agent_runs').update({ status, finished_at: new Date().toISOString(), metadata: errorCode ? { errorCode } : {} }).eq('id', runId);
+  async finishRun(runId: string, status: AgentResponse['status'], errorCode?: string, diagnostics?: Record<string, string | boolean | null>) {
+    const { error } = await this.admin.from('agent_runs').update({ status, finished_at: new Date().toISOString(), metadata: { ...diagnostics, ...(errorCode ? { errorCode } : {}) } }).eq('id', runId);
     if (error) throw new AgentError('DATABASE_FAILURE', 'The agent run could not be finalized.');
     console.info(JSON.stringify({ event: 'agent_run_finished', runId, status, errorCode }));
   }

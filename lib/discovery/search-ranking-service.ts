@@ -9,30 +9,42 @@ const intentKinds: Record<ParsedQuery["intent"], CatalogKind | null> = {
 };
 
 export const SearchRankingService = {
-  score(kind: CatalogKind, item: { name: string; slug: string; aliases: readonly string[] }, parsed: ParsedQuery, details: { specialty?: string; country?: string; treatmentSlugs?: readonly string[]; searchText?: string } = {}): number {
+  score(kind: CatalogKind, item: { name: string; slug: string; aliases: readonly string[] }, parsed: ParsedQuery, details: { specialty?: string; country?: string; city?: string; treatmentSlugs?: readonly string[]; searchText?: string } = {}): number {
     if (!parsed.query) return 1;
     const title = normalize(item.name);
     const fullText = normalize([item.name, ...item.aliases, details.specialty ?? "", details.country ?? "", details.searchText ?? ""].join(" "));
     let score = 0;
-    if (title === normalize(parsed.query)) score += 20;
-    if (item.aliases.some((alias) => normalize(alias) === normalize(parsed.query))) score += 16;
+    if (title === normalize(parsed.query)) score += 60;
+    if (item.aliases.some((alias) => normalize(alias) === normalize(parsed.query))) score += 50;
     for (const token of parsed.tokens) {
       if (` ${title} `.includes(` ${token} `)) score += 5;
       else if (` ${fullText} `.includes(` ${token} `)) score += 2;
     }
-    if (parsed.entities.procedure && (item.slug === parsed.entities.procedure || details.treatmentSlugs?.includes(parsed.entities.procedure))) score += 12;
-    if (parsed.entities.specialty && details.specialty === parsed.entities.specialty) score += 4;
-    if (parsed.entities.countries.includes(details.country ?? "")) score += 3;
+    if (parsed.entities.procedure && (item.slug === parsed.entities.procedure || details.treatmentSlugs?.includes(parsed.entities.procedure))) score += 120;
+    if (parsed.entities.specialty && details.specialty === parsed.entities.specialty) score += 80;
+    if (parsed.entities.city && normalize(details.city ?? '') === normalize(parsed.entities.city)) score += 60;
+    if (parsed.entities.countries.includes(details.country ?? "")) score += 30;
     if (parsed.entities.service && item.slug === parsed.entities.service) score += 12;
     if (intentKinds[parsed.intent] === kind && (score > 0 || parsed.tokens.length === 0)) score += 3;
     return score;
   },
 
-  reason(kind: CatalogKind, parsed: ParsedQuery, details: { country?: string; treatmentSlugs?: readonly string[]; specialty?: string } = {}): string {
+  matchType(kind: CatalogKind, item: { slug: string; name: string; aliases: readonly string[] }, parsed: ParsedQuery,
+    details: { country?: string; city?: string; treatmentSlugs?: readonly string[]; specialty?: string } = {}): 'exact' | 'related' | 'none' {
+    if (parsed.entities.procedure) return item.slug === parsed.entities.procedure || details.treatmentSlugs?.includes(parsed.entities.procedure) ? 'exact' : 'none';
+    if (parsed.entities.specialty && details.specialty === parsed.entities.specialty) return 'exact';
+    if (parsed.entities.city && normalize(details.city ?? '') === normalize(parsed.entities.city)) return 'exact';
+    if (parsed.entities.country && details.country === parsed.entities.country) return 'exact';
+    if ([item.name, ...item.aliases].some((value) => normalize(value) === normalize(parsed.query))) return 'exact';
+    return 'related';
+  },
+
+  reason(kind: CatalogKind, parsed: ParsedQuery, details: { country?: string; city?: string; treatmentSlugs?: readonly string[]; specialty?: string } = {}): string {
     if (!parsed.query) return "Browse this sample record.";
-    if (parsed.entities.procedure && details.treatmentSlugs?.includes(parsed.entities.procedure)) return "Related to the treatment in your search.";
-    if (parsed.entities.procedure && kind === "treatments") return "Matches the treatment in your search.";
+    if (parsed.entities.procedure && details.treatmentSlugs?.includes(parsed.entities.procedure)) return "Explicitly linked to the requested catalog treatment.";
+    if (parsed.entities.procedure && kind === "treatments") return "The requested catalog treatment or approved alias.";
     if (parsed.entities.specialty && details.specialty === parsed.entities.specialty) return `Matches ${parsed.entities.specialty.toLowerCase()} in your search.`;
+    if (details.city && parsed.entities.city && normalize(details.city) === normalize(parsed.entities.city)) return `Located in ${details.city}.`;
     if (details.country && parsed.entities.countries.includes(details.country)) return "Matches the destination in your search.";
     if (kind === "services") return "Matches the care service in your search.";
     return "Matches terms in your search.";

@@ -7,12 +7,15 @@ import { CloudflareProvider } from '@/lib/agents/cloudflare-provider';
 import { runAgent } from '@/lib/agents/runtime';
 import { createAdminClient, createUserClient, SupabaseAgentStore, SupabaseCaseAccess, verifyUser } from '@/lib/agents/persistence';
 import { executeTool } from '@/lib/agents/tools';
+import { discoveryRoute } from '@/lib/agents/discovery-routing';
+import { catalogRepository } from '@/lib/catalog/repository';
 import type { AgentStore } from '@/lib/agents/persistence';
 import { toolResultSchema, type AgentResponse } from '@/lib/agents/schemas';
 
 const ready = Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN
   && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 const persistenceReady = Boolean(ready && process.env.SUPABASE_SECRET_KEY && process.env.RUN_REMOTE_PERSISTENCE_TEST === '1');
+const discoveryLiveReady = Boolean(ready && process.env.RUN_DISCOVERY_LIVE === '1');
 const id = (number: number) => `00000000-0000-4000-8000-${String(number).padStart(12, '0')}`;
 
 class LiveStore implements AgentStore {
@@ -142,3 +145,41 @@ it.skipIf(!persistenceReady)('persists a real model and tool run to the remote S
     await admin.auth.admin.deleteUser(userId);
   }
 }, 180000);
+
+const discoveryScenarios = [
+  { query: 'Find hospitals for underwater brain surgery in Mumbai', status: 'completed', tools: ['search_treatments', 'get_treatment'], kinds: [] },
+  { query: 'Find me a hospital for surgery', status: 'awaiting_user_input', tools: [], kinds: [] },
+  { query: 'I need a heart doctor in Mumbai', status: 'completed', tools: ['search_doctors'], kinds: ['doctors'] },
+  { query: 'Find knee replacement hospitals in Mumbai', status: 'completed', tools: ['search_hospitals'], kinds: ['hospitals'] },
+  { query: 'Find knee replacement hospitals in Mumbai and show me relevant packages', status: 'completed', tools: ['search_hospitals', 'search_packages'], kinds: ['hospitals', 'packages'] },
+  { query: 'Find cardiologists in Mumbai', status: 'completed', tools: ['search_doctors'], kinds: ['doctors'] },
+  { query: 'Find cancer doctors in Mumbai', status: 'completed', tools: ['search_doctors'], kinds: [] },
+  { query: 'Find hospitals in Pune', status: 'completed', tools: ['search_hospitals'], kinds: [] },
+] as const;
+
+it.skipIf(!discoveryLiveReady)('loads one remote catalog interpretation', async () => {
+  const route = await discoveryRoute('I need a heart doctor in Mumbai', catalogRepository);
+  expect(route?.normalized.entities).toMatchObject({ specialty: 'Cardiology', city: 'Mumbai' });
+}, 60000);
+
+for (const scenario of discoveryScenarios) {
+  it.skipIf(!discoveryLiveReady)(`live discovery reliability: ${scenario.query}`, async () => {
+    const store = new LiveStore();
+    const response = await runAgent({ content: scenario.query }, {
+      userId: id(3), store, provider: new CloudflareProvider(),
+      caseAccess: { readContext: async () => { throw new Error('case access denied'); }, readDocumentMetadata: async () => [] },
+    });
+    expect(response.status, JSON.stringify({ summary: response.summary, tasks: response.tasks })).toBe(scenario.status);
+    expect(response.tasks.map((task) => task.tool)).toEqual(scenario.tools);
+    for (const kind of scenario.kinds) expect(response.findings.some((finding) => finding.kind === kind)).toBe(true);
+    expect(response.summary).not.toMatch(/invalid action|schema error|cloudflare error/i);
+    if (scenario.query.includes('underwater')) {
+      expect(response.discovery?.matchType).toBe('none');
+      expect(response.findings.every((finding) => finding.kind === 'treatments' && finding.matchType === 'related')).toBe(true);
+    }
+    if (scenario.query.includes('heart doctor') || scenario.query.includes('cardiologists')) {
+      expect(response.question).toBeNull();
+      expect(response.findings.every((finding) => finding.facts.city === 'Mumbai' && finding.facts.specialty === 'Cardiology')).toBe(true);
+    }
+  }, 180000);
+}

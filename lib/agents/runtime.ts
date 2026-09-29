@@ -1,7 +1,9 @@
 import type { LLMProvider } from '@/lib/ai/contracts';
+import { ZodError } from 'zod';
 import { AgentError } from './errors';
+import { discoveryRoute, routeToolDependencies, type DiscoveryRoute } from './discovery-routing';
 import { agents } from './registry';
-import { planSchema, synthesisSchema, toolResultSchema, userRequestSchema, type AgentPlan, type AgentResponse, type AgentTaskView, type Finding, type ToolResult } from './schemas';
+import { discoveryResultSchema, planSchema, synthesisSchema, toolResultSchema, userRequestSchema, type AgentPlan, type AgentResponse, type AgentTaskView, type Finding, type ToolResult } from './schemas';
 import { executeTool, type CaseAccess, type ToolDependencies, defaultToolDependencies, toolDescriptions, toolSchemas } from './tools';
 import type { AgentStore } from './persistence';
 
@@ -50,9 +52,10 @@ function safetyPlan(content: string): AgentPlan | undefined {
   return undefined;
 }
 
-async function planRequest(provider: LLMProvider, content: string, caseContext?: Record<string, unknown>, followUp?: { agent: AgentPlan['agent']; findings: Finding[]; usedTools: string[] }): Promise<AgentPlan> {
+async function planRequest(provider: LLMProvider, content: string, caseContext?: Record<string, unknown>,
+  followUp?: { agent: AgentPlan['agent']; findings: Finding[]; usedTools: string[] }, onValidationError?: (failure: AgentError) => void): Promise<AgentPlan> {
   const definitions = Object.values(agents).map(({ id, purpose, allowedTools, safety }) => ({ id, purpose, allowedTools, safety }));
-  const system = `You are MedBridge's non-clinical care coordination planner. Select exactly one agent and up to ${AGENT_LIMITS.maxToolCalls} executable tools. Each tool input must follow its schema. Never diagnose, prescribe, rank by unverified quality, or invent data. The catalog is synthetic/demo until verified. Ask at most one necessary question. Do not ask for medical documents. Do not request external actions except through request_external_action. ${followUp ? `This is iteration two. Keep agent ${followUp.agent}, choose only genuinely needed new tools using returned catalog slugs, or return no steps. Do not repeat a call.` : ''} Agent definitions: ${JSON.stringify(definitions)}. Tool descriptions: ${JSON.stringify(toolDescriptions)}. Tool input JSON schemas: ${JSON.stringify(Object.fromEntries(Object.entries(toolSchemas).map(([name, schema]) => [name, schema.toJSONSchema()])))}.`;
+  const system = `You are MedBridge's non-clinical care coordination planner. Select one agent and up to ${AGENT_LIMITS.maxToolCalls} allowed tools. Never invent catalog entities or treat a related procedure as an exact match. A hospital offers a procedure only when a tool confirms an explicit treatment link. Do not ask for a locality when a city is supplied, or for a budget unless required. Ask only for genuinely missing information. Never diagnose, prescribe, invent prices or availability, or expose tool errors. The catalog contains synthetic/demo records. ${followUp ? `This is iteration two. Keep agent ${followUp.agent}; use only needed new tools with returned slugs.` : ''} Agent definitions: ${JSON.stringify(definitions)}. Tool descriptions: ${JSON.stringify(toolDescriptions)}. Tool input JSON schemas: ${JSON.stringify(Object.fromEntries(Object.entries(toolSchemas).map(([name, schema]) => [name, schema.toJSONSchema()])))}.`;
   let lastError: unknown;
   for (let attempt = 0; attempt < AGENT_LIMITS.maxPlanningAttempts; attempt++) {
     try {
@@ -62,7 +65,10 @@ async function planRequest(provider: LLMProvider, content: string, caseContext?:
             findings: followUp.findings.map(({ kind, slug, title, facts }) => ({ kind, slug, title, facts })) } : undefined,
           correction: attempt ? 'Previous plan was invalid. Use only tools allowed for the selected agent and valid inputs.' : undefined }),
         schema: planSchema, maxOutputTokens: 1300, timeoutMs: AGENT_LIMITS.modelTimeoutMs });
-      const generated = planSchema.parse(raw);
+      const parsed = planSchema.safeParse(raw);
+      if (!parsed.success) throw new AgentError('PLAN_SCHEMA_INVALID', 'The assistant could not prepare a reliable search.',
+        parsed.error.issues.map((issue) => `${issue.path.join('.')}:${issue.code}`).join(','));
+      const generated = parsed.data;
       // The selected agent is fixed for a run. A later model turn may suggest a
       // different specialist, but only the original agent's allowlist can execute.
       const hasCatalogRead = generated.steps.some((step) => step.tool.startsWith('search_') || step.tool.startsWith('get_'));
@@ -71,13 +77,39 @@ async function planRequest(provider: LLMProvider, content: string, caseContext?:
       if (plan.steps.some((step) => !agents[plan.agent].allowedTools.includes(step.tool))) throw new AgentError('PLAN_TOOL_DENIED', 'The assistant selected an unavailable action.');
       for (const step of plan.steps) {
         let input: unknown;
-        try { input = JSON.parse(step.input); } catch { throw new AgentError('PLAN_INPUT_INVALID', 'The assistant prepared an invalid action.'); }
-        if (!toolSchemas[step.tool].safeParse(input).success) throw new AgentError('PLAN_INPUT_INVALID', 'The assistant prepared an invalid action.');
+        try { input = JSON.parse(step.input); } catch { throw new AgentError('PLAN_INPUT_INVALID', 'The assistant could not prepare a reliable search.', `${step.tool}:invalid_json`); }
+        const validated = toolSchemas[step.tool].safeParse(input);
+        if (!validated.success) throw new AgentError('PLAN_INPUT_INVALID', 'The assistant could not prepare a reliable search.',
+          `${step.tool}:${validated.error.issues.map((issue) => `${issue.path.join('.')}:${issue.code}`).join(',')}`);
       }
       return plan;
-    } catch (error) { lastError = error; }
+    } catch (error) {
+      lastError = error;
+      if (error instanceof AgentError && error.code.startsWith('PLAN_')) onValidationError?.(error);
+      if (error instanceof AgentError && ['MODEL_AUTH_FAILURE', 'MODEL_RATE_LIMIT', 'MODEL_TIMEOUT', 'MODEL_UNAVAILABLE'].includes(error.code)) break;
+    }
   }
-  throw publicFailure(lastError);
+  throw lastError instanceof ZodError ? new AgentError('PLAN_SCHEMA_INVALID', 'The assistant could not prepare a reliable search.') : publicFailure(lastError);
+}
+
+function discoverySummary(route: DiscoveryRoute, findings: readonly Finding[]) {
+  const { entities, missingEntities } = route.normalized;
+  if (missingEntities.length) return { summary: 'I need the specific procedure before searching hospital options.',
+    nextSteps: ['Tell me the surgery or procedure you want to explore.'] };
+  if (entities.procedurePhrase && ['related', 'none'].includes(entities.procedureMatchType)) {
+    return { summary: `I couldn't find an exact catalog match for “${entities.procedurePhrase}”. I won't list hospitals or packages as providers of that procedure.`,
+      nextSteps: ['Try a broader catalog term as a separate search, or ask a clinician which procedure name to use.'] };
+  }
+  if (!findings.length) {
+    const subject = route.normalized.targets.includes('doctors') && entities.specialty
+      ? `${entities.specialty.toLowerCase()} doctors` : route.normalized.targets.join(' or ') || 'catalog records';
+    const place = entities.city ? ` in ${entities.city}` : entities.country ? ` in ${entities.country}` : '';
+    return { summary: `I couldn't find ${subject}${place} that meet your criteria in the current MedBridge catalog. No provider has been shown as a match.`,
+    nextSteps: ['Try a broader location or treatment term.'] };
+  }
+  const demo = findings.some((item) => item.provenance.sourceKind === 'synthetic');
+  return { summary: `I found ${findings.length} catalog ${findings.length === 1 ? 'record' : 'records'} matching your stated criteria.${demo ? ' Demo records are not live provider information.' : ''}`,
+    nextSteps: ['Review the sourced records and their exact match reasons.'] };
 }
 
 export async function runAgent(rawRequest: unknown, context: RuntimeContext): Promise<AgentResponse> {
@@ -89,19 +121,49 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
   await context.store.addMessage(conversationId, 'user', request.content);
 
   const clinical = clinicalPattern.test(request.content);
+  let route: DiscoveryRoute | undefined;
+  const diagnostics: Record<string, string | boolean | null> = {};
   let plan: AgentPlan;
   try {
     if (clinical) plan = { agent: 'discovery', understanding: 'This request may need clinical assessment.', steps: [], missingInformation: null };
-    else plan = safetyPlan(request.content) ?? await planRequest(context.provider, request.content, caseContext);
+    else {
+      const guarded = safetyPlan(request.content);
+      if (guarded) plan = guarded;
+      else {
+        route = request.caseId ? undefined : await discoveryRoute(request.content, context.tools?.repository ?? defaultToolDependencies.repository);
+        if (route) {
+          plan = route.plan;
+          diagnostics.discoveryRouting = 'catalog';
+          if (!route.normalized.missingEntities.length) {
+            try {
+              const suggested = await planRequest(context.provider, request.content, caseContext, undefined, (failure) => {
+                diagnostics.modelPlanError = failure.code;
+                diagnostics.validationError = typeof failure.cause === 'string' ? failure.cause.slice(0, 300) : null;
+                diagnostics.recoveryAttempted = true;
+              });
+              if (suggested.agent !== route.plan.agent || JSON.stringify(suggested.steps) !== JSON.stringify(route.plan.steps)) {
+                diagnostics.modelPlanError ??= 'PLAN_RELEVANCE_OVERRIDE';
+                diagnostics.recoveryAttempted = true;
+              }
+            } catch (error) {
+              const failure = publicFailure(error);
+              diagnostics.modelPlanError = failure.code;
+              diagnostics.validationError = typeof failure.cause === 'string' ? failure.cause.slice(0, 300) : null;
+              diagnostics.recoveryAttempted = true;
+            }
+          }
+        } else plan = await planRequest(context.provider, request.content, caseContext);
+      }
+    }
   } catch (error) {
     const failure = publicFailure(error);
     const failedRunId = await context.store.startRun(conversationId, context.userId, 'discovery', request.caseId);
     const failedResponse: AgentResponse = { conversationId, runId: failedRunId, agent: 'discovery', status: 'failed',
-      understanding: 'The request could not be planned safely.', summary: failure.publicMessage, findings: [],
-      nextSteps: ['Try rephrasing your request.'], question: null, tasks: [] };
+      understanding: 'The request could not be planned safely.', summary: 'I couldn’t complete this search. Please try a more specific catalog request.', findings: [],
+      nextSteps: ['Try again with a treatment, specialty, or location.'], question: null, tasks: [] };
     await context.store.saveOutput(failedRunId, failedResponse);
     await context.store.addMessage(conversationId, 'assistant', failedResponse.summary, failedRunId, { response: failedResponse });
-    await context.store.finishRun(failedRunId, 'failed', failure.code);
+    await context.store.finishRun(failedRunId, 'failed', failure.code, diagnostics);
     return failedResponse;
   }
 
@@ -126,6 +188,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
       return response;
     }
     let activePlan = plan;
+    const dependencies = route ? routeToolDependencies(route, context.tools ?? defaultToolDependencies) : context.tools ?? defaultToolDependencies;
     const used = new Set<string>();
     for (let iteration = 0; iteration < AGENT_LIMITS.maxPlanIterations; iteration++) {
       const steps = activePlan.steps.slice(0, AGENT_LIMITS.maxToolCalls - tasks.length)
@@ -145,9 +208,13 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
         const toolStarted = Date.now();
         try {
           const input = JSON.parse(step.input);
-          const result = toolResultSchema.parse(await boundedTool(executeTool(step.tool, input, {
+          const rawResult = await boundedTool(executeTool(step.tool, input, {
             agent: plan.agent, userId: context.userId, caseId: request.caseId, caseAccess: context.caseAccess,
-          }, context.tools ?? defaultToolDependencies)));
+          }, dependencies));
+          const result = toolResultSchema.parse(route?.normalized.entities.relatedProcedure && step.tool === 'get_treatment'
+            ? { ...rawResult, findings: rawResult.findings.map((item) => ({ ...item, matchType: 'related' as const,
+              matchReason: 'A broader catalog topic only; it does not confirm the requested procedure or any provider.' })) }
+            : rawResult);
           const duration = Date.now() - toolStarted;
           results.push({ tool: step.tool, result });
           findings.push(...result.findings);
@@ -173,7 +240,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
       }
       if (status !== 'completed') break;
       if (activePlan.missingInformation && findings.length === 0) { status = 'awaiting_user_input'; question = activePlan.missingInformation; break; }
-      if (iteration + 1 >= AGENT_LIMITS.maxPlanIterations || tasks.length >= AGENT_LIMITS.maxToolCalls || findings.length === 0) break;
+      if (route || iteration + 1 >= AGENT_LIMITS.maxPlanIterations || tasks.length >= AGENT_LIMITS.maxToolCalls || findings.length === 0) break;
       activePlan = await planRequest(context.provider, request.content, caseContext, {
         agent: plan.agent, findings, usedTools: results.map((item) => item.tool),
       });
@@ -191,7 +258,11 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
     let summary: string;
     let nextSteps: string[];
     if (approval) { summary = approval; nextSteps = ['Review the proposed action below. No change happens until you approve.']; }
-    else {
+    else if (route) {
+      const result = discoverySummary(route, findings);
+      summary = result.summary; nextSteps = result.nextSteps;
+      if (route.normalized.missingEntities.length) { status = 'awaiting_user_input'; question = plan.missingInformation; }
+    } else {
       const synthesis = synthesisSchema.parse(await context.provider.generateStructured({
         purpose: 'synthesis', schema: synthesisSchema, maxOutputTokens: 550, timeoutMs: AGENT_LIMITS.modelTimeoutMs,
         system: `You are ${agents[plan.agent].name}. ${agents[plan.agent].safety} Write a concise coordination summary. All provider and cost facts appear in separate trusted cards; do not repeat names, numbers, prices, credentials, or medical claims in your summary. Use only the tool results. If no results, say what information is missing. Do not say any action was completed unless a tool completed it.`,
@@ -204,11 +275,25 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
       if (synthesis.question && !question && findings.length === 0) { question = synthesis.question; status = 'awaiting_user_input'; }
     }
     const unique = [...new Map(findings.map((item) => [item.provenance.recordId, item])).values()];
+    const unsupportedProcedure = Boolean(route?.normalized.entities.procedurePhrase && ['related', 'none'].includes(route.normalized.entities.procedureMatchType));
+    const discoveryResult = route ? discoveryResultSchema.parse({
+      query: request.content, normalizedQuery: route.normalized.normalizedQuery, intent: route.normalized.intent,
+      entities: route.normalized.entities, results: unique, relatedResults: unique.filter((item) => item.matchType === 'related'),
+      matchType: unsupportedProcedure ? 'none' : unique.some((item) => item.matchType === 'exact') ? 'exact' : unique.some((item) => item.matchType === 'related') ? 'related' : 'none',
+      matchReason: route.normalized.missingEntities.length ? 'A required procedure is missing from the request.'
+        : !unique.length && route.normalized.entities.procedure ? 'The treatment is in the catalog, but no provider met all search criteria.'
+          : route.normalized.matchReason,
+      missingEntities: route.normalized.missingEntities,
+      sources: unique.map((item) => item.provenance), nextActions: nextSteps, recovered: Boolean(diagnostics.recoveryAttempted),
+    }) : undefined;
+    const discovery = discoveryResult ? { normalizedQuery: discoveryResult.normalizedQuery, matchType: discoveryResult.matchType,
+      matchReason: discoveryResult.matchReason, recovered: discoveryResult.recovered } : undefined;
     const response: AgentResponse = { conversationId, runId, agent: plan.agent, status, understanding: plan.understanding,
-      summary, findings: unique, nextSteps, question, tasks, approvalId, approvalProposal };
+      summary, findings: unique, nextSteps, question, tasks, approvalId, approvalProposal, discovery };
+    if (diagnostics.recoveryAttempted) diagnostics.recoveryResult = status === 'completed' ? 'completed' : status;
     await context.store.saveOutput(runId, response);
     await context.store.addMessage(conversationId, 'assistant', summary, runId, { response });
-    await context.store.finishRun(runId, status);
+    await context.store.finishRun(runId, status, undefined, diagnostics);
     return response;
   } catch (error) {
     const failure = publicFailure(error);
@@ -217,7 +302,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
       understanding: plan.understanding, summary: failure.publicMessage, findings, nextSteps: ['Try again or narrow the request.'], question: null, tasks };
     await context.store.saveOutput(runId, failedResponse);
     await context.store.addMessage(conversationId, 'assistant', failedResponse.summary, runId, { response: failedResponse });
-    await context.store.finishRun(runId, 'failed', failure.code);
+    await context.store.finishRun(runId, 'failed', failure.code, { ...diagnostics, ...(diagnostics.recoveryAttempted ? { recoveryResult: 'failed' } : {}) });
     return failedResponse;
   }
 }

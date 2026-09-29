@@ -91,7 +91,18 @@ export interface PriceEstimate {
 
 export type CatalogCandidates = Readonly<Record<CatalogKind, ReadonlySet<string>>>;
 
+export interface CatalogSnapshot {
+  treatments: readonly Treatment[];
+  hospitals: readonly Hospital[];
+  doctors: readonly Doctor[];
+  packages: readonly Package[];
+  countries: readonly Country[];
+  services: readonly Service[];
+  estimates: readonly PriceEstimate[];
+}
+
 export interface CatalogRepository {
+  loadSnapshot?(): Promise<CatalogSnapshot>;
   listTreatments(): Promise<readonly Treatment[]>;
   listHospitals(): Promise<readonly Hospital[]>;
   listDoctors(): Promise<readonly Doctor[]>;

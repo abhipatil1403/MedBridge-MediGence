@@ -35,6 +35,10 @@
 .assistant-response > div > small { display: block; margin-bottom: 7px; color: var(--teal); font-size: 10px; font-weight: 800; letter-spacing: .08em; }
 .assistant-response ul { margin: 0; padding-left: 19px; line-height: 1.6; }
 .assistant-response__question { padding: 15px; background: #f0f5e9; }
+.assistant-match-state { padding: 12px 15px; border-left: 3px solid var(--teal); background: #f4f7f1; }
+.assistant-match-state strong { display: block; font-size: 13px; }
+.assistant-match-state p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.assistant-match-reason { font-size: 12px; color: var(--teal); }
 .assistant-recovery { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; font-size: 12px; }
 .assistant-recovery button { border: 1px solid #719184; background: var(--deep); color: white; padding: 9px 12px; cursor: pointer; font: inherit; }
 .assistant-recovery a { color: var(--teal); text-decoration: underline; }

@@ -147,6 +147,7 @@ const loadSnapshot = cache(async () => {
 });
 
 export const catalogRepository: CatalogRepository = {
+  async loadSnapshot() { return loadSnapshot(); },
   async listTreatments() { return (await loadSnapshot()).treatments; },
   async listHospitals() { return (await loadSnapshot()).hospitals; },
   async listDoctors() { return (await loadSnapshot()).doctors; },

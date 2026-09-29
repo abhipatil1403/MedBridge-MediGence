@@ -108,7 +108,7 @@ const tableLists = {
 } as const;
 const hrefKinds: Record<string, string> = { treatments: 'treatments', hospitals: 'hospitals', doctors: 'doctors', packages: 'packages' };
 
-function toFinding(kind: string, record: CatalogRecord): Finding {
+function toFinding(kind: string, record: CatalogRecord, matchType: Finding['matchType'] = 'exact', matchReason = 'Selected catalog record.'): Finding {
   const facts: Record<string, string | number | null> = {};
   const item = record as unknown as Record<string, unknown>;
   for (const key of ['city', 'country', 'specialty', 'hospitalName', 'samplePriceUsd', 'sampleBaseCostUsd', 'durationDays', 'verification', 'travelNote', 'consultationMode']) {
@@ -123,7 +123,7 @@ function toFinding(kind: string, record: CatalogRecord): Finding {
   return {
     kind, slug: record.slug, title: record.name, detail: record.description,
     href: hrefKinds[kind] ? `/${hrefKinds[kind]}/${record.slug}` : undefined,
-    facts,
+    facts, matchType, matchReason,
     provenance: { kind: 'catalog', table: kind === 'services' ? 'healthcare_services' : kind,
       recordId: record.recordId, sourceRecordId: record.sourceRecordId, label: 'MedBridge catalog',
       sourceKind: record.sourceKind, retrievedAt: new Date().toISOString() },
@@ -146,7 +146,8 @@ export async function executeTool(name: ToolName, rawInput: unknown, context: To
     const result = await dependencies.search(input.query, kind, { country: input.country, city: input.city, treatment: input.treatment, specialty: input.specialty,
       hospital: input.hospital, mode: input.mode as DiscoveryFilters['mode'] });
     const matches = result.sections[kind].filter(({ item }) => !input.verification || (input.verification === 'demo' ? item.sourceKind === 'synthetic' : item.sourceKind !== 'synthetic'));
-    return { findings: matches.slice(0, 5).map(({item}) => toFinding(kind, item)), note: matches.length === 0 ? 'No matching catalog records were found.' : undefined };
+    return { findings: matches.slice(0, 5).map(({item, matchType, reason}) => toFinding(kind, item, matchType, reason)),
+      note: matches.length === 0 ? 'No matching catalog records were found.' : undefined };
   }
   if (name in getKinds) {
     const kind = getKinds[name as keyof typeof getKinds];
@@ -165,6 +166,7 @@ export async function executeTool(name: ToolName, rawInput: unknown, context: To
       kind: 'price_estimates', title: `${comparison.treatment.name} in ${side.country.name} — estimate`,
       detail: 'Indicative catalog range in USD; request a provider quote for current, patient-specific pricing.',
       facts: { estimatedMinUsd: side.estimate.estimatedMinUsd, estimatedMaxUsd: side.estimate.estimatedMaxUsd },
+      matchType: 'related', matchReason: 'Catalog estimate associated with the selected treatment and country.',
       provenance: { kind: 'catalog' as const, table: 'price_estimates', recordId: side.estimate.recordId,
         sourceRecordId: side.estimate.sourceRecordId, label: 'MedBridge catalog estimate',
         sourceKind: side.estimate.sourceKind, retrievedAt: new Date().toISOString() },
