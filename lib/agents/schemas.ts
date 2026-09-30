@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { normalizedDiscoveryQuerySchema } from '@/lib/discovery/query-normalizer';
+import { referenceContextSchema, referenceResolutionSchema, type ReferenceContext, type ReferenceResolution } from '@/lib/conversation/schemas';
 
 export const agentIdSchema = z.enum(['discovery', 'treatment_planning', 'hospital_matching', 'comparison']);
 export type AgentId = z.infer<typeof agentIdSchema>;
@@ -159,6 +160,8 @@ export interface AgentTaskView {
 }
 
 export interface AgentResponse {
+  referenceContext?: ReferenceContext;
+  referenceResolution?: ReferenceResolution;
   conversationId: string;
   runId: string;
   agent: AgentId;
@@ -182,6 +185,7 @@ export interface AgentResponse {
 }
 
 export const assistantResponseSchema = z.object({
+  referenceContext: referenceContextSchema.optional(), referenceResolution: referenceResolutionSchema.optional(),
   conversationId: z.uuid(), runId: z.uuid(), agent: agentIdSchema,
   status: z.enum(['completed', 'awaiting_user_input', 'awaiting_approval', 'failed']),
   understanding: z.string().max(600), summary: z.string().max(1600), findings: z.array(findingSchema).max(30),

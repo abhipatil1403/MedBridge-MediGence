@@ -3,13 +3,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Json } from '@/types/database';
 import { AgentError } from '../errors';
 import { carePlanSchema, type CarePlan } from '../schemas';
+import type { ConversationMessage } from '@/lib/conversation/context';
 
 export interface PlanningStore {
   load(conversationId: string, userId: string): Promise<CarePlan | undefined>;
   save(plan: CarePlan, lease: string): Promise<CarePlan>;
   acquire(conversationId: string, userId: string, lease: string): Promise<boolean>;
   release(conversationId: string, lease: string): Promise<void>;
-  recentMessages(conversationId: string): Promise<Array<{ role: string; content: string }>>;
+  recentMessages(conversationId: string): Promise<ConversationMessage[]>;
 }
 
 export class SupabasePlanningStore implements PlanningStore {
@@ -53,9 +54,9 @@ export class SupabasePlanningStore implements PlanningStore {
     if (result.error) console.error(JSON.stringify({ event: 'assistant_lease_release_failed', conversationId }));
   }
   async recentMessages(conversationId: string) {
-    const result = await this.userDb.from('conversation_messages').select('role,content').eq('conversation_id', conversationId)
-      .order('created_at', { ascending: false }).limit(8);
+    const result = await this.userDb.from('conversation_messages').select('role,content,metadata,created_at').eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(20);
     if (result.error) throw new AgentError('DATABASE_FAILURE', 'Conversation context could not be loaded.');
-    return (result.data ?? []).reverse();
+    return (result.data ?? []).reverse().map((message) => ({ ...message, createdAt: message.created_at }));
   }
 }

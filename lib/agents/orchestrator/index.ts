@@ -10,6 +10,7 @@ import type { PlanningStore } from '../treatment-planning/store';
 import { upsertTask } from '../treatment-planning/tasks';
 import { classifyWorkflow } from './classifier';
 import { prepareComparison } from '../comparison/agent';
+import { prepareReferenceExecution } from '@/lib/conversation/execution';
 
 export interface OrchestratorContext extends RuntimeContext { planningStore: PlanningStore }
 
@@ -62,6 +63,9 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
       } }));
     }
     const snapshot = await loadDiscoverySnapshot(context.tools?.repository ?? defaultToolDependencies.repository);
+    const referenceExecution = await prepareReferenceExecution({ content: request.content, conversationId, recent, active, snapshot,
+      store: context.planningStore, lease });
+    if (referenceExecution) return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution: referenceExecution }));
     const goalText = request.content.split(/[.!?]/)[0].replace(/\s+treatment(?=\s+(?:in|at|near)\b|$)/i, '');
     let normalized = QueryNormalizer.normalize(goalText, snapshot);
     let content = request.content;

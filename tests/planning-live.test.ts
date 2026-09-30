@@ -85,6 +85,22 @@ it.skipIf(!ready)('persists and restores an authenticated multi-turn care plan w
     expect(privateComparisons.error).toBeNull(); expect(privateComparisons.data).toEqual([]);
     const cheaper = await orchestrate({ content: 'Which has the cheaper package?', conversationId: first.conversationId }, base);
     expect(cheaper.question).toBeNull(); expect(cheaper.tasks).toHaveLength(0); expect(cheaper.summary).not.toMatch(/Mumbai is cheaper/);
+    const hospitalDetail = await orchestrate({ content: 'Tell me more about the hospital.', conversationId: first.conversationId }, base);
+    expect(hospitalDetail.referenceResolution?.reference?.slug).toBe('demo-care-mumbai');
+    expect(hospitalDetail.tasks.map((task) => task.tool)).toEqual(['get_hospital']); expect(hospitalDetail.plan?.id).toBe(first.plan?.id);
+    const linkedPackages = await orchestrate({ content: 'Show me its package.', conversationId: first.conversationId }, base);
+    expect(linkedPackages.tasks.map((task) => task.tool)).toEqual(['search_packages']);
+    expect(linkedPackages.findings.every((finding) => finding.facts.hospitalSlug === 'demo-care-mumbai')).toBe(true);
+    const packageDetail = await orchestrate({ content: 'Tell me more about that package.', conversationId: first.conversationId }, {
+      ...base, planningStore: new SupabasePlanningStore(admin, user.db),
+      provider: { generateStructured: async () => { throw new Error('Reference resolution must not use the model'); } },
+    });
+    expect(packageDetail.tasks.map((task) => task.tool)).toEqual(['get_package']);
+    expect(packageDetail.findings[0].slug).toBe(linkedPackages.findings[0].slug);
+    const privateReferences = await other.db.from('conversation_messages').select('metadata').eq('conversation_id', first.conversationId);
+    expect(privateReferences.error).toBeNull(); expect(privateReferences.data).toEqual([]);
+    const ownedReferences = await user.db.from('conversation_messages').select('metadata').eq('conversation_id', first.conversationId).eq('run_id', packageDetail.runId).eq('role', 'assistant').single();
+    expect((ownedReferences.data?.metadata as { response?: { referenceContext?: unknown } })?.response?.referenceContext).toBeDefined();
     const regressionQueries = ['Find me a hospital.', 'I need a heart doctor in Mumbai.', 'Find hospitals for underwater brain surgery in Mumbai.'];
     for (const content of regressionQueries) {
       const response = await orchestrate({ content }, base); conversations.push(response.conversationId);

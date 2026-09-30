@@ -19,6 +19,10 @@ Task keys are unique within a plan. Tasks distinguish discovery, user review/pre
 
 ComparisonAgent reuses `care_plan_tasks.metadata`: a discovery coordination task stores `comparisonRequest` and its validated `comparison` result (result ID, ordered options, subject, independent result groups, execution status, source records, missing fields and limitations). Existing discovery tasks store the actual approved search inputs and results; execution foreign keys link each side to its persistent task. A review task records the user's review separately. Context and result history remain scoped to the original owned conversation. The task type remains `discovery`; no table, SQL constraint, RPC or RLS migration is required.
 
+## Implemented conversational references
+
+Assistant responses in `conversation_messages.metadata.response` and `agent_outputs.content` now include optional strict `referenceContext` and `referenceResolution` JSON. Context records response/run scope, ordered result groups, entity IDs/slugs/names, group positions, available location/price/duration values and creation time. Empty/incomplete comparison groups remain explicit. Resolution records resolved/ambiguous/unresolved status, actual candidates, selected reference when resolved, and the normalized reference query. These are generated from validated tool findings; no new entity rows or catalog identifiers are manufactured. Existing structured responses remain readable and can reconstruct references without the new fields. Reads use the user's conversation RLS; reference executions use the existing runtime and service-only planning save/lease RPCs. Stable discovery tasks link reference operations to an active plan. No database migration or RLS change is required.
+
 ## Future extensions
 
 ## Identity and access

@@ -29,6 +29,8 @@ At `/assistant`, “I need knee replacement treatment in Mumbai” creates a sav
 
 ## Cross-journey invariants
 
+Catalog follow-ups now resolve against saved structured results: “the second hospital”, “the Mumbai one” and “that package” preserve displayed order and identity across refresh. Multiple plausible records or an ordinal outside the shown list prompt clarification. After a hospital detail, “Show me its package” searches only packages linked to that hospital and the active plan criteria. Relative prices/durations use complete comparable listed values; missing comparison-side prices cannot produce a cheaper destination. Normal explicit discovery, planning and comparison queries retain their existing routes.
+
 - A person may have several cases; a service request belongs to one case and one patient profile. A caregiver needs an explicit grant, not a shared login.
 - Each action has an actor, timestamp, state transition and idempotency key where it can be retried. Notifications are consequences of persisted events.
 - Patient-reported facts, imported records, AI drafts and clinician conclusions are separate fields and visually distinct.

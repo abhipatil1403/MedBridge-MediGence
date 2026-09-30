@@ -8,6 +8,7 @@ import { SearchService } from '@/lib/discovery/search-service';
 import type { ToolDependencies } from '@/lib/agents/tools';
 import type { CatalogRepository, CatalogSnapshot, Treatment, Hospital, Doctor, Package } from '@/types/catalog';
 import type { LLMProvider } from '@/lib/ai/contracts';
+import type { ConversationMessage } from '@/lib/conversation/context';
 const userId = randomUUID();
 const record = (slug: string, name: string) => ({ recordId: randomUUID(), sourceRecordId: randomUUID(), slug, name,
   aliases: [], description: `${name} synthetic sample record`, demo: true, sourceKind: 'synthetic' as const });
@@ -36,7 +37,7 @@ const caseAccess = { readContext: async () => ({}), readDocumentMetadata: async 
 const unavailable: LLMProvider = { generateStructured: async () => { throw new AgentError('MODEL_UNAVAILABLE', 'Unavailable'); } };
 
 class MemoryPlanningStore implements PlanningStore {
-  plans = new Map<string, CarePlan>(); messages = new Map<string, Array<{ role: string; content: string }>>(); locks = new Map<string, string>();
+  plans = new Map<string, CarePlan>(); messages = new Map<string, ConversationMessage[]>(); locks = new Map<string, string>();
   saves = 0;
   async load(conversationId: string, owner: string) { const plan = this.plans.get(conversationId); return plan?.userId === owner ? structuredClone(plan) : undefined; }
   async save(plan: CarePlan, lease: string) {
@@ -55,7 +56,7 @@ function harness(provider = unavailable, dependencies = tools) {
   const store: AgentStore = {
     createConversation: async () => { const id = randomUUID(); conversations.add(id); return id; },
     assertConversation: async (id) => { if (!conversations.has(id)) throw new AgentError('CONVERSATION_ACCESS_DENIED', 'Denied'); },
-    addMessage: async (id, role, content) => { const messages = planningStore.messages.get(id) ?? []; messages.push({ role, content }); planningStore.messages.set(id, messages); },
+    addMessage: async (id, role, content, _runId, metadata) => { const messages = planningStore.messages.get(id) ?? []; messages.push({ role, content, metadata, createdAt: new Date().toISOString() }); planningStore.messages.set(id, messages); },
     startRun: async (_conv, _user, _agent, _case, planId) => { if (planId) runLinks.push(planId); return randomUUID(); },
     createTask: async (_run, _agent, _objective, _tool, _case, taskId) => { if (taskId) taskLinks.push(taskId); return randomUUID(); },
     updateTask: async () => {}, recordAction: async (_run, _task, tool) => { actions.push(tool); return undefined; },

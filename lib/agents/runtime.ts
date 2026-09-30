@@ -6,6 +6,7 @@ import { agents } from './registry';
 import { assistantResponseSchema, discoveryResultSchema, planSchema, synthesisSchema, toolResultSchema, userRequestSchema, type AgentId, type AgentPlan, type AgentResponse, type AgentTaskView, type Finding, type ToolResult } from './schemas';
 import { executeTool, type CaseAccess, type ToolDependencies, defaultToolDependencies, toolDescriptions, toolSchemas } from './tools';
 import type { AgentStore } from './persistence';
+import { attachReferences } from '@/lib/conversation/context';
 
 export const AGENT_LIMITS = { maxToolCalls: 8, maxPlanIterations: 2, maxPlanningAttempts: 2, modelTimeoutMs: 25000, toolTimeoutMs: 12000, runTimeoutMs: 80000 } as const;
 const clinicalPattern = /\b(chest pain|chest hurts|can't breathe|cannot breathe|stroke symptoms|suicid|diagnos(e|is)|what disease|prescrib(e|tion))\b/i;
@@ -198,7 +199,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
         summary: 'I cannot diagnose symptoms. If symptoms may be urgent, seek emergency care now. A licensed clinician can assess them.',
         findings, nextSteps: ['Contact a qualified medical professional for an assessment.'], question: null, tasks };
       if (context.execution?.finalize) response = await context.execution.finalize(response, results);
-      response = assistantResponseSchema.parse(response);
+      response = assistantResponseSchema.parse(attachReferences(response));
       await context.store.saveOutput(runId, response);
       await context.store.addMessage(conversationId, 'assistant', response.summary, runId, { response });
       await context.store.finishRun(runId, status);
@@ -310,7 +311,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
     let response: AgentResponse = { conversationId, runId, agent: plan.agent, status, understanding: plan.understanding,
       summary, findings: unique, nextSteps, question, tasks, approvalId, approvalProposal, discovery };
     if (context.execution?.finalize) response = await context.execution.finalize(response, results);
-    response = assistantResponseSchema.parse(response);
+    response = assistantResponseSchema.parse(attachReferences(response));
     if (diagnostics.recoveryAttempted) diagnostics.recoveryResult = response.status;
     await context.store.saveOutput(runId, response);
     await context.store.addMessage(conversationId, 'assistant', response.summary, runId, { response });
@@ -322,7 +323,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
     let failedResponse: AgentResponse = { conversationId, runId, agent: plan.agent, status: 'failed',
       understanding: plan.understanding, summary: failure.publicMessage, findings, nextSteps: ['Try again or narrow the request.'], question: null, tasks };
     if (context.execution?.finalize) failedResponse = await context.execution.finalize(failedResponse, results);
-    failedResponse = assistantResponseSchema.parse(failedResponse);
+    failedResponse = assistantResponseSchema.parse(attachReferences(failedResponse));
     await context.store.saveOutput(runId, failedResponse);
     await context.store.addMessage(conversationId, 'assistant', failedResponse.summary, runId, { response: failedResponse });
     await context.store.finishRun(runId, 'failed', failure.code, { ...diagnostics, ...(diagnostics.recoveryAttempted ? { recoveryResult: 'failed' } : {}) });
