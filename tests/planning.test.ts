@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 vi.mock('server-only', () => ({}));
 import { orchestrate } from '@/lib/agents/orchestrator';
 import { AgentError } from '@/lib/agents/errors';
@@ -13,6 +15,7 @@ import { SearchService } from '@/lib/discovery/search-service';
 import { executeTool, type ToolDependencies } from '@/lib/agents/tools';
 import type { CatalogRepository, CatalogSnapshot, Treatment, Hospital, Doctor, Package } from '@/types/catalog';
 import type { LLMProvider } from '@/lib/ai/contracts';
+import { PlanningResultGroups } from '@/components/assistant/catalog-results';
 
 const userId = randomUUID();
 const record = (slug: string, name: string) => ({ recordId: randomUUID(), sourceRecordId: randomUUID(), slug, name,
@@ -90,12 +93,13 @@ describe('central orchestrator and treatment planning', () => {
         then: (resolve: (value: unknown) => unknown) => Promise.resolve(resolve({ error: null, data: table === 'care_plan_tasks' ? plan.tasks.map((task) => ({
           id: task.id, task_key: task.key, title: task.title, description: task.description, task_type: task.taskType, status: task.status,
           priority: task.priority, requires_user_action: task.requiresUserAction, requires_approval: task.requiresApproval, approval_status: task.approvalStatus,
-          metadata: { findings: task.findings, position: plan.tasks.indexOf(task) }, updated_at: offsetTime })).reverse() : [] })),
+          metadata: { findings: task.findings, tool: task.tool, input: task.input, discovery: task.discovery, position: plan.tasks.indexOf(task) }, updated_at: offsetTime })).reverse() : [] })),
       }; return query;
     } } as unknown as ConstructorParameters<typeof SupabasePlanningStore>[1];
     const restored = await new SupabasePlanningStore(db, db).load(plan.conversationId, userId);
     expect(restored?.createdAt).toBe('2026-09-30T12:15:30.123Z'); expect(restored?.tasks[0].updatedAt).toBe(restored?.createdAt);
     expect(restored?.tasks.map((task) => task.id)).toEqual(plan.tasks.map((task) => task.id));
+    expect(restored?.tasks.map((task) => task.discovery)).toEqual(plan.tasks.map((task) => task.discovery));
     expect(() => carePlanSchema.parse(restored)).not.toThrow();
   });
   it('creates a sourced plan with hospital and package tasks, with model failure fallback', async () => {
@@ -114,9 +118,58 @@ describe('central orchestrator and treatment planning', () => {
     const second = await h.send('Show me packages.', first.conversationId);
     expect(second.plan?.id).toBe(first.plan?.id); expect(second.question).toBeNull(); expect(second.tasks).toEqual([]);
     expect(second.findings.map((finding) => finding.kind)).toEqual(['packages']); expect(h.actions).toHaveLength(2);
-    expect(second.discovery?.matchType).toBe('exact'); expect(second.discovery?.matchReason).not.toMatch(/no provider/i);
+    expect(second.discovery).toBeUndefined(); expect(second.resultGroups).toMatchObject([{ target: 'packages', matchType: 'exact', status: 'completed' }]);
+    expect(second.resultGroups).toHaveLength(1); expect(second.resultGroups?.[0].matchReason).not.toMatch(/no provider/i);
     expect(second.plan?.tasks.map((task) => task.id)).toEqual(first.plan?.tasks.map((task) => task.id));
     expect(h.planningStore.plans.size).toBe(1); expect(second.plan?.context.city).toBe('Mumbai');
+  });
+  it.each([
+    ['exact', 'exact'], ['none', 'exact'], ['exact', 'none'], ['none', 'none'], ['related', 'exact'],
+  ] as const)('reports hospitals %s and packages %s independently through tools, persistence and UI', async (hospitals, packages) => {
+    const dependencies: ToolDependencies = { ...tools, search: async (q, type, filters) => {
+      const result = await tools.search(q, type, filters);
+      if (type === 'hospitals') result.sections.hospitals = hospitals === 'none' ? []
+        : result.sections.hospitals.map((item) => ({ ...item, matchType: hospitals, reason: hospitals === 'related' ? 'Broader catalog association only.' : item.reason }));
+      if (type === 'packages') result.sections.packages = packages === 'none' ? []
+        : result.sections.packages.map((item) => ({ ...item, matchType: packages }));
+      return result;
+    } };
+    const h = harness(unavailable, dependencies); const response = await h.send('I need knee replacement treatment in Mumbai.');
+    expect(h.actions).toEqual(['search_hospitals', 'search_packages']);
+    expect(response.resultGroups?.map((group) => [group.target, group.matchType])).toEqual([['hospitals', hospitals], ['packages', packages]]);
+    expect(response.discovery).toBeUndefined(); expect(() => assistantResponseSchema.parse(response)).not.toThrow();
+    const saved = await h.planningStore.load(response.conversationId, userId);
+    expect(saved?.tasks.filter((task) => task.taskType === 'discovery').map((task) => task.discovery?.matchType)).toEqual([hospitals, packages]);
+    expect(response.findings).toEqual(response.resultGroups?.flatMap((group) => group.findings));
+    const html = renderToStaticMarkup(createElement(PlanningResultGroups, { groups: response.resultGroups! }));
+    for (const [target, state] of [['hospitals', hospitals], ['packages', packages]]) {
+      const section = html.split(`aria-label="${target} results"`)[1].split('</section>')[0];
+      expect(section).toContain(state === 'exact' ? 'Exact catalog matches' : state === 'related' ? 'Related catalog information' : 'No catalog matches');
+      if (state !== 'none') expect(section).toContain('Demo data');
+    }
+    expect(html).not.toContain('No exact catalog match');
+    if (hospitals === 'none' && packages === 'none') expect(response.summary).toMatch(/No catalog options meet/);
+    else expect(response.summary).not.toMatch(/no catalog options|no exact|no provider/i);
+    const followUp = await h.send('Show me packages.', response.conversationId);
+    expect(followUp.resultGroups).toHaveLength(1); expect(followUp.resultGroups?.[0].matchType).toBe(packages);
+    expect(followUp.tasks).toEqual([]); expect(h.actions).toHaveLength(2);
+  });
+  it('keeps exact hospital/package groups when doctor discovery has no results', async () => {
+    const dependencies: ToolDependencies = { ...tools, search: async (q, type, filters) => {
+      const result = await tools.search(q, type, filters); if (type === 'doctors') result.sections.doctors = []; return result;
+    } };
+    const response = await harness(unavailable, dependencies).send('I need knee replacement in Mumbai. Find hospitals, packages and doctors.');
+    expect(response.resultGroups?.map((group) => [group.target, group.matchType])).toEqual([['hospitals', 'exact'], ['doctors', 'none'], ['packages', 'exact']]);
+    expect(response.summary).not.toMatch(/no catalog|no exact|no provider/i);
+  });
+  it('restores group metadata for a legacy saved plan without repeating its searches', async () => {
+    const h = harness(); const first = await h.send('I need knee replacement in Mumbai.');
+    for (const task of h.planningStore.plans.get(first.conversationId)!.tasks) delete task.discovery;
+    const next = await h.send('Show me packages.', first.conversationId);
+    expect(next.resultGroups?.[0].matchType).toBe('exact'); expect(h.actions).toHaveLength(2);
+    expect(next.plan?.tasks.find((task) => task.key === 'search_packages')?.discovery?.matchType).toBe('exact');
+    const invalid = structuredClone(next); invalid.resultGroups![0].matchType = 'none';
+    expect(assistantResponseSchema.safeParse(invalid).success).toBe(false);
   });
   it('stores a USD budget and refreshes only the affected package search', async () => {
     const h = harness(); const first = await h.send('I need knee replacement in Mumbai.');
@@ -124,6 +177,9 @@ describe('central orchestrator and treatment planning', () => {
     expect(updated.plan?.id).toBe(first.plan?.id); expect(updated.plan?.context.budget).toEqual({ amount: 5000, currency: 'USD', source: 'user' });
     expect(updated.tasks.map((task) => task.tool)).toEqual(['search_packages']); expect(updated.findings.some((item) => item.kind === 'packages')).toBe(false);
     expect(updated.question).toBeNull(); expect(updated.plan?.status).toBe('awaiting_user');
+    expect(updated.resultGroups).toMatchObject([{ target: 'hospitals', matchType: 'exact' }, { target: 'packages', matchType: 'none', findings: [] }]);
+    expect(updated.plan?.tasks.find((task) => task.key === 'search_packages')?.discovery?.matchType).toBe('none');
+    expect(updated.plan?.tasks.find((task) => task.key === 'search_hospitals')?.discovery?.matchType).toBe('exact');
   });
   it('accepts an initial budget without treating it as a procedure name', async () => {
     const result = await harness().send('I need knee replacement in Mumbai. My budget is around $6000.');
@@ -152,10 +208,12 @@ describe('central orchestrator and treatment planning', () => {
   it('preserves discovery, heart-doctor and unsupported-procedure behavior', async () => {
     const h = harness(); const heart = await h.send('I need a heart doctor in Mumbai.');
     expect(heart.agent).toBe('discovery'); expect(heart.findings[0].title).toBe('Demo Cardiologist'); expect(heart.question).toBeNull();
+    expect(heart.discovery?.matchType).toBe('exact'); expect(heart.findings[0].facts).toMatchObject({ specialty: 'Cardiology', city: 'Mumbai' });
     const missing = await h.send('Find me a hospital.'); expect(missing.question).toMatch(/surgery or procedure/i); expect(missing.plan).toBeUndefined();
     const unknown = await h.send('Find hospitals for underwater brain surgery in Mumbai.');
     expect(unknown.plan).toBeUndefined(); expect(unknown.discovery?.matchType).toBe('none');
     expect(unknown.findings.every((item) => item.kind === 'treatments' && item.matchType === 'related')).toBe(true);
+    expect(unknown.findings.some((item) => item.title === 'Brain & Spine Surgery')).toBe(true);
   });
   it('compares saved package prices without re-querying or presenting a live offer', async () => {
     const h = harness(); const first = await h.send('I need knee replacement in Mumbai.');
@@ -226,6 +284,8 @@ describe('central orchestrator and treatment planning', () => {
     expect(result.status).toBe('failed'); expect(result.plan?.findings.some((item) => item.kind === 'hospitals')).toBe(true);
     expect(result.summary).not.toContain('secret database error'); expect(h.planningStore.locks.size).toBe(0);
     expect(result.plan?.tasks.some((task) => task.status === 'in_progress')).toBe(false);
+    expect(result.resultGroups).toMatchObject([{ target: 'hospitals', matchType: 'exact', status: 'completed' },
+      { target: 'packages', matchType: 'none', status: 'blocked', findings: [], matchReason: expect.stringContaining('could not finish') }]);
   });
   it('cancels only unfinished coordination tasks without another search', async () => {
     const h = harness(); const first = await h.send('I need knee replacement in Mumbai.');

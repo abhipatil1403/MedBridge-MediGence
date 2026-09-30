@@ -27,5 +27,5 @@ export function discoveryTask(tasks: CarePlanTask[], step: AgentPlan['steps'][nu
   const task = tasks.find((item) => item.key === step.tool);
   const changed = task?.input !== step.input;
   return upsertTask(tasks, step.tool, { title: step.objective, taskType: 'discovery', tool: step.tool, input: step.input,
-    ...(changed ? { status: 'pending', findings: [], runId: undefined, agentTaskId: undefined } : {}) });
+    ...(changed ? { status: 'pending', findings: [], discovery: undefined, runId: undefined, agentTaskId: undefined } : {}) });
 }

@@ -39,13 +39,16 @@ it.skipIf(!ready)('persists and restores an authenticated multi-turn care plan w
     expect(firstReload?.tasks.map((task) => task.id)).toEqual(first.plan!.tasks.map((task) => task.id));
     const packageFollowUp = await orchestrate({ content: 'Show me packages.', conversationId: first.conversationId }, base);
     expect(packageFollowUp.plan?.id).toBe(first.plan?.id); expect(packageFollowUp.question).toBeNull(); expect(packageFollowUp.tasks).toHaveLength(0);
-    expect(packageFollowUp.discovery?.matchType).toBe('exact');
+    expect(packageFollowUp.discovery).toBeUndefined();
+    expect(packageFollowUp.resultGroups).toMatchObject([{ target: 'packages', matchType: 'exact', status: 'completed' }]);
+    expect(packageFollowUp.resultGroups).toHaveLength(1);
     const budget = await orchestrate({ content: 'My budget is around $6000.', conversationId: first.conversationId }, base);
     expect(budget.plan?.context.budget?.amount).toBe(6000); expect(budget.plan?.id).toBe(first.plan?.id);
     const multi = await orchestrate({ content: 'I need knee replacement in Mumbai. Find hospitals, packages and doctors.', conversationId: first.conversationId }, base);
     expect(multi.plan?.id).toBe(first.plan?.id); expect(multi.tasks.some((task) => task.tool === 'search_doctors')).toBe(true);
     const restored = await new SupabasePlanningStore(admin, user.db).load(first.conversationId, user.id);
     expect(restored?.context).toMatchObject({ treatmentSlug: 'knee-replacement', city: 'Mumbai', budget: { amount: 6000 } });
+    expect(restored?.tasks.filter((task) => task.taskType === 'discovery').every((task) => task.discovery?.matchType === 'exact')).toBe(true);
     expect(new Set(restored?.tasks.map((task) => task.key)).size).toBe(restored?.tasks.length);
     const owned = await user.db.from('care_plans').select('id').eq('conversation_id', first.conversationId);
     const hidden = await other.db.from('care_plans').select('id').eq('conversation_id', first.conversationId);

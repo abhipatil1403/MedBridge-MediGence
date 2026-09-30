@@ -11,6 +11,7 @@ import { toolSchemas, type ToolDependencies } from '../tools';
 import { resolvePlanningContext, planningQuestion } from './context';
 import { derivePlanStatus, discoveryTask, PLANNING_LIMITS, upsertTask } from './tasks';
 import type { PlanningStore } from './store';
+import { discoveryMatch, planningResultGroup, planningTargets } from './results';
 
 export async function prepareTreatmentPlanning(input: { content: string; userId: string; conversationId: string;
   snapshot: CatalogSnapshot; active?: CarePlan; caseContext?: Record<string, unknown>; store: PlanningStore; lease: string; provider: LLMProvider; tools: ToolDependencies }): Promise<NonNullable<RuntimeContext['execution']>> {
@@ -34,7 +35,7 @@ export async function prepareTreatmentPlanning(input: { content: string; userId:
     await store.save(plan, lease);
     const cancelledPlan: AgentPlan = { agent: 'treatment_planning', understanding: 'This coordination plan is cancelled.', steps: [], missingInformation: null };
     return { plan: cancelledPlan, route: { ...tempRoute, plan: cancelledPlan }, carePlanId: plan.id,
-      finalize: async (response) => ({ ...response, type: 'progress', plan, findings: [], question: null,
+      finalize: async (response) => ({ ...response, type: 'progress', plan, findings: [], discovery: undefined, resultGroups: [], question: null,
         summary: 'Your coordination plan is cancelled. Previously saved catalog findings remain available in its history.', nextSteps: ['Start a new conversation for another planning goal.'] }) };
   }
   const scopeChanged = active && ['treatmentSlug', 'specialty', 'city', 'country', 'budget', 'preferredHospital', 'consultationMode']
@@ -43,7 +44,7 @@ export async function prepareTreatmentPlanning(input: { content: string; userId:
   if (goalChanged) {
     plan.title = `${subject} plan${location ? ` · ${location}` : ''}`.slice(0, 160);
     if (context.treatmentSlug !== active.context.treatmentSlug) plan.goal = content;
-    for (const task of plan.tasks) if (task.taskType !== 'external_action') { task.status = 'cancelled'; task.findings = []; }
+    for (const task of plan.tasks) if (task.taskType !== 'external_action') { task.status = 'cancelled'; task.findings = []; task.discovery = undefined; }
     plan.findings = [];
   }
   const steps: AgentPlan['steps'] = question ? [] : baseRoute.plan.steps.map((step) => {
@@ -108,21 +109,32 @@ export async function prepareTreatmentPlanning(input: { content: string; userId:
         if (!task) continue;
         task.runId = response.runId; task.agentTaskId = executed.id;
         task.status = executed.status === 'completed' ? 'completed' : 'blocked';
-        task.findings = results.find((item) => item.tool === executed.tool)?.result.findings ?? [];
+        task.findings = task.status === 'completed' ? results.find((item) => item.tool === executed.tool)?.result.findings ?? [] : [];
+        task.discovery = undefined;
         task.updatedAt = new Date().toISOString();
         const review = plan.tasks.find((item) => item.key === `review_${executed.tool}`);
-        if (review && !task.findings.length) { review.status = 'blocked'; review.description = 'No catalog matches meet the saved criteria. Adjust the search before reviewing options.'; }
+        if (review && !task.findings.length) { review.status = 'blocked'; review.description = task.status === 'blocked'
+          ? 'The search could not finish. Retry before reviewing options.' : 'No catalog matches meet the saved criteria. Adjust the search before reviewing options.'; }
         else if (review && review.status === 'blocked') { review.status = 'pending'; review.description = ''; }
       }
       // A runtime failure before task creation must not leave a saved task running indefinitely.
       for (const task of plan.tasks) if (task.status === 'in_progress') {
         task.status = 'blocked'; task.updatedAt = new Date().toISOString();
       }
+      for (const task of plan.tasks) {
+        const target = planningTargets[task.tool as keyof typeof planningTargets];
+        if (target && task.taskType === 'discovery' && task.status === 'completed') task.discovery = discoveryMatch(task.findings, target);
+      }
       plan.findings = uniqueFindings(plan.tasks.filter((task) => task.status === 'completed' && task.taskType === 'discovery').flatMap((task) => task.findings));
       plan.status = derivePlanStatus(plan.tasks, plan.findings.length > 0);
       plan.updatedAt = new Date().toISOString();
       const saved = await store.save(plan, lease);
-      const selectedFindings = uniqueFindings(steps.flatMap((step) => plan.tasks.find((task) => task.key === step.tool)?.findings ?? []));
+      const resultGroups = steps.flatMap((step) => {
+        const task = saved.tasks.find((task) => task.key === step.tool);
+        const group = task && planningResultGroup(task);
+        return group ? [group] : [];
+      });
+      const selectedFindings = uniqueFindings(resultGroups.flatMap((group) => group.findings));
       const cheapest = /\b(cheapest|lowest|compare)\b/i.test(content) ? packageComparison(plan.findings) : undefined;
       const summary = response.status === 'failed' ? 'Part of this catalog search could not finish. Your plan and completed findings are saved; you can retry.'
         : question ? 'Your planning goal is saved. I need one detail before searching the catalog.'
@@ -130,14 +142,8 @@ export async function prepareTreatmentPlanning(input: { content: string; userId:
             : 'No catalog options meet the saved criteria. Your plan is saved so you can adjust the treatment or destination.');
       const nextSteps = question ? [question] : ['Review the sourced options in your plan.', 'Confirm preferences or share an optional budget or preferred provider.'];
       if (context.budget?.currency === 'INR') nextSteps.push('Your INR budget is saved. USD sample prices have not been converted or filtered by it.');
-      // Reused findings are not in this run's tool outputs; describe the findings actually returned.
-      const matchType = selectedFindings.some((finding) => finding.matchType === 'exact') ? 'exact'
-        : selectedFindings.length ? 'related' : 'none';
-      const discovery = response.discovery && !question ? { ...response.discovery, matchType: matchType as 'exact' | 'related' | 'none',
-        matchReason: selectedFindings.length ? 'Saved catalog records meet the current planning search criteria.'
-          : 'No saved catalog records meet the current planning search criteria.' } : response.discovery;
       return { ...response, understanding, summary, findings: selectedFindings, plan: saved, question,
-        discovery,
+        discovery: undefined, resultGroups,
         status: response.status === 'failed' ? 'failed' : question ? 'awaiting_user_input' : 'completed',
         type: response.status === 'failed' ? 'error' : question ? 'clarification' : runnable.length ? 'planning' : 'progress',
         nextSteps, questions: question ? [question] : [], nextActions: nextSteps,

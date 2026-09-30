@@ -1,5 +1,6 @@
 'use client';
 import type { CarePlan } from '@/lib/agents/schemas';
+import { planningResultGroup, resultGroupLabel } from '@/lib/agents/treatment-planning/results';
 
 export function CarePlanPanel({ plan, busy, onTaskAction }: { plan: CarePlan; busy: boolean;
   onTaskAction: (taskId: string, action: 'complete' | 'reopen') => void }) {
@@ -11,8 +12,11 @@ export function CarePlanPanel({ plan, busy, onTaskAction }: { plan: CarePlan; bu
     <p className="assistant-care-plan__progress" role="status">{completed} of {tasks.length} planning tasks complete · {plan.status.replaceAll('_', ' ')}</p>
     {plan.context.budget && <p>Your budget preference: {plan.context.budget.currency} {plan.context.budget.amount.toLocaleString('en-US')}
       {plan.context.budget.currency === 'INR' ? ' · No currency conversion applied' : ' · Sample package filter'}</p>}
-    <ol className="assistant-care-plan__tasks">{tasks.map((task) => <li key={task.id}>
+    <ol className="assistant-care-plan__tasks">{tasks.map((task) => {
+      const group = ['completed', 'blocked'].includes(task.status) ? planningResultGroup(task) : undefined;
+      return <li key={task.id}>
       <strong>{task.title}</strong><span>{task.status.replaceAll('_', ' ')}</span>
+      {group && <small>{resultGroupLabel(group)}</small>}
       {task.description && <p>{task.description}</p>}
       {task.requiresApproval && <p>Confirmation required · {task.approvalStatus}. This action is not connected.</p>}
       {plan.status !== 'cancelled' && task.requiresUserAction && ['review', 'preferences'].includes(task.taskType) && !task.requiresApproval
@@ -20,7 +24,7 @@ export function CarePlanPanel({ plan, busy, onTaskAction }: { plan: CarePlan; bu
           aria-label={`${task.status === 'completed' ? 'Reopen' : 'Mark done'}: ${task.title}`}
           onClick={() => onTaskAction(task.id, task.status === 'completed' ? 'reopen' : 'complete')}>
           {task.status === 'completed' ? 'Reopen' : 'Mark done'}</button>}
-    </li>)}</ol>
+    </li>; })}</ol>
     {plan.findings.length > 0 && <details><summary>Saved catalog findings ({plan.findings.length})</summary>
       <ul className="assistant-care-plan__findings">{plan.findings.map((finding) => <li key={finding.provenance.recordId}>
         {finding.href ? <a href={finding.href}>{finding.title}</a> : <span>{finding.title}</span>}

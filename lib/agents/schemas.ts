@@ -85,6 +85,18 @@ export const discoveryResultSchema = z.object({
 }).strict();
 export type DiscoveryResult = z.infer<typeof discoveryResultSchema>;
 
+export const discoveryMatchSchema = z.object({
+  matchType: z.enum(['exact', 'related', 'none']), matchReason: z.string().min(1).max(600),
+}).strict();
+export const planningResultGroupSchema = discoveryMatchSchema.extend({
+  taskId: z.uuid(), target: z.enum(['hospitals', 'packages', 'doctors', 'services']),
+  status: z.enum(['completed', 'blocked']), findings: z.array(findingSchema).max(30),
+}).strict().refine((group) => {
+  const actual = group.findings.some((finding) => finding.matchType === 'exact') ? 'exact' : group.findings.length ? 'related' : 'none';
+  return group.matchType === actual && (group.status === 'completed' || group.findings.length === 0);
+}, 'Group match status must describe its own findings');
+export type PlanningResultGroup = z.infer<typeof planningResultGroupSchema>;
+
 export const planningContextSchema = z.object({
   goalType: z.enum(['treatment', 'consultation']),
   treatmentSlug: z.string().optional(), treatmentName: z.string().optional(), treatmentId: z.guid().optional(),
@@ -102,6 +114,7 @@ export const carePlanTaskSchema = z.object({
   requiresApproval: z.boolean(), approvalStatus: z.enum(['not_required', 'pending', 'approved', 'rejected']),
   tool: toolNameSchema.optional(), input: z.string().max(1000).optional(),
   runId: z.uuid().optional(), agentTaskId: z.uuid().optional(),
+  discovery: discoveryMatchSchema.optional(),
   findings: z.array(findingSchema).max(30), updatedAt: z.iso.datetime(),
 }).strict();
 export type CarePlanTask = z.infer<typeof carePlanTaskSchema>;
@@ -135,6 +148,7 @@ export interface AgentResponse {
   question: string | null;
   tasks: AgentTaskView[];
   discovery?: { normalizedQuery: string; matchType: 'exact' | 'related' | 'none'; matchReason: string; recovered: boolean };
+  resultGroups?: PlanningResultGroup[];
   approvalId?: string;
   approvalProposal?: { action: string; detail: string };
   type?: 'discovery' | 'planning' | 'clarification' | 'progress' | 'result' | 'error';
@@ -153,6 +167,7 @@ export const assistantResponseSchema = z.object({
     status: z.enum(['pending', 'running', 'completed', 'failed', 'blocked', 'awaiting_approval', 'awaiting_user_input']),
     startedAt: z.iso.datetime().optional(), completedAt: z.iso.datetime().optional(), errorCode: z.string().optional() })).max(8),
   discovery: z.object({ normalizedQuery: z.string(), matchType: z.enum(['exact', 'related', 'none']), matchReason: z.string(), recovered: z.boolean() }).optional(),
+  resultGroups: z.array(planningResultGroupSchema).max(4).optional(),
   approvalId: z.uuid().optional(), approvalProposal: z.object({ action: z.string(), detail: z.string() }).optional(),
   type: z.enum(['discovery', 'planning', 'clarification', 'progress', 'result', 'error']).optional(),
   plan: carePlanSchema.optional(), questions: z.array(z.string()).max(3).optional(),

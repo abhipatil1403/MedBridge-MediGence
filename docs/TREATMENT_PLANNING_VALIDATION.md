@@ -21,6 +21,27 @@ Browser validation found two display defects and the subsequent checks verified 
 
 After the fixes, the default suite again passed all 65 tests (18 optional integration tests skipped), and the strengthened opt-in planning test passed. Lint, typecheck, and production build passed. Exact-value scans of the changed files and 25 client assets found neither configured server secret.
 
+## Independent planning result aggregation
+
+The former planning response reused one global `discovery.matchType` for multiple search tasks. Runtime discovery summaries described newly executed tools, so cached findings could be paired with a zero-result heading. Recomputing one global heading from all findings still could not describe mixed hospital/package/doctor results independently.
+
+Planning now persists `discovery.matchType` and `matchReason` on each completed discovery task in the existing `care_plan_tasks.metadata` JSON. Criteria changes clear this metadata together with findings. Older plans derive it from their saved sourced findings and persist it on the next planning turn. No database migration is required.
+
+The strict response schema adds optional `resultGroups`, containing a task ID, requested target, execution status, match state/reason, and the group's sourced findings. Validation rejects match states inconsistent with the group's findings. The existing flat `findings` array is retained. Planning responses omit the global discovery banner; ordinary DiscoveryAgent responses retain their existing contract and UI. Failed groups render “Search incomplete” rather than a completed zero-result search. The response cards and saved task panel show each group's own state.
+
+Checks executed for this correction:
+
+- `npm run lint`, `npm run typecheck`, and `npm run build` passed.
+- Complete default suite: 72 passed, 18 opt-in integration tests skipped. The new cases cover hospital/package exact-exact, none-exact, exact-none, none-none, and related-exact; cached package continuation for every pair; exact hospital/package with empty doctors; legacy metadata recovery; strict group validation; budget invalidation; and partial search failure. Heart-doctor Cardiology/Mumbai/exact and unsupported underwater brain surgery with related Brain & Spine Surgery regressions passed.
+- Opt-in live planning test: 1 passed against the configured Supabase project. It verifies task match metadata after reload, cached package groups, saved budget/context, ownership isolation, execution links, and existing discovery regressions using temporary accounts.
+- Authenticated local production `/assistant`: the four requested turns (initial knee replacement in Mumbai, packages, USD 6000 budget, hospitals) passed. Initial results had separate exact hospital/package groups; package and hospital continuations displayed only the relevant exact group. Refresh restored the conversation, USD 6000 budget, plan, and both task match states.
+- An additional real catalog search with a USD 4000 budget produced exact hospitals and no packages. Both independent states remained visible in the response and plan panel after refresh. No false global zero-result heading appeared. Captured browser error/warning logs were empty in the checked flow.
+- The changed files and 25 generated client assets contained neither configured server secret in an exact-value scan. Temporary browser and integration identities and their owned data were cleaned up.
+
+Files changed: `lib/agents/schemas.ts`, `lib/agents/treatment-planning/agent.ts`, `lib/agents/treatment-planning/tasks.ts`, new `lib/agents/treatment-planning/results.ts`, `components/assistant/assistant-workspace.tsx`, `components/assistant/care-plan-panel.tsx`, new `components/assistant/catalog-results.tsx`, `tests/planning.test.ts`, `tests/planning-live.test.ts`, and this validation document.
+
+These aggregation browser checks used the local production build with remote Supabase. They do not establish that the new commit has deployed to Vercel. Previously saved assistant messages remain readable in their original flat format; new planning turns return result groups.
+
 ## Scope
 
 These tests used synthetic catalog records and disposable accounts. Existing discovery remains available when the planning RPC is missing; a planning request returns a migration-needed state. The earlier layout fixture established layout only; the authenticated checks above establish the tested persistence and button behavior.

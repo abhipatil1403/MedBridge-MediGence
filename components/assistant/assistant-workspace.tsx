@@ -5,6 +5,7 @@ import { createClient, type Session } from '@supabase/supabase-js';
 import Link from 'next/link';
 import type { AgentResponse, CarePlan } from '@/lib/agents/schemas';
 import { CarePlanPanel } from './care-plan-panel';
+import { FindingCards, PlanningResultGroups } from './catalog-results';
 
 type Conversation = { id: string; title: string; case_id: string | null; updated_at: string };
 type Case = { id: string; title: string; status: string; agentConsent: boolean; canManageConsent: boolean };
@@ -216,17 +217,12 @@ function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disable
   onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; onRetry?: () => void; disabled: boolean }) {
   return <div className="assistant-response"><div><small>WHAT I UNDERSTOOD</small><p>{response.understanding}</p></div>
     <div><small>FINDINGS</small><p>{response.summary}</p>
-      {response.discovery && <div className="assistant-match-state" role="status"><strong>{response.status === 'awaiting_user_input' ? 'One detail needed' : response.discovery.matchType === 'exact' ? 'Exact catalog matches' : response.discovery.matchType === 'related' ? 'Related catalog information' : 'No exact catalog match'}</strong>
+      {!response.resultGroups?.length && response.discovery && <div className="assistant-match-state" role="status"><strong>{response.status === 'awaiting_user_input' ? 'One detail needed' : response.discovery.matchType === 'exact' ? 'Exact catalog matches' : response.discovery.matchType === 'related' ? 'Related catalog information' : 'No exact catalog match'}</strong>
         <p>{response.discovery.matchReason}</p>
         {response.discovery.recovered && <p>Catalog criteria were checked directly to complete this search.</p>}</div>}
       {response.status === 'failed' && <div className="assistant-recovery">{onRetry && <button type="button" disabled={disabled} onClick={onRetry}>Retry this request</button>}
         <Link href="/discover">Continue with standard catalog search →</Link></div>}
-      {response.findings.length > 0 && <div className="assistant-finding-grid">{response.findings.map((item) => <article key={item.provenance.recordId} className="assistant-finding">
-        <span>{item.kind.replaceAll('_', ' ')} · {item.matchType === 'exact' ? 'Exact match' : 'Related information'}</span><h3>{item.href ? <Link href={item.href}>{item.title}</Link> : item.title}</h3><p>{item.detail}</p>
-        <p className="assistant-match-reason">{item.matchReason}</p>
-        {Object.entries(item.facts).slice(0, item.kind === 'packages' ? 8 : 5).map(([key, value]) => <div className="assistant-fact" key={key}><strong>{key.replace(/([A-Z])/g, ' $1')}</strong><span>{value}</span></div>)}
-        <footer>{item.provenance.sourceKind === 'synthetic' ? 'Demo data' : item.provenance.sourceKind === 'external' ? 'External catalog data' : 'MedBridge data'} · {item.provenance.label} · Record {item.provenance.recordId.slice(0, 8)} · Retrieved {new Date(item.provenance.retrievedAt).toLocaleDateString()}</footer>
-      </article>)}</div>}</div>
+      {response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : <FindingCards findings={response.findings} />}</div>
     {response.question && <div className="assistant-response__question"><small>WHAT I NEED FROM YOU</small><p>{response.question}</p></div>}
     {response.approvalProposal && <div className="assistant-response__approval"><small>PROPOSED ACTION</small><p>{response.approvalProposal.detail}</p>
       {response.approvalProposal.action === 'request_external_action' ? <p>External sharing and bookings are not connected. This request remains pending human review.</p>
