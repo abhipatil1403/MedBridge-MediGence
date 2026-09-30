@@ -9,12 +9,20 @@
 - Supabase response timestamp offsets are normalized and tested before validating restored plan data.
 - Browser checks used the production `/assistant` sign-in shell and a separately labeled local HTML fixture rendered from the actual `CarePlanPanel` component. At 320, 375, 390, 430, 768, and 1440 pixels, neither had horizontal overflow. Panel tasks, progress, optional budget text, and expanded provenance were visible. No console errors were captured in these checked views.
 
-## Pending live validation
+## Live validation after the remote migration
 
-The configured remote Supabase database did not have `care_plans` when the opt-in planning test was attempted. It stopped before creating temporary test users. CLI database access requires the user's database password, which has not been supplied to this session. The user has been asked to run `supabase db push` in the repository terminal to apply `20260930090000_care_planning.sql`.
+The user successfully applied `20260930090000_care_planning.sql` with `supabase db push`. The opt-in planning test then passed against the configured remote Supabase project. It verified real plan/task persistence, context and budget continuity, hospital/package/doctor searches, owner isolation, denied direct patient writes, review updates, execution links, and stable task order after reload. A fresh plan also succeeded with a deliberately unavailable model provider and real catalog tools. Temporary integration identities and their owned data were removed afterward.
 
-After that migration, run `tests/planning-live.test.ts` with `RUN_PLANNING_LIVE=1` and the ignored local environment loaded. The test creates temporary identities, checks real multi-turn persistence/context/reviews and owner isolation, and removes its test data afterward.
+Authenticated browser checks used temporary test accounts and the local production build. They covered initial planning, an initial USD 6000 budget, package continuation, hospital/package/doctor requests, generic-hospital clarification, heart-doctor discovery, and unsupported-procedure handling. Refresh restored the same conversation, budget, and review state. Plan counts and task counts in Supabase confirmed follow-ups reused the existing records. A separate local production server with deliberately invalid model configuration still created a saved plan with hospital and package findings; the checked browser views had no captured console errors.
 
-Authenticated manual planning, browser refresh of a persisted remote plan, live planning with Cloudflare unavailable, and the deployed Vercel application have not been verified in this checkpoint. The layout fixture does not establish persistence, hydration, or button-action behavior. Existing discovery remains available when the new planning RPC is missing; a planning request returns a migration-needed state.
+The deployed application at `https://medbridge-medigence.vercel.app/assistant` was also tested through its authenticated UI. Initial plan creation, package continuation, budget updates, hospital/package/doctor findings, marking a review complete, refresh persistence, and restoration after navigating away all passed. The deployed view showed the saved-order and cached-match-status corrections from commit `54200ab`. Expanded sourced findings were checked at 320, 375, 390, 430, 768, and 1440 pixels with no horizontal overflow and no captured console or hydration errors. Production model configuration was not changed for the outage test.
+
+Browser validation found two display defects and the subsequent checks verified their fixes: atomic task saves now retain an explicit position in existing task metadata, and reused findings determine the returned match heading rather than the current run's empty tool-output list. No additional migration is required for these corrections.
+
+After the fixes, the default suite again passed all 65 tests (18 optional integration tests skipped), and the strengthened opt-in planning test passed. Lint, typecheck, and production build passed. Exact-value scans of the changed files and 25 client assets found neither configured server secret.
+
+## Scope
+
+These tests used synthetic catalog records and disposable accounts. Existing discovery remains available when the planning RPC is missing; a planning request returns a migration-needed state. The earlier layout fixture established layout only; the authenticated checks above establish the tested persistence and button behavior.
 
 External contact, bookings, payments, travel, visa submissions, and clinical decisions are unimplemented. Catalog prices remain sourced sample values; no live offer or provider availability is implied.
