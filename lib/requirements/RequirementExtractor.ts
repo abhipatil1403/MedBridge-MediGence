@@ -3,6 +3,7 @@ import { QueryNormalizer } from '@/lib/discovery/query-normalizer';
 import { EntityMatcher } from '@/lib/discovery/entity-matcher';
 import { extractBudget } from './RequirementNormalizer';
 import { requirementsSchema, type Requirement } from './RequirementTypes';
+import { normalize } from '@/lib/discovery/normalize';
 
 export const attributePatterns: Record<string, RegExp> = {
   accommodation: /\baccommodation\b/i, hotel: /\bhotels?\b/i, hospital_stay: /\bhospital stay\b/i,
@@ -27,14 +28,30 @@ export const RequirementExtractor = {
     const places = EntityMatcher.locations(content, snapshot);
     const cities = places.filter((place) => place.type === 'city');
     if (places.length) put('location', (cities.length ? cities : places).map((p) => p.label).join(' or '), { places: cities.length ? cities : places });
-    const budget = extractBudget(content); if (budget) result.set('budget', budget);
+    const duration = /\b(under|below|less than|within|at most|up to|over|above|more than|at least|exactly)\s+(\d+)\s+days\b/i.exec(content);
+    const budget = extractBudget(duration ? content.replace(duration[0], '') : content); if (budget) result.set('budget', budget);
+    if (duration || /\bduration\b/i.test(content)) {
+      const n = duration ? Number(duration[2]) : undefined;
+      const operator = duration ? /^(under|below|less than)$/i.test(duration[1]) ? 'lt' : /^(over|above|more than)$/i.test(duration[1]) ? 'gt'
+        : /^at least$/i.test(duration[1]) ? 'gte' : /^exactly$/i.test(duration[1]) ? 'eq' : 'lte' : undefined;
+      put('duration', duration?.[0] ?? 'Package duration', { operator, ...(n === undefined ? {} : operator === 'eq' ? { minimum: n, maximum: n }
+        : operator === 'gt' || operator === 'gte' ? { minimum: n } : { maximum: n }) });
+      if (!result.has('package')) put('package', 'Package', { desired: true });
+    }
     if (/\b(no|remove|drop)\s+(?:the\s+)?budget\b/i.test(content)) result.delete('budget');
+    if (/\b(?:cost|price|pricing)\b/i.test(content) && !result.has('budget')) put('price', 'Listed sample price');
     if (!result.has('package') && /\bpackages?|bundles?\b/i.test(content) && !/^\s*tell me(?: more)? about\b|\bits package|\b(?:this|that|the) package|\b(?:first|second|third) package/i.test(content)) put('package', 'Package', { desired: true });
     if (/\bverified (?:hospital|provider|doctor)\b/i.test(content)) put('verified', 'Verified provider');
     const preferredHospital = snapshot.hospitals.find((item) => /\bprefer|\bat\b/i.test(content) && content.toLowerCase().includes(item.name.toLowerCase()));
     if (preferredHospital) put('hospital', preferredHospital.name, { value: preferredHospital.slug });
     if (/\bclinical suitability|medically suitable\b/i.test(content)) put('clinical_suitability', 'Clinical suitability');
-    if (entities.specialty && /\bdoctor|specialist|cardiologist|oncologist|neurologist\b/i.test(content)) put('specialty', entities.specialty, { value: entities.specialty });
+    if (entities.specialty && (/\bdoctor|specialist|cardiologist|oncologist|neurologist\b/i.test(content)
+      || /\bhospitals?\b/i.test(content) && normalize(content).includes(normalize(entities.specialty))))
+      put('specialty', entities.specialty, { value: entities.specialty });
+    if (/\bservices?|support|help with\b/i.test(content)) for (const service of snapshot.services)
+      if ([service.name, ...service.aliases].some((name) => normalize(content).includes(normalize(name))))
+        result.set(`service:${service.slug}`, { id: `service:${service.slug}`, type: 'service', label: service.name, required: true,
+          value: service.slug, originalExpression: content });
     const attrsText = content.replace(/\bcompanion accommodation\b/gi, 'companion_accommodation');
     for (const [type, pattern] of Object.entries(attributePatterns)) if (pattern.test(type === 'companion_accommodation' ? content : attrsText)) {
       const term = pattern.exec(content)![0];

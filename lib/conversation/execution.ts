@@ -21,6 +21,9 @@ export async function prepareReferenceExecution(input: { content: string; conver
   let query = ReferenceDetector.detect(input.content);
   const responses = persistedResponses(input.recent, input.conversationId);
   const latest = responses.at(-1);
+  if (query?.ordinal && !query.entityType && !query.attribute && query.operation === 'details'
+    && latest?.agent === 'hospital_matching' && !latest.comparison && latest.hospitalMatches?.length)
+    query = { ...query, entityType: 'hospital' };
   let namedCandidates: EntityReference[] | undefined;
   // Resolve a short clarification against the actual candidates; no catalog or prose reconstruction.
   if (!query && latest?.referenceResolution?.status === 'ambiguous' && !/\b(find|compare|i need|i want|show|budget)\b/i.test(input.content)) {
@@ -61,7 +64,7 @@ export async function prepareReferenceExecution(input: { content: string; conver
     tool: query.operation === 'packages' ? 'search_packages' : `get_${chosen.entityType}` as ToolName,
     objective: query.operation === 'packages' ? `Find packages associated with ${chosen.displayName}`.slice(0, 160) : `Read ${chosen.displayName}`.slice(0, 160),
     input: JSON.stringify(query.operation === 'packages' ? { query: `Packages for ${chosen.displayName}`.slice(0, 240), hospital: chosen.slug,
-      treatment: input.active?.context.treatmentSlug, budget: input.active?.context.budget?.currency === 'USD' && !input.active.context.requirements?.some((r) => (packageAttributes as readonly string[]).includes(r.type)) ? input.active.context.budget.amount : undefined } : { slug: chosen.slug }),
+      treatment: input.active?.context.treatmentSlug, budget: !input.active?.context.compoundRequest?.operations.some((op) => op.type === 'discover_hospitals') && input.active?.context.budget?.currency === 'USD' && !input.active.context.requirements?.some((r) => (packageAttributes as readonly string[]).includes(r.type)) ? input.active.context.budget.amount : undefined } : { slug: chosen.slug }),
   }] : [];
   const plan = { agent: 'discovery' as const, understanding: chosen ? `You are referring to ${chosen.displayName}.`.slice(0, 400) : 'I need to identify the result you mean.',
     steps, missingInformation: chosen ? null : resolution.reason.slice(0, 300) };

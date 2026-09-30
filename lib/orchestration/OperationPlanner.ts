@@ -7,6 +7,7 @@ export function planOperations(requested: OperationType[]): PlannedOperation[] {
     operations.push({ id: type, type, dependsOn, scope, status: 'pending' });
   if (requested.includes('discover_hospitals')) add('discover_hospitals');
   if (requested.includes('discover_doctors')) add('discover_doctors');
+  if (requested.includes('discover_services')) add('discover_services');
   if (requested.includes('discover_packages')) add('discover_packages', requested.includes('discover_hospitals') ? ['discover_hospitals'] : [],
     requested.includes('discover_hospitals') ? 'linked_hospitals' : 'independent');
   const retrievals = operations.map((op) => op.id);

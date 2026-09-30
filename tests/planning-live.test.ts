@@ -133,6 +133,11 @@ it.skipIf(!ready)('persists and restores an authenticated multi-turn care plan w
     expect(compoundPackage.facts.hospitalId).toBe(compoundHospital.provenance.recordId);
     expect(compound.summary).toContain("isn't a second sourced hospital");
     const compoundReload = await new SupabasePlanningStore(admin, user.db).load(compound.conversationId, user.id);
+    expect(compound.agent).toBe('hospital_matching');
+    expect(compound.hospitalMatches?.[0].classification).toBe('strong_match');
+    expect(compoundReload?.tasks.find((task) => task.hospitalMatches)?.hospitalMatches).toEqual(compound.hospitalMatches);
+    const privateHospitalMatches = await other.db.from('care_plan_tasks').select('metadata').eq('care_plan_id', compound.plan!.id);
+    expect(privateHospitalMatches.error).toBeNull(); expect(privateHospitalMatches.data).toEqual([]);
     expect(compoundReload?.context.compoundRequest).toEqual(compound.compoundRequest);
     expect(compoundReload?.tasks.filter((t) => t.tool).every((t) => /^[a-f0-9]{24}$/.test(t.catalogSignature ?? ''))).toBe(true);
     expect(compoundReload?.context.requirements?.some((r) => r.type === 'package')).toBe(true);
@@ -140,6 +145,7 @@ it.skipIf(!ready)('persists and restores an authenticated multi-turn care plan w
     expect(compoundForeign.error).toBeNull(); expect(compoundForeign.data).toEqual([]);
     const freshBase = { ...base, planningStore: new SupabasePlanningStore(admin, user.db) };
     const replay = await orchestrate({ content: compound.plan!.goal, conversationId: compound.conversationId }, freshBase);
+    expect(replay.hospitalMatches?.[0].hospital.provenance.recordId).toBe(compoundHospital.provenance.recordId);
     expect(replay.tasks).toEqual([]); expect(replay.findings.map((f) => f.provenance.recordId)).toEqual(compound.findings.map((f) => f.provenance.recordId));
     const hospitalAfterReload = await orchestrate({ content: 'Tell me more about the first hospital.', conversationId: compound.conversationId }, freshBase);
     expect(hospitalAfterReload.findings[0].provenance.recordId).toBe(compoundHospital.provenance.recordId);

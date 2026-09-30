@@ -102,9 +102,9 @@ describe('compound intent orchestration', () => {
     const compared = await h.send('Compare Mumbai and Pune.', response.conversationId);
     expect(compared.question).toBeNull(); expect(compared.comparison?.request.subject?.slug).toBe('knee-replacement');
   });
-  it('leaves single discovery unchanged', async () => {
+  it('coordinates hospital discovery with the same sourced catalog identity', async () => {
     const response = await harness().send('Find hospitals for knee replacement in Mumbai.');
-    expect(response.agent).toBe('discovery'); expect(response.compoundRequest).toBeUndefined(); expect(response.findings[0].slug).toBe(hospital.slug);
+    expect(response.agent).toBe('hospital_matching'); expect(response.compoundRequest?.operations.map((o) => o.type)).toEqual(['discover_hospitals', 'evaluate_requirements']); expect(response.findings[0].slug).toBe(hospital.slug);
   });
   it('leaves the existing comparison workflow unchanged', async () => {
     const response = await harness().send('Compare knee replacement in Pune and Mumbai.');

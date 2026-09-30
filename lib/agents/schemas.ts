@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { normalizedDiscoveryQuerySchema } from '@/lib/discovery/query-normalizer';
 import { referenceContextSchema, referenceResolutionSchema, type ReferenceContext, type ReferenceResolution } from '@/lib/conversation/schemas';
-import { requirementsSchema, resultRequirementEvaluationSchema, type Requirement, type ResultRequirementEvaluation } from '@/lib/requirements/RequirementTypes';
+import { requirementsSchema, requirementEvaluationSchema, resultRequirementEvaluationSchema, type Requirement, type ResultRequirementEvaluation } from '@/lib/requirements/RequirementTypes';
 import { compoundRequestSchema, type CompoundRequest } from '@/lib/orchestration/CompoundRequest';
 
 export const agentIdSchema = z.enum(['discovery', 'treatment_planning', 'hospital_matching', 'comparison']);
@@ -80,6 +80,37 @@ export const toolResultSchema = z.object({ findings: z.array(findingSchema).max(
   comparison: z.record(z.string(), z.unknown()).optional(), caseContext: z.record(z.string(), z.unknown()).optional(),
   requestedInformation: z.string().optional(), approvalRequired: z.string().optional() });
 
+export const hospitalMatchClassificationSchema = z.enum(['strong_match', 'partial_match', 'insufficient_evidence', 'does_not_match']);
+export const hospitalMatchSchema = z.object({
+  hospital: findingSchema.refine((f) => f.kind === 'hospitals'),
+  classification: hospitalMatchClassificationSchema,
+  linkedPackages: z.array(z.object({ package: findingSchema.refine((f) => f.kind === 'packages'),
+    classification: hospitalMatchClassificationSchema }).strict()).max(30),
+  evidencePackageId: z.guid().optional(),
+  criteria: z.array(z.object({ evaluation: requirementEvaluationSchema, level: z.enum(['hospital', 'package']),
+    source: provenanceSchema.optional() }).strict()).max(30),
+  fulfilledRequirements: z.array(z.string()).max(30), failedRequirements: z.array(z.string()).max(30),
+  missingInformation: z.array(z.string()).max(30),
+  packageSearchComplete: z.boolean(),
+  packageEvidenceRequested: z.boolean().default(true),
+}).strict().refine((match) => !match.evidencePackageId || match.linkedPackages.some((p) => p.package.provenance.recordId === match.evidencePackageId),
+  'Aggregate evidence must come from one actual linked package').superRefine((match, ctx) => {
+  const ids = (statuses: string[]) => match.criteria.filter((c) => statuses.includes(c.evaluation.status)).map((c) => c.evaluation.requirementId);
+  if (JSON.stringify(match.fulfilledRequirements) !== JSON.stringify(ids(['exact']))
+    || JSON.stringify(match.failedRequirements) !== JSON.stringify(ids(['not_met']))
+    || JSON.stringify(match.missingInformation) !== JSON.stringify(ids(['unknown', 'incomplete', 'related'])))
+    ctx.addIssue({ code: 'custom', message: 'Requirement summaries must reflect the evidence statuses' });
+  if (match.classification === 'strong_match' && (!match.criteria.length || match.criteria.some((c) => c.evaluation.status !== 'exact' || !c.source || !c.evaluation.evidence.length)))
+    ctx.addIssue({ code: 'custom', message: 'Strong matches need sourced evidence for every requested criterion' });
+  if ((match.classification === 'does_not_match') !== (match.failedRequirements.length > 0))
+    ctx.addIssue({ code: 'custom', message: 'Does not match requires explicit contradictory evidence' });
+  if (match.linkedPackages.some((p) => p.package.facts.hospitalId !== match.hospital.provenance.recordId || p.package.facts.hospitalSlug !== match.hospital.slug))
+    ctx.addIssue({ code: 'custom', message: 'Packages must preserve their hospital identity association' });
+  if (match.criteria.some((c) => c.source && c.source.recordId !== (c.level === 'hospital' ? match.hospital.provenance.recordId : match.evidencePackageId)))
+    ctx.addIssue({ code: 'custom', message: 'Each criterion must reference its actual evidence record' });
+});
+export type HospitalMatch = z.infer<typeof hospitalMatchSchema>;
+
 export const discoveryResultSchema = z.object({
   query: z.string(), normalizedQuery: z.string(), intent: z.string(),
   entities: normalizedDiscoveryQuerySchema.shape.entities,
@@ -137,6 +168,7 @@ export const planningContextSchema = z.object({
 export type PlanningContext = z.infer<typeof planningContextSchema>;
 export const careTaskStatusSchema = z.enum(['pending', 'in_progress', 'blocked', 'awaiting_user', 'completed', 'cancelled']);
 export const carePlanTaskSchema = z.object({
+  hospitalMatches: z.array(hospitalMatchSchema).max(30).optional(),
   id: z.uuid(), key: z.string().min(1).max(200), title: z.string().min(1).max(160), description: z.string().max(600),
   taskType: z.enum(['discovery', 'review', 'preferences', 'clarification', 'external_action']),
   status: careTaskStatusSchema, priority: z.enum(['normal', 'high']), requiresUserAction: z.boolean(),
@@ -168,6 +200,7 @@ export interface AgentTaskView {
 }
 
 export interface AgentResponse {
+  hospitalMatches?: HospitalMatch[];
   compoundRequest?: CompoundRequest;
   requirements?: Requirement[];
   referenceContext?: ReferenceContext;
@@ -195,6 +228,7 @@ export interface AgentResponse {
 }
 
 export const assistantResponseSchema = z.object({
+  hospitalMatches: z.array(hospitalMatchSchema).max(30).optional(),
   compoundRequest: compoundRequestSchema.optional(),
   requirements: requirementsSchema.optional(),
   referenceContext: referenceContextSchema.optional(), referenceResolution: referenceResolutionSchema.optional(),

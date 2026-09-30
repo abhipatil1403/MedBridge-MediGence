@@ -30,6 +30,7 @@ export function buildReferenceContext(response: AgentResponse, createdAt = new D
         const group = side.groups[index]; add(target, group.findings, side.option.label, sideIndex + 1, group.status !== 'completed');
       }
     if (response.comparison.subjectFinding) add('treatments', [response.comparison.subjectFinding], undefined, undefined, false, true);
+    for (const group of response.resultGroups ?? []) if (group.target === 'services') add(group.target, group.findings, undefined, undefined, group.status !== 'completed');
   } else if (response.resultGroups?.length) {
     for (const group of response.resultGroups) add(group.target, group.findings, undefined, undefined, group.status !== 'completed');
   } else {

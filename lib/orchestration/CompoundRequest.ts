@@ -1,17 +1,17 @@
 import { z } from 'zod';
 import { requirementsSchema } from '@/lib/requirements/RequirementTypes';
 
-export const operationTypeSchema = z.enum(['discover_hospitals', 'discover_doctors', 'discover_packages', 'evaluate_requirements', 'compare_results']);
+export const operationTypeSchema = z.enum(['discover_hospitals', 'discover_doctors', 'discover_packages', 'discover_services', 'evaluate_requirements', 'compare_results']);
 export const plannedOperationSchema = z.object({
   id: operationTypeSchema, type: operationTypeSchema,
-  dependsOn: z.array(operationTypeSchema).max(4),
+  dependsOn: z.array(operationTypeSchema).max(5),
   scope: z.enum(['independent', 'linked_hospitals', 'candidates']),
   status: z.enum(['pending', 'completed', 'incomplete', 'skipped']),
   note: z.string().max(600).optional(),
 }).strict();
 export const compoundRequestSchema = z.object({
   requirements: requirementsSchema,
-  operations: z.array(plannedOperationSchema).min(2).max(5),
+  operations: z.array(plannedOperationSchema).min(2).max(6),
   requiresClarification: z.boolean(),
   clarification: z.object({ field: z.enum(['procedure', 'location']), question: z.string().max(300) }).strict().optional(),
 }).strict().superRefine((request, ctx) => {

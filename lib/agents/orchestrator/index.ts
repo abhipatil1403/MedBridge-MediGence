@@ -14,7 +14,7 @@ import { prepareReferenceExecution } from '@/lib/conversation/execution';
 import { persistedResponses } from '@/lib/conversation/context';
 import { RequirementExtractor } from '@/lib/requirements/RequirementExtractor';
 import { applyRequirements } from '@/lib/requirements/response';
-import { parseCompoundIntent } from '@/lib/orchestration/CompoundIntentParser';
+import { parseCompoundIntent, parseHospitalMatchingIntent } from '@/lib/orchestration/CompoundIntentParser';
 import { prepareCompoundExecution } from '@/lib/orchestration/OperationExecutor';
 import { prepareReferenceComparison } from '@/lib/conversation/comparison-execution';
 
@@ -22,7 +22,7 @@ export interface OrchestratorContext extends RuntimeContext { planningStore: Pla
 
 /** One authenticated turn, one selected workflow, one bounded runtime. No recursive agent calls. */
 export async function orchestrate(rawRequest: unknown, context: OrchestratorContext): Promise<AgentResponse> {
-  context = { ...context, supportedAgents: ['discovery', 'treatment_planning', 'comparison'] };
+  context = { ...context, supportedAgents: ['discovery', 'treatment_planning', 'hospital_matching', 'comparison'] };
   const request = userRequestSchema.parse(rawRequest);
   const caseContext = request.caseId ? await context.caseAccess.readContext(request.caseId) : undefined;
   const conversationId = request.conversationId ?? await context.store.createConversation(context.userId, request.caseId);
@@ -92,6 +92,12 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
       store: context.planningStore, lease }) ?? await prepareReferenceExecution({ content: request.content, conversationId, recent, active, snapshot,
       store: context.planningStore, lease });
     if (referenceExecution) return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution: referenceExecution }));
+    const hospitalRequest = parseHospitalMatchingIntent(request.content, requirements, newGoal ? undefined : active?.context.compoundRequest);
+    if (hospitalRequest && hasPlanningSchema) {
+      const execution = await prepareCompoundExecution({ content: request.content, request: hospitalRequest, snapshot, active, caseContext,
+        userId: context.userId, conversationId, store: context.planningStore, lease });
+      return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
+    }
     const goalText = request.content.split(/[.!?]/)[0].replace(/,?\s+(?:under|below|within|less than|maximum|budget|with|and I want)\b.*$/i, '').replace(/\s+treatment(?=\s+(?:in|at|near)\b|$)/i, '');
     let normalized = QueryNormalizer.normalize(goalText, snapshot);
     let content = request.content;

@@ -12,8 +12,8 @@ export function RequirementResults({ evaluation }: { evaluation?: ResultRequirem
         {item.sourceFields.length > 0 && <small>Catalog fields: {item.sourceFields.join(', ')}</small>}
       </details>
     </li>)}</ul>
-    {evaluation.evaluations.some((item) => item.status === 'not_applicable') && <details><summary>Other requirements do not apply to this entity</summary>
-      <ul>{evaluation.evaluations.filter((item) => item.status === 'not_applicable').map((item) => <li key={item.requirementId}>{item.label}: Not applicable</li>)}</ul>
+    {evaluation.evaluations.some((item) => item.status === 'not_applicable') && <details><summary>{evaluation.resultType === 'hospitals' ? 'Package requirements are evaluated separately' : 'Other requirements do not apply to this entity'}</summary>
+      <ul>{evaluation.evaluations.filter((item) => item.status === 'not_applicable').map((item) => <li key={item.requirementId}>{item.label}: {evaluation.resultType === 'hospitals' ? 'Evaluated at package level' : 'Not applicable'}</li>)}</ul>
     </details>}
   </div>;
 }

@@ -15,7 +15,7 @@ export function compoundContext(content: string, request: CompoundRequest, snaps
     treatmentSlug: treatment?.slug ?? previous.treatmentSlug, treatmentName: treatment?.name ?? previous.treatmentName, treatmentId: treatment?.recordId ?? previous.treatmentId,
     city: city ?? (country ? undefined : previous.city), country: country ?? previous.country,
     budget: legacyBudget(request.requirements),
-    requestedTargets: request.operations.flatMap((op) => op.type === 'discover_hospitals' ? ['hospitals'] : op.type === 'discover_packages' ? ['packages'] : op.type === 'discover_doctors' ? ['doctors'] : []),
+    requestedTargets: request.operations.flatMap((op) => op.type === 'discover_hospitals' ? ['hospitals'] : op.type === 'discover_packages' ? ['packages'] : op.type === 'discover_doctors' ? ['doctors'] : op.type === 'discover_services' ? ['services'] : []),
   });
 }
 

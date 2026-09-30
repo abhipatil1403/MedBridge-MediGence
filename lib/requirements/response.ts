@@ -2,6 +2,7 @@ import type { AgentResponse, Comparison, Finding } from '@/lib/agents/schemas';
 import type { CatalogSnapshot } from '@/types/catalog';
 import { RequirementEvaluator } from './RequirementEvaluator';
 import { packageAttributes, type Requirement } from './RequirementTypes';
+import { HospitalMatchingAgent } from '@/lib/agents/HospitalMatchingAgent';
 
 export function evaluateFindings(findings: Finding[], requirements: Requirement[], snapshot: CatalogSnapshot): Finding[] {
   const evaluated = findings.map((finding) => ({ ...finding, requirementEvaluation: RequirementEvaluator.evaluate(finding, requirements, snapshot) }));
@@ -41,6 +42,34 @@ export function applyRequirements(response: AgentResponse, requirements: Require
       tasks: response.plan.tasks.map((task) => ({ ...task, findings: evaluateFindings(task.findings, requirements, snapshot),
         comparison: task.comparison && evaluateComparison(task.comparison, task.comparison.request.requirements ?? requirements, snapshot) })) };
   }
+  // Hospital aggregation defines the transparent order supplied to comparison and reference creation.
+  if (response.hospitalMatches) {
+    result.hospitalMatches = HospitalMatchingAgent.match({ requirements, requestedOperations: response.compoundRequest?.operations.map((o) => o.type) ?? ['discover_hospitals'] },
+      response.hospitalMatches.map((m) => m.hospital), response.hospitalMatches.flatMap((m) => m.linkedPackages.map((p) => p.package)), snapshot,
+      new Map(response.hospitalMatches.map((m) => [m.hospital.provenance.recordId, m.packageSearchComplete])));
+    if (result.comparison) {
+      const displayed = result.comparison.sides.flatMap((s) => s.groups.filter((g) => g.target === 'hospitals').flatMap((g) => g.findings.map((f) => f.provenance.recordId)));
+      result.hospitalMatches.sort((a, b) => displayed.indexOf(a.hospital.provenance.recordId) - displayed.indexOf(b.hospital.provenance.recordId));
+    }
+    const ids = result.hospitalMatches.flatMap((m) => [m.hospital.provenance.recordId, ...m.linkedPackages.map((p) => p.package.provenance.recordId)]);
+    const ordered = (findings: Finding[]) => findings.sort((a, b) => (ids.indexOf(a.provenance.recordId) < 0 ? 99 : ids.indexOf(a.provenance.recordId))
+      - (ids.indexOf(b.provenance.recordId) < 0 ? 99 : ids.indexOf(b.provenance.recordId)));
+    // Keep entity blocks in the flat result; references use groups/comparison order.
+    for (const group of result.resultGroups ?? []) ordered(group.findings);
+    for (const side of result.comparison?.sides ?? []) for (const group of side.groups) ordered(group.findings);
+    result.findings = [...new Map((result.comparison ? [...result.comparison.sides.flatMap((s) => s.groups.flatMap((g) => g.findings)),
+      ...result.resultGroups?.flatMap((g) => g.findings) ?? []] : result.resultGroups?.flatMap((g) => g.findings) ?? ordered(result.findings))
+      .map((f) => [f.provenance.recordId, f])).values()].slice(0, 30);
+  }
+  if (result.plan) result.plan.tasks = result.plan.tasks.map((task) => {
+    if (!task.hospitalMatches) return task;
+    const matches = HospitalMatchingAgent.match({ requirements, requestedOperations: result.plan!.context.compoundRequest?.operations.map((o) => o.type) ?? ['discover_hospitals'] },
+      task.hospitalMatches.map((m) => m.hospital), task.hospitalMatches.flatMap((m) => m.linkedPackages.map((p) => p.package)), snapshot,
+      new Map(task.hospitalMatches.map((m) => [m.hospital.provenance.recordId, m.packageSearchComplete])));
+    const displayed = task.hospitalMatches.map((m) => m.hospital.provenance.recordId);
+    matches.sort((a, b) => displayed.indexOf(a.hospital.provenance.recordId) - displayed.indexOf(b.hospital.provenance.recordId));
+    return { ...task, hospitalMatches: matches };
+  });
   const hasFeatures = requirements.some((r) => (packageAttributes as readonly string[]).includes(r.type));
   if (excludedIds.length && !result.findings.length && !result.question) result.summary = 'No additional catalog package is available for the retained requirements. I have kept your requirements; no alternative has been invented.';
   else if (hasFeatures && !result.compoundRequest && result.findings.length && !result.question && result.status !== 'failed') {

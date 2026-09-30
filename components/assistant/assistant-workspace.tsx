@@ -1,5 +1,7 @@
 'use client';
 
+import { HospitalMatchResults } from './hospital-match-results';
+
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { createClient, type Session } from '@supabase/supabase-js';
 import Link from 'next/link';
@@ -218,7 +220,7 @@ function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disable
   onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; onRetry?: () => void; disabled: boolean }) {
   return <div className="assistant-response"><div><small>WHAT I UNDERSTOOD</small><p>{response.understanding}</p></div>
     {response.compoundRequest && <details><summary>Request progress</summary><ul className="assistant-source-list">
-      {response.compoundRequest.operations.map((operation) => <li key={operation.id}><strong>{({ discover_hospitals: 'Hospital search', discover_doctors: 'Doctor search', discover_packages: 'Package search', evaluate_requirements: 'Requirement check', compare_results: 'Comparison' })[operation.type]}</strong>
+      {response.compoundRequest.operations.map((operation) => <li key={operation.id}><strong>{({ discover_hospitals: 'Hospital search', discover_doctors: 'Doctor search', discover_packages: 'Package search', discover_services: 'General services · hospital availability unconfirmed', evaluate_requirements: 'Requirement check', compare_results: 'Comparison' })[operation.type]}</strong>
         {' · '}{operation.status}{operation.note && <p>{operation.note}</p>}</li>)}
     </ul></details>}
     <div><small>FINDINGS</small><p>{response.summary}</p>
@@ -227,7 +229,9 @@ function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disable
         {response.discovery.recovered && <p>Catalog criteria were checked directly to complete this search.</p>}</div>}
       {response.status === 'failed' && <div className="assistant-recovery">{onRetry && <button type="button" disabled={disabled} onClick={onRetry}>Retry this request</button>}
         <Link href="/discover">Continue with standard catalog search →</Link></div>}
+      {response.hospitalMatches && <HospitalMatchResults matches={response.hospitalMatches} />}
       {response.comparison ? <ComparisonResults comparison={response.comparison} /> : response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : <FindingCards findings={response.findings} />}</div>
+    {response.comparison && response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : null}
     {response.question && <div className="assistant-response__question"><small>WHAT I NEED FROM YOU</small><p>{response.question}</p></div>}
     {response.approvalProposal && <div className="assistant-response__approval"><small>PROPOSED ACTION</small><p>{response.approvalProposal.detail}</p>
       {response.approvalProposal.action === 'request_external_action' ? <p>External sharing and bookings are not connected. This request remains pending human review.</p>

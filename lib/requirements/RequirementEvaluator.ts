@@ -12,7 +12,7 @@ export const RequirementEvaluator = {
       const base = { requirementId: requirement.id, type: requirement.type, label: requirement.label, requestedValue: requirement };
       const result = (status: RequirementEvaluation['status'], explanation: string, evidence: string[] = [], sourceFields: string[] = []) => ({ ...base, status, explanation, evidence, sourceFields });
       const type = requirement.type;
-      const applicable = type === 'budget' || type === 'package' || (packageAttributes as readonly string[]).includes(type) ? finding.kind === 'packages'
+      const applicable = type === 'budget' || type === 'price' || type === 'duration' || type === 'package' || (packageAttributes as readonly string[]).includes(type) ? finding.kind === 'packages'
         : type === 'verified' || type === 'hospital' ? ['hospitals', 'doctors', 'packages'].includes(finding.kind)
           : type === 'procedure' ? ['treatments', 'hospitals', 'doctors', 'packages'].includes(finding.kind)
             : type === 'specialty' ? ['doctors', 'hospitals', 'treatments'].includes(finding.kind)
@@ -21,7 +21,21 @@ export const RequirementEvaluator = {
       if (!record) return result('unknown', 'No current published catalog record verifies this result identity.');
       const item = record as unknown as Record<string, unknown>;
       if (type === 'clinical_suitability') return result('unknown', 'Catalog availability cannot establish clinical suitability; a clinician must assess it.');
+      if (type === 'service') return result('unknown', 'A general service catalog entry does not document availability at this hospital. No hospital-specific service association is published.');
       if (type === 'package') return result('exact', 'This is a published catalog package; its requested features are evaluated separately.', [record.name], ['packages']);
+      if (type === 'duration') {
+        const days = item.durationDays;
+        if (typeof days !== 'number' || !Number.isFinite(days) || days <= 0) return result('unknown', 'The package duration is not documented.', [], ['durationDays']);
+        const matches = (requirement.minimum === undefined || (requirement.operator === 'gt' ? days > requirement.minimum : days >= requirement.minimum))
+          && (requirement.maximum === undefined || (requirement.operator === 'lt' ? days < requirement.maximum : days <= requirement.maximum));
+        return result(matches ? 'exact' : 'not_met', `The documented ${days}-day package duration ${matches ? 'meets' : 'does not meet'} the requested duration criterion; it does not establish recovery time.`, [`${days} days`], ['durationDays']);
+      }
+      if (type === 'price') {
+        const price = item.samplePriceUsd;
+        return typeof price === 'number' && Number.isFinite(price) && price > 0
+          ? result('exact', 'The catalog documents a USD sample price; it is not a provider quote.', [`USD ${price}`], ['samplePriceUsd'])
+          : result('unknown', 'No listed sample price is available.', [], ['samplePriceUsd']);
+      }
       if ((packageAttributes as readonly string[]).includes(type)) {
         const evidence = attributeEvidence(record as Package, type);
         if (requirement.desired === false && ['exact', 'not_met'].includes(evidence.status)) return { ...base, ...evidence, status: evidence.status === 'exact' ? 'not_met' : 'exact', explanation: evidence.status === 'exact' ? 'The package includes a feature the user asked to exclude.' : 'The catalog explicitly excludes the feature the user asked to exclude.' };

@@ -96,7 +96,11 @@ The runtime applies deterministic evaluations after each agent's finalization an
 
 ## Compound intent orchestration
 
-Compound catalog goals are decomposed before mutually exclusive workflow routing. The strict shared request and ordered dependency graph live in `lib/orchestration/`; the existing runtime executes independent reads followed by hospital-linked package reads under its existing limits. Requirement evaluation precedes candidate comparison, and the final response uses the existing plan, task, output and reference persistence. Cache signatures account for current catalog records, associations and requirements. Successful partial results survive a failed operation; empty sides and missing comparison candidates remain explicit. See [compound validation](COMPOUND_INTENT_VALIDATION.md) for supported operations and verification evidence.
+Compound catalog goals are decomposed before mutually exclusive workflow routing. The strict shared request and ordered dependency graph live in `lib/orchestration/`; the existing runtime executes independent reads followed by hospital-linked package reads under its existing limits. Requirement evaluation precedes candidate comparison, and the final response uses the existing plan, task, output and reference persistence. Cache signatures account for current catalog records, associations and retrieval filters; changed evidence-only criteria reevaluate reusable candidates. Successful partial results survive a failed operation; empty sides and missing comparison candidates remain explicit. See [compound validation](COMPOUND_INTENT_VALIDATION.md) for supported operations and verification evidence.
+
+## Hospital matching
+
+HospitalMatchingAgent coordinates evidence inside the compound executor: existing hospital discovery → requirement checks → actual linked package retrieval → independent package evaluation → hospital/package evidence aggregation → existing candidate comparison. The structured results describe requirement satisfaction, retain provenance, and persist in existing response/task metadata. No separate search, comparison or persistence engine is introduced. Budget/feature changes reevaluate reusable catalog data; affected retrieval filters or published records invalidate searches. General service entries do not establish hospital-specific availability. See [hospital matching validation](HOSPITAL_MATCHING_VALIDATION.md).
 
 ## Explicit prohibitions
 

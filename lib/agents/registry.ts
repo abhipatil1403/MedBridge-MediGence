@@ -22,7 +22,7 @@ export const agents: Record<AgentId, AgentDefinition> = {
   },
   hospital_matching: {
     id: 'hospital_matching', name: 'HospitalMatchingAgent', purpose: 'Match hospitals against available structured criteria.',
-    allowedTools: ['search_hospitals', 'search_treatments', 'search_packages', 'get_hospital', 'get_treatment', ...common],
+    allowedTools: ['search_hospitals', 'search_treatments', 'search_packages', 'search_services', 'get_hospital', 'get_treatment', ...common],
     safety: 'Describe criteria matches only. Never claim best, safest, success rates, or guaranteed outcomes.',
   },
   comparison: {
