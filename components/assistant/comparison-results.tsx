@@ -3,6 +3,7 @@ import type { Comparison, Finding, PlanningResultGroup } from '@/lib/agents/sche
 import { comparisonFields, factText } from '@/lib/agents/comparison/format';
 import { resultGroupLabel } from '@/lib/agents/treatment-planning/results';
 import { FindingCards } from './catalog-results';
+import { RequirementResults } from './requirement-results';
 
 function Values({ findings, field }: { findings: Finding[]; field: string }) {
   const records = findings.filter((finding) => field === 'name' || factText(finding, field) !== undefined);
@@ -14,14 +15,14 @@ function Values({ findings, field }: { findings: Finding[]; field: string }) {
   </li>)}</ul> : <span>Not available in current catalog</span>;
 }
 function Match({ group }: { group: PlanningResultGroup }) {
-  return <><strong>{resultGroupLabel(group)}</strong><p>{group.matchReason}</p></>;
+  return <><strong>{group.matchType === 'exact' && group.findings.some((f) => f.matchType === 'exact' && f.requirementEvaluation && f.requirementEvaluation.overallStatus !== 'fully_satisfies') ? 'Catalog results · review requirements' : resultGroupLabel(group)}</strong><p>{group.matchReason}</p></>;
 }
 export function ComparisonResults({ comparison }: { comparison: Comparison }) {
   const [first, second] = comparison.sides;
   return <section className="assistant-comparison" aria-label="Catalog comparison">
     <h3>{comparison.request.subject?.value} — {first.option.label} vs {second.option.label}</h3>
     {comparison.request.budget && <p>Budget preference: {comparison.request.budget.currency} {comparison.request.budget.amount.toLocaleString('en-US')}
-      {comparison.request.budget.currency === 'USD' ? ' · filters listed USD sample packages' : ' · no currency conversion applied'}</p>}
+      {comparison.request.budget.currency === 'USD' ? ' · compared with listed USD sample prices' : ' · no currency conversion applied'}</p>}
     {comparison.request.targets.map((target, index) => {
       const a = first.groups[index], b = second.groups[index];
       const fields = comparisonFields[target].filter(([key]) => [...a.findings, ...b.findings].some((finding) => factText(finding, key) !== undefined));
@@ -32,6 +33,9 @@ export function ComparisonResults({ comparison }: { comparison: Comparison }) {
             <th scope="col">{first.option.label}</th><th scope="col">{second.option.label}</th></tr></thead><tbody>
             <tr><th scope="row">Catalog matches</th><td><Match group={a} /></td><td><Match group={b} /></td></tr>
             <tr><th scope="row">Records</th><td><Values findings={a.findings} field="name" /></td><td><Values findings={b.findings} field="name" /></td></tr>
+            {[...a.findings, ...b.findings].some((f) => f.requirementEvaluation) && <tr><th scope="row">Requirements</th>
+              {[a, b].map((group, side) => <td key={side}>{group.findings.map((f) => <div key={f.provenance.recordId}><strong>{f.title}</strong><RequirementResults evaluation={f.requirementEvaluation} /></div>)}</td>)}
+            </tr>}
             {fields.map(([key, label]) => <tr key={key}><th scope="row">{label}</th>
               <td><Values findings={a.findings} field={key} /></td><td><Values findings={b.findings} field={key} /></td></tr>)}
           </tbody></table>

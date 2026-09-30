@@ -84,6 +84,16 @@ Every tool declaration has `name`, `version`, `purpose`, `inputSchema`, `outputS
 - Evaluation uses de-identified test cases: intent accuracy, abstention, source attribution, tool authorization, PHI leakage, false price/provider claims, clinical safety and reviewer edit rate. A shadow rollout precedes any patient-facing automation.
 - Fallbacks are deterministic search and human care coordination. A model outage must not block case access, bookings, document retrieval or clinician review.
 
+## Requirement-aware matching
+
+The orchestrator extracts explicit requirements with `lib/requirements/RequirementExtractor` using the existing discovery entity normalizer and structured location matcher. Budget normalization retains currency, bounds, strict/inclusive operators and the original expression; it performs no exchange-rate conversion. Package features are distinct criteria, including accommodation, hotel, hospital stay and companion accommodation.
+
+`RequirementEvaluator` verifies each result ID/slug against the published snapshot and evaluates each applicable criterion independently. `exact`, `related`, `unknown`, `not_met`, `incomplete` and `not_applicable` carry explanations, actual evidence and normalized catalog field names (for example `samplePriceUsd`, `treatmentSlug`, `inclusions`, `exclusions` and linked `hospitals.city`). Inclusion/exclusion evidence is authoritative; hospital stay cannot prove accommodation, optional inclusions are incomplete, and conflicting statements require confirmation. Sample prices cannot establish a provider quote, and catalog availability cannot establish medical suitability.
+
+Peers are ranked by documented requirement satisfaction before the existing tool result limit, preserving entity blocks and stable ordering for equal scores. Feature-constrained package requests retain partial/unknown and over-budget records with explicit evaluations rather than deleting useful small-catalog options. Existing budget-only searches keep their upper-bound filter; unknown prices remain unknown. Reference contexts are created after evaluation/ranking, so ordinals follow the actual displayed order.
+
+The runtime applies deterministic evaluations after each agent's finalization and before response/output persistence. Existing care-plan JSON stores requirements; plan/task findings store evaluations and existing catalog references. Follow-ups retain criteria, destination changes replace the location criterion, and comparisons evaluate each side against its own destination. Inclusion questions use the existing reference resolver and detail tools. “Another package” excludes the latest displayed packages from the response and honestly reports when no additional record exists. No new agent, framework or table is introduced.
+
 ## Explicit prohibitions
 
 No direct SQL, unmediated database mutation, invented hospitals/doctors/prices/accreditation/availability, diagnosis, prescription, unsupported outcome claims, or false assertion that an external service was contacted. AI-generated clinical summaries are labelled **draft — requires professional review** until signed. The product does not imply regulatory compliance without a separate assessment.

@@ -10,6 +10,7 @@ import { ReferenceDetector } from './ReferenceDetector';
 import { ReferenceResolver } from './ReferenceResolver';
 import type { EntityReference, ReferenceContext } from './schemas';
 import { normalize } from '@/lib/discovery/normalize';
+import { packageAttributes } from '@/lib/requirements/RequirementTypes';
 
 const lists = { hospital: 'hospitals', package: 'packages', doctor: 'doctors', treatment: 'treatments', country: 'countries', service: 'services' } as const;
 
@@ -58,7 +59,7 @@ export async function prepareReferenceExecution(input: { content: string; conver
     tool: query.operation === 'packages' ? 'search_packages' : `get_${chosen.entityType}` as ToolName,
     objective: query.operation === 'packages' ? `Find packages associated with ${chosen.displayName}`.slice(0, 160) : `Read ${chosen.displayName}`.slice(0, 160),
     input: JSON.stringify(query.operation === 'packages' ? { query: `Packages for ${chosen.displayName}`.slice(0, 240), hospital: chosen.slug,
-      treatment: input.active?.context.treatmentSlug, budget: input.active?.context.budget?.currency === 'USD' ? input.active.context.budget.amount : undefined } : { slug: chosen.slug }),
+      treatment: input.active?.context.treatmentSlug, budget: input.active?.context.budget?.currency === 'USD' && !input.active.context.requirements?.some((r) => (packageAttributes as readonly string[]).includes(r.type)) ? input.active.context.budget.amount : undefined } : { slug: chosen.slug }),
   }] : [];
   const plan = { agent: 'discovery' as const, understanding: chosen ? `You are referring to ${chosen.displayName}.`.slice(0, 400) : 'I need to identify the result you mean.',
     steps, missingInformation: chosen ? null : resolution.reason.slice(0, 300) };

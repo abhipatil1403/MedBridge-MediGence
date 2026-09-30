@@ -18,7 +18,7 @@ export function buildReferenceContext(response: AgentResponse, createdAt = new D
         sourceRunId: response.runId, createdAt, matchType: item.matchType, location,
         city: typeof item.facts.city === 'string' ? item.facts.city : undefined,
         country: typeof item.facts.country === 'string' ? item.facts.country : undefined,
-        samplePrice: typeof item.facts.samplePriceUsd === 'number' && item.facts.samplePriceUsd >= 0 ? item.facts.samplePriceUsd : undefined,
+        samplePrice: typeof item.facts.samplePriceUsd === 'number' && item.facts.samplePriceUsd > 0 ? item.facts.samplePriceUsd : undefined,
         currency: typeof item.facts.currency === 'string' ? item.facts.currency : undefined,
         durationDays: typeof item.facts.durationDays === 'number' && item.facts.durationDays > 0 ? item.facts.durationDays : undefined,
       })) });

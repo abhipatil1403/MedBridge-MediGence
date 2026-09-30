@@ -103,6 +103,10 @@ erDiagram
   orders ||--o{ payments : records
 ```
 
+## Requirement evaluation persistence
+
+Requirement-aware matching adds optional, Zod-validated `requirements` to existing care-plan context and assistant/comparison responses. Each finding may contain `requirementEvaluation`, with per-criterion requested values, status, evidence, source fields, explanation and an overall result status. Existing plan/task findings, conversation response metadata and agent outputs persist this JSON. Legacy rows without these fields remain readable. No SQL migration or RLS change is needed; requirement evidence uses the same owner-scoped plan/conversation reads.
+
 ## Access, integrity and retention
 
 - Enable RLS before patient tables are exposed. Patient sees own records; caregiver sees only explicit grant scope; assigned staff sees only case tasks; clinician sees assigned clinical material; finance sees billing metadata, not clinical documents. Server service role is never sent to the browser.

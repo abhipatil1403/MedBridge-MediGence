@@ -113,6 +113,16 @@ it.skipIf(!ready)('persists and restores an authenticated multi-turn care plan w
     expect(runs.data?.every((run) => run.care_plan_id === first.plan!.id)).toBe(true);
     const links = await admin.from('agent_tasks').select('care_plan_task_id').in('run_id', (runs.data ?? []).map((run) => run.id));
     expect(links.data?.every((task) => Boolean(task.care_plan_task_id))).toBe(true);
+    const required = await orchestrate({ content: 'I need knee replacement in Mumbai, under $6,000, and I want a package with accommodation.' }, base);
+    conversations.push(required.conversationId);
+    const requiredPackage = required.findings.find((finding) => finding.kind === 'packages')!;
+    expect(requiredPackage.requirementEvaluation?.evaluations.find((e) => e.type === 'accommodation')?.status).toBe('unknown');
+    expect(requiredPackage.requirementEvaluation?.evaluations.find((e) => e.type === 'budget')?.status).toBe('exact');
+    const savedRequired = await new SupabasePlanningStore(admin, user.db).load(required.conversationId, user.id);
+    expect(savedRequired?.context.requirements?.find((r) => r.type === 'accommodation')).toBeDefined();
+    expect(savedRequired?.findings[0].requirementEvaluation?.overallStatus).toBe('partially_satisfies');
+    const foreignRequired = await other.db.from('care_plans').select('context,findings').eq('id', savedRequired!.id);
+    expect(foreignRequired.error).toBeNull(); expect(foreignRequired.data).toEqual([]);
   } finally {
     // Cleanup only the temporary identities and their owned test data.
     const ownedConversations = await admin.from('conversations').select('id').in('owner_id', users);

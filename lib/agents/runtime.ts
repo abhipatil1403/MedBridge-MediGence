@@ -25,6 +25,7 @@ export interface RuntimeContext {
   provider: LLMProvider;
   tools?: ToolDependencies;
   supportedAgents?: readonly AgentId[];
+  finalizeResponse?: (response: AgentResponse) => Promise<AgentResponse>;
   execution?: {
     plan: AgentPlan; route?: DiscoveryRoute; carePlanId?: string;
     taskLinks?: Record<string, string>;
@@ -199,6 +200,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
         summary: 'I cannot diagnose symptoms. If symptoms may be urgent, seek emergency care now. A licensed clinician can assess them.',
         findings, nextSteps: ['Contact a qualified medical professional for an assessment.'], question: null, tasks };
       if (context.execution?.finalize) response = await context.execution.finalize(response, results);
+      if (context.finalizeResponse) response = await context.finalizeResponse(response);
       response = assistantResponseSchema.parse(attachReferences(response));
       await context.store.saveOutput(runId, response);
       await context.store.addMessage(conversationId, 'assistant', response.summary, runId, { response });
@@ -311,6 +313,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
     let response: AgentResponse = { conversationId, runId, agent: plan.agent, status, understanding: plan.understanding,
       summary, findings: unique, nextSteps, question, tasks, approvalId, approvalProposal, discovery };
     if (context.execution?.finalize) response = await context.execution.finalize(response, results);
+    if (context.finalizeResponse) response = await context.finalizeResponse(response);
     response = assistantResponseSchema.parse(attachReferences(response));
     if (diagnostics.recoveryAttempted) diagnostics.recoveryResult = response.status;
     await context.store.saveOutput(runId, response);
@@ -323,6 +326,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
     let failedResponse: AgentResponse = { conversationId, runId, agent: plan.agent, status: 'failed',
       understanding: plan.understanding, summary: failure.publicMessage, findings, nextSteps: ['Try again or narrow the request.'], question: null, tasks };
     if (context.execution?.finalize) failedResponse = await context.execution.finalize(failedResponse, results);
+    if (context.finalizeResponse) failedResponse = await context.finalizeResponse(failedResponse);
     failedResponse = assistantResponseSchema.parse(attachReferences(failedResponse));
     await context.store.saveOutput(runId, failedResponse);
     await context.store.addMessage(conversationId, 'assistant', failedResponse.summary, runId, { response: failedResponse });

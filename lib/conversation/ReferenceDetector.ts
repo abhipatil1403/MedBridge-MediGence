@@ -15,16 +15,17 @@ export const ReferenceDetector = {
       : /\b(?:more expensive|highest (?:price|cost))\b/.test(text) ? 'expensive'
         : /\blonger\b/.test(text) ? 'longer' : /\bshorter\b/.test(text) ? 'shorter' : undefined;
     const demonstrative = /\b(?:this|that|these|those|its|their)\b/.test(text);
-    const detail = /\b(?:tell me|more about|details?|how much|you (?:showed|mentioned))\b/.test(text);
+    const inclusionQuestion = /\b(?:does|do|is)\b.*\b(?:include|included|provide|cover)\b/.test(text);
+    const detail = inclusionQuestion || /\b(?:tell me|more about|details?|how much|you (?:showed|mentioned))\b/.test(text);
     const typedDemonstrative = demonstrative && /\b(?:hospital|provider|doctor|package|treatment)s?\b/.test(text);
     if (!ordinalMatch && !relation && !(attribute && /\b(?:which|one|package)\b/.test(text))
       && !typedDemonstrative && !/^(?:this|that|this one|that one)$/.test(text)
-      && !(detail && (demonstrative || location || /\bthe (?:hospital|doctor|package|treatment|provider)\b/.test(text)))) return undefined;
+      && !(detail && (demonstrative || location || inclusionQuestion && /\bit\b/.test(text) || /\bthe (?:hospital|doctor|package|treatment|provider)\b/.test(text)))) return undefined;
     const entityType = /\b(?:hospital|provider)s?\b/.test(text) ? 'hospital' : /\bdoctors?\b/.test(text) ? 'doctor'
       : /\bpackages?\b/.test(text) ? 'package' : /\btreatments?\b/.test(text) ? 'treatment' : undefined;
     const word = ordinalMatch?.[1];
     const ordinal = word === 'last' ? 'last' : word ? ordinalWords.includes(word) ? ordinalWords.indexOf(word) + 1 : parseInt(word, 10) : undefined;
-    return referenceQuerySchema.parse({ ordinal, entityType: relation ? 'hospital' : entityType,
+    return referenceQuerySchema.parse({ ordinal, entityType: relation ? 'hospital' : entityType ?? (inclusionQuestion ? 'package' : undefined),
       location: location && !ordinalWords.includes(location) && !['last', 'cheaper', 'more expensive', 'longer', 'shorter'].includes(location) ? location : undefined,
       attribute, operation: relation ? 'packages' : /\bhow much\b/.test(text) ? 'price' : 'details' });
   },

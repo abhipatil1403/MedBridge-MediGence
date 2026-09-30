@@ -15,7 +15,7 @@ export function classifyWorkflow(content: string, normalized: NormalizedDiscover
   const simpleDoctor = normalized.targets.length === 1 && normalized.targets[0] === 'doctors' && !normalized.entities.procedure && !/\b(plan|consultation)\b/i.test(content);
   if (simpleDoctor && normalized.entities.specialty && active?.context.specialty !== normalized.entities.specialty)
     return workflowDecisionSchema.parse({ workflow: 'discovery', reason: 'catalog_request' });
-  const followUp = /\b(show|packages?|hospitals?|doctors?|options?|cheapest|compare|budget|prefer|reviewed|confirm|continue|cancel|consultation|done|complete|those|these)\b/i.test(content);
+  const followUp = /\b(show|packages?|hospitals?|doctors?|options?|cheapest|compare|budget|prefer|reviewed|confirm|continue|cancel|consultation|done|complete|those|these|what about|another)\b/i.test(content);
   if (active && (followUp || (active.status === 'awaiting_user' && (normalized.entities.procedure || normalized.entities.city || normalized.entities.specialty))) && !(/\b(?:new|separate) (?:plan|goal)\b/i.test(content))) {
     // An explicit different procedure is a new goal within the current conversation.
     if (!normalized.entities.procedure || !active.context.treatmentSlug || normalized.entities.procedure === active.context.treatmentSlug)

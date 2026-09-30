@@ -11,6 +11,9 @@ import { upsertTask } from '../treatment-planning/tasks';
 import { classifyWorkflow } from './classifier';
 import { prepareComparison } from '../comparison/agent';
 import { prepareReferenceExecution } from '@/lib/conversation/execution';
+import { persistedResponses } from '@/lib/conversation/context';
+import { RequirementExtractor } from '@/lib/requirements/RequirementExtractor';
+import { applyRequirements } from '@/lib/requirements/response';
 
 export interface OrchestratorContext extends RuntimeContext { planningStore: PlanningStore }
 
@@ -63,10 +66,22 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
       } }));
     }
     const snapshot = await loadDiscoverySnapshot(context.tools?.repository ?? defaultToolDependencies.repository);
+    const lastResponse = persistedResponses(recent, conversationId).at(-1);
+    const previousRequirements = active?.context.requirements ?? lastResponse?.requirements ?? [];
+    const newGoal = /\b(?:new|separate) (?:plan|goal|search)\b/i.test(request.content);
+    const requirements = RequirementExtractor.extract(request.content, snapshot, newGoal ? [] : previousRequirements);
+    const another = /\b(?:another|different) (?:one|package)\b/i.test(request.content);
+    const excludedIds = another ? (lastResponse?.findings ?? []).filter((f) => f.kind === 'packages').map((f) => f.provenance.recordId) : [];
+    context = { ...context, tools: { ...(context.tools ?? defaultToolDependencies), requirements, evaluationSnapshot: snapshot }, finalizeResponse: async (response) => {
+      const evaluated = applyRequirements(response, requirements, snapshot, excludedIds);
+      if (evaluated.plan && hasPlanningSchema) evaluated.plan = await context.planningStore.save(evaluated.plan, lease);
+      return evaluated;
+    } };
+    if (active) active.context.requirements = requirements;
     const referenceExecution = await prepareReferenceExecution({ content: request.content, conversationId, recent, active, snapshot,
       store: context.planningStore, lease });
     if (referenceExecution) return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution: referenceExecution }));
-    const goalText = request.content.split(/[.!?]/)[0].replace(/\s+treatment(?=\s+(?:in|at|near)\b|$)/i, '');
+    const goalText = request.content.split(/[.!?]/)[0].replace(/,?\s+(?:under|below|within|less than|maximum|budget|with|and I want)\b.*$/i, '').replace(/\s+treatment(?=\s+(?:in|at|near)\b|$)/i, '');
     let normalized = QueryNormalizer.normalize(goalText, snapshot);
     let content = request.content;
     // Resolve the answer to the most recent targeted discovery clarification.

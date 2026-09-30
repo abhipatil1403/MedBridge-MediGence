@@ -12,6 +12,7 @@ import { resolvePlanningContext, planningQuestion } from './context';
 import { derivePlanStatus, discoveryTask, PLANNING_LIMITS, upsertTask } from './tasks';
 import type { PlanningStore } from './store';
 import { discoveryMatch, planningResultGroup, planningTargets } from './results';
+import { packageAttributes } from '@/lib/requirements/RequirementTypes';
 
 export async function prepareTreatmentPlanning(input: { content: string; userId: string; conversationId: string;
   snapshot: CatalogSnapshot; active?: CarePlan; caseContext?: Record<string, unknown>; store: PlanningStore; lease: string; provider: LLMProvider; tools: ToolDependencies }): Promise<NonNullable<RuntimeContext['execution']>> {
@@ -50,7 +51,7 @@ export async function prepareTreatmentPlanning(input: { content: string; userId:
   const steps: AgentPlan['steps'] = question ? [] : baseRoute.plan.steps.map((step) => {
     const args: Record<string, unknown> = JSON.parse(step.input);
     args.query = `Find ${step.tool.replace('search_', '')} for ${context.treatmentName ?? context.specialty}${location ? ` in ${location}` : ''}`;
-    if (step.tool === 'search_packages' && context.budget?.currency === 'USD') args.budget = context.budget.amount;
+    if (step.tool === 'search_packages' && context.budget?.currency === 'USD' && !context.requirements?.some((r) => (packageAttributes as readonly string[]).includes(r.type))) args.budget = context.budget.amount;
     if (context.preferredHospital && ['search_hospitals', 'search_packages', 'search_doctors'].includes(step.tool)) args.hospital = context.preferredHospital;
     if (step.tool === 'search_doctors' && context.consultationMode) args.mode = context.consultationMode;
     // Input keys have stable order so a repeated request reuses the completed search.

@@ -69,7 +69,7 @@ export function routeToolDependencies(route: DiscoveryRoute, base: ToolDependenc
     listPriceEstimates: async () => snapshot.estimates,
   };
   const search = new SearchService(repository);
-  return { repository, compare: base.compare,
+  return { ...base, repository, compare: base.compare,
     search: base.search === defaultToolDependencies.search
       ? (query, type, filters) => search.search({ q: query, type, ...filters, sort: 'relevance' })
       : base.search };

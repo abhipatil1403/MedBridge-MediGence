@@ -2,10 +2,12 @@ import type { CatalogSnapshot } from '@/types/catalog';
 import { QueryNormalizer } from '@/lib/discovery/query-normalizer';
 import { normalize } from '@/lib/discovery/normalize';
 import { planningContextSchema, type CarePlan, type PlanningContext } from '../schemas';
+import { RequirementExtractor } from '@/lib/requirements/RequirementExtractor';
+import { legacyBudget } from '@/lib/requirements/RequirementNormalizer';
 
 export function resolvePlanningContext(content: string, snapshot: CatalogSnapshot, active?: CarePlan, caseContext?: Record<string, unknown>): PlanningContext {
   // Later sentences express actions/preferences, not part of the procedure's name.
-  const goalText = content.split(/[.!?]/)[0].replace(/\s+(?:my )?budget\b.*$/i, '').replace(/\s+treatment(?=\s+(?:in|at|near)\b|$)/i, '');
+  const goalText = content.split(/[.!?]/)[0].replace(/,?\s+(?:under|below|within|less than|maximum|(?:my )?budget|with|and I want)\b.*$/i, '').replace(/\s+treatment(?=\s+(?:in|at|near)\b|$)/i, '');
   const normalized = QueryNormalizer.normalize(goalText, snapshot);
   const entities = normalized.entities;
   const treatment = snapshot.treatments.find((item) => item.slug === entities.procedure);
@@ -19,22 +21,21 @@ export function resolvePlanningContext(content: string, snapshot: CatalogSnapsho
   const consultation = /\bconsultation\b/i.test(content);
   const newConsultationGoal = consultation && !treatment && entities.specialty && entities.specialty !== previous?.specialty;
   const explicitTargets: PlanningContext['requestedTargets'] = [];
+  const requirements = RequirementExtractor.extract(content, snapshot, previous?.requirements);
   if (/\bhospitals?\b/i.test(content)) explicitTargets.push('hospitals');
   if (/\bpackages?\b/i.test(content)) explicitTargets.push('packages');
+  if (requirements.some((item) => item.type === 'package') && !explicitTargets.includes('packages')) explicitTargets.push('packages');
   if (/\b(doctors?|cardiologists?|specialists?|clinicians?)\b/i.test(content)) explicitTargets.push('doctors');
   if (consultation && !treatment) explicitTargets.push('doctors', 'services');
   const requestedTargets = [...new Set(explicitTargets.length ? explicitTargets : previous?.requestedTargets.length ? previous.requestedTargets : ['hospitals', 'packages'] as const)];
-  const budgetMatch = /(?:\b(?:my\s+)?budget\s+(?:is\s+)?(?:around\s+|about\s+|up to\s+)?)(?:(\$|usd|₹|inr|rs\.?|rupees)\s*)?([\d,]+(?:\.\d+)?)(?:\s*(usd|inr|dollars|rupees))?/i.exec(content);
-  const currencyText = (budgetMatch?.[1] || budgetMatch?.[3] || '').toLowerCase();
-  const amount = budgetMatch ? Number(budgetMatch[2].replaceAll(',', '')) : undefined;
-  const budget = amount && amount <= 100000000 && currencyText ? { amount,
-    currency: /₹|inr|rs|rupees/.test(currencyText) ? 'INR' as const : 'USD' as const, source: 'user' as const } : previous?.budget;
+  const budget = requirements.some((r) => r.type === 'budget') ? legacyBudget(requirements)
+    : /\b(no|remove|drop)\s+(?:the\s+)?budget\b/i.test(content) ? undefined : previous?.budget;
   const hospital = snapshot.hospitals.find((item) => /\bprefer\b/i.test(content) && normalize(content).includes(normalize(item.name)));
   return planningContextSchema.parse({ ...previous, goalType: consultation ? 'consultation' : treatment ? 'treatment' : previous?.goalType ?? 'treatment',
     treatmentSlug: treatment?.slug ?? (newConsultationGoal ? undefined : previous?.treatmentSlug), treatmentName: treatment?.name ?? (newConsultationGoal ? undefined : previous?.treatmentName),
     treatmentId: treatment?.recordId ?? (newConsultationGoal ? undefined : previous?.treatmentId),
-    specialty: entities.specialty ?? previous?.specialty, city: entities.city ?? previous?.city, country: entities.country ?? previous?.country,
-    budget, requestedTargets, preferredHospital: hospital?.slug ?? previous?.preferredHospital,
+    specialty: entities.specialty ?? previous?.specialty, city: entities.city ?? (entities.country ? undefined : previous?.city), country: entities.country ?? previous?.country,
+    budget, requirements, requestedTargets, preferredHospital: hospital?.slug ?? previous?.preferredHospital,
     consultationMode: /\b(video|online)\b/i.test(content) ? 'video' : /\bin.person\b/i.test(content) ? 'in-person' : previous?.consultationMode,
   });
 }

@@ -218,7 +218,7 @@ function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disable
   onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; onRetry?: () => void; disabled: boolean }) {
   return <div className="assistant-response"><div><small>WHAT I UNDERSTOOD</small><p>{response.understanding}</p></div>
     <div><small>FINDINGS</small><p>{response.summary}</p>
-      {!response.resultGroups?.length && response.discovery && <div className="assistant-match-state" role="status"><strong>{response.status === 'awaiting_user_input' ? 'One detail needed' : response.discovery.matchType === 'exact' ? 'Exact catalog matches' : response.discovery.matchType === 'related' ? 'Related catalog information' : 'No exact catalog match'}</strong>
+      {!response.resultGroups?.length && response.discovery && <div className="assistant-match-state" role="status"><strong>{response.status === 'awaiting_user_input' ? 'One detail needed' : response.findings.some((f) => f.requirementEvaluation && f.requirementEvaluation.overallStatus !== 'fully_satisfies') ? 'Catalog results · review requirements' : response.discovery.matchType === 'exact' ? 'Exact catalog matches' : response.discovery.matchType === 'related' ? 'Related catalog information' : 'No exact catalog match'}</strong>
         <p>{response.discovery.matchReason}</p>
         {response.discovery.recovered && <p>Catalog criteria were checked directly to complete this search.</p>}</div>}
       {response.status === 'failed' && <div className="assistant-recovery">{onRetry && <button type="button" disabled={disabled} onClick={onRetry}>Retry this request</button>}

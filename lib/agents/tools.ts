@@ -7,6 +7,7 @@ import { getComparison } from '@/lib/catalog/comparison-service';
 import { agents } from './registry';
 import { AgentError } from './errors';
 import { toolResultSchema, type AgentId, type Finding, type ToolName, type ToolResult } from './schemas';
+import { evaluateFindings } from '@/lib/requirements/response';
 
 const searchInput = z.object({
   query: z.string().trim().min(2).max(240),
@@ -84,6 +85,8 @@ export interface ToolContext {
   caseAccess: CaseAccess;
 }
 export interface ToolDependencies {
+  requirements?: import('@/lib/requirements/RequirementTypes').Requirement[];
+  evaluationSnapshot?: import('@/types/catalog').CatalogSnapshot;
   repository: CatalogRepository;
   search: (query: string, type: ResultType, filters: Pick<DiscoveryFilters, 'country' | 'city' | 'treatment' | 'specialty' | 'hospital' | 'mode' | 'budget'>) => Promise<DiscoveryResults>;
   compare: typeof getComparison;
@@ -112,7 +115,7 @@ const hrefKinds: Record<string, string> = { treatments: 'treatments', hospitals:
 function toFinding(kind: string, record: CatalogRecord, matchType: Finding['matchType'] = 'exact', matchReason = 'Selected catalog record.'): Finding {
   const facts: Record<string, string | number | null> = {};
   const item = record as unknown as Record<string, unknown>;
-  for (const key of ['city', 'country', 'specialty', 'hospitalSlug', 'hospitalName', 'samplePriceUsd', 'sampleBaseCostUsd', 'durationDays', 'verification', 'travelNote', 'consultationMode', 'sampleBedCount', 'sampleAccreditation', 'sampleExperienceYears']) {
+  for (const key of ['city', 'country', 'specialty', 'hospitalSlug', 'hospitalName', 'treatmentSlug', 'samplePriceUsd', 'sampleBaseCostUsd', 'durationDays', 'verification', 'travelNote', 'consultationMode', 'sampleBedCount', 'sampleAccreditation', 'sampleExperienceYears']) {
     const value = item[key];
     // The legacy catalog adapter uses zero for absent optional counts. Do not present these as sourced attributes.
     if (['sampleBedCount', 'sampleExperienceYears'].includes(key) && (typeof value !== 'number' || value <= 0)) continue;
@@ -150,7 +153,8 @@ export async function executeTool(name: ToolName, rawInput: unknown, context: To
     const result = await dependencies.search(input.query, kind, { country: input.country, city: input.city, treatment: input.treatment, specialty: input.specialty,
       hospital: input.hospital, mode: input.mode as DiscoveryFilters['mode'], budget: input.budget });
     const matches = result.sections[kind].filter(({ item }) => !input.verification || (input.verification === 'demo' ? item.sourceKind === 'synthetic' : item.sourceKind !== 'synthetic'));
-    return { findings: matches.slice(0, 5).map(({item, matchType, reason}) => toFinding(kind, item, matchType, reason)),
+    const findings = matches.map(({ item, matchType, reason }) => toFinding(kind, item, matchType, reason));
+    return { findings: (dependencies.requirements?.length && dependencies.evaluationSnapshot ? evaluateFindings(findings, dependencies.requirements, dependencies.evaluationSnapshot) : findings).slice(0, 5),
       note: matches.length === 0 ? 'No matching catalog records were found.' : undefined };
   }
   if (name in getKinds) {

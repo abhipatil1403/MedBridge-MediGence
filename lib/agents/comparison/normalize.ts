@@ -3,6 +3,8 @@ import { QueryNormalizer } from '@/lib/discovery/query-normalizer';
 import { normalize } from '@/lib/discovery/normalize';
 import type { CatalogSnapshot } from '@/types/catalog';
 import { comparisonRequestSchema, type CarePlan, type ComparisonRequest } from '../schemas';
+import { RequirementExtractor } from '@/lib/requirements/RequirementExtractor';
+import { legacyBudget } from '@/lib/requirements/RequirementNormalizer';
 
 export function latestComparisonRequest(plan?: CarePlan) {
   return [...plan?.tasks ?? []].reverse().filter((task) => task.status !== 'cancelled' && task.comparisonRequest)
@@ -23,7 +25,7 @@ export function normalizeComparison(content: string, snapshot: CatalogSnapshot, 
   const previous = latestComparisonRequest(active);
   const marker = /\b(compare|comparison|which)\b/i.exec(content);
   const clause = marker ? content.slice(marker.index) : content;
-  const text = clause.replace(/\b(?:with|within|under)\b[^.!?]*\bbudget\b[^.!?]*|\b(?:my\s+)?budget\b[^.!?]*$/gi, '').replace(/[.!?]+$/, '');
+  const text = clause.replace(/[.!?]+$/, '').replace(/,?\s+(?:under|below|within|less than|(?:my\s+)?budget)\b.*$/gi, '');
   const locations = EntityMatcher.locations(text, snapshot);
   const cities = locations.filter((option) => option.type === 'city');
   const ordered = cities.length >= 2 ? cities : locations;
@@ -57,7 +59,7 @@ export function normalizeComparison(content: string, snapshot: CatalogSnapshot, 
   if (!subject) {
     const entities = EntityMatcher.match(text, snapshot);
     if (entities.specialty) subject = { type: 'specialty', value: entities.specialty, matchType: 'exact' };
-    else if (referential) subject = previous?.subject ?? (active?.context.treatmentSlug
+    else if (referential || active?.context.treatmentSlug) subject = previous?.subject ?? (active?.context.treatmentSlug
       ? { type: 'treatment', value: active.context.treatmentName ?? active.context.treatmentSlug, slug: active.context.treatmentSlug, matchType: 'exact' }
       : active?.context.specialty ? { type: 'specialty', value: active.context.specialty, matchType: 'exact' } : undefined);
     else if (explicitTargets.length === 1 && explicitTargets[0] === 'hospitals') subject = { type: 'catalog', value: 'Hospitals', matchType: 'exact' };
@@ -67,9 +69,10 @@ export function normalizeComparison(content: string, snapshot: CatalogSnapshot, 
   const budgetMatch = /\bbudget\s+(?:is\s+)?(?:around\s+|about\s+|up to\s+)?(\$|usd|₹|inr|rs\.?)\s*([\d,]+(?:\.\d+)?)|(\$|usd|₹|inr|rs\.?)\s*([\d,]+(?:\.\d+)?)\s*(?:budget)?/i.exec(content);
   const amount = budgetMatch ? Number((budgetMatch[2] ?? budgetMatch[4]).replaceAll(',', '')) : undefined;
   const currency = budgetMatch?.[1] ?? budgetMatch?.[3];
-  const budget = amount && amount <= 100000000 ? { amount, currency: /₹|inr|rs/i.test(currency!) ? 'INR' as const : 'USD' as const, source: 'user' as const }
-    : referential ? previous?.budget ?? active?.context.budget : undefined;
-  const request = comparisonRequestSchema.parse({ intent: 'comparison', subject, options, targets, budget,
+  const requirements = RequirementExtractor.extract(content, snapshot, active?.context.requirements ?? previous?.requirements);
+  const budget = legacyBudget(requirements) ?? (amount && amount <= 100000000 ? { amount, currency: /₹|inr|rs/i.test(currency!) ? 'INR' as const : 'USD' as const, source: 'user' as const }
+    : referential ? previous?.budget ?? active?.context.budget : undefined);
+  const request = comparisonRequestSchema.parse({ intent: 'comparison', subject, options, targets, budget, requirements,
     focus: /\b(cheaper|lower|lowest)\b/i.test(clause) ? 'package_price' : 'catalog' });
   const question = ordered.length > 2 ? 'Which two cities or countries would you like to compare?'
     : !subject ? options.length === 2 ? `What would you like to compare between ${options[0].label} and ${options[1].label}?` : 'What treatment or specialty would you like to compare?'

@@ -11,6 +11,7 @@ import { derivePlanStatus, upsertTask } from '../treatment-planning/tasks';
 import { discoveryMatch, planningResultGroup } from '../treatment-planning/results';
 import { normalizeComparison } from './normalize';
 import { comparisonSummary, missingFields } from './format';
+import { packageAttributes } from '@/lib/requirements/RequirementTypes';
 
 const unique = (findings: Finding[]) => [...new Map(findings.map((finding) => [finding.provenance.recordId, finding])).values()].slice(0, 30);
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 24);
@@ -47,7 +48,7 @@ export async function prepareComparison(input: { content: string; userId: string
       const args = { query: `Find ${target} for ${subject!.type === 'catalog' ? 'catalog records' : subject!.value} in ${option.label}`,
         treatment: subject?.type === 'treatment' ? subject.slug : undefined, specialty: subject?.type === 'specialty' ? subject.value : undefined,
         city: option.type === 'city' ? option.value : undefined, country: option.type === 'country' ? option.value : EntityMatcher.match(option.label, snapshot).country,
-        budget: target === 'packages' && request.budget?.currency === 'USD' ? request.budget.amount : undefined };
+        budget: target === 'packages' && request.budget?.currency === 'USD' && !request.requirements?.some((r) => (packageAttributes as readonly string[]).includes(r.type)) ? request.budget.amount : undefined };
       const tool = `search_${target}` as 'search_hospitals' | 'search_packages' | 'search_doctors';
       const step = { tool, objective: `Find ${target} for ${option.label}`, input: JSON.stringify(toolSchemas[tool].parse(args)) };
       const cached = plan.tasks.find((task) => task.taskType === 'discovery' && task.status === 'completed' && task.tool === tool && task.input === step.input);

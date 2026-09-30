@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { normalizedDiscoveryQuerySchema } from '@/lib/discovery/query-normalizer';
 import { referenceContextSchema, referenceResolutionSchema, type ReferenceContext, type ReferenceResolution } from '@/lib/conversation/schemas';
+import { requirementsSchema, resultRequirementEvaluationSchema, type Requirement, type ResultRequirementEvaluation } from '@/lib/requirements/RequirementTypes';
 
 export const agentIdSchema = z.enum(['discovery', 'treatment_planning', 'hospital_matching', 'comparison']);
 export type AgentId = z.infer<typeof agentIdSchema>;
@@ -47,6 +48,7 @@ export interface Provenance {
 }
 
 export interface Finding {
+  requirementEvaluation?: ResultRequirementEvaluation;
   kind: string;
   slug?: string;
   title: string;
@@ -70,6 +72,7 @@ export interface ToolResult {
 export const provenanceSchema = z.object({ kind: z.literal('catalog'), table: z.string(), recordId: z.guid(),
   sourceRecordId: z.guid().nullable(), label: z.string(), sourceKind: z.enum(['synthetic', 'external', 'first_party']), retrievedAt: z.iso.datetime() });
 export const findingSchema = z.object({ kind: z.string(), slug: z.string().optional(), title: z.string(), detail: z.string(),
+  requirementEvaluation: resultRequirementEvaluationSchema.optional(),
   href: z.string().optional(), facts: z.record(z.string(), z.union([z.string(), z.number(), z.null()])),
   matchType: z.enum(['exact', 'related']), matchReason: z.string().min(1), provenance: provenanceSchema });
 export const toolResultSchema = z.object({ findings: z.array(findingSchema).max(30), note: z.string().optional(),
@@ -102,6 +105,7 @@ export const comparisonOptionSchema = z.object({ type: z.enum(['city', 'country'
 export const comparisonSubjectSchema = z.object({ type: z.enum(['treatment', 'specialty', 'catalog']), value: z.string().min(1).max(160),
   slug: z.string().optional(), matchType: z.enum(['exact', 'related', 'none']), relatedSlug: z.string().optional() }).strict();
 export const comparisonRequestSchema = z.object({ intent: z.literal('comparison'), subject: comparisonSubjectSchema.optional(),
+  requirements: requirementsSchema.optional(),
   options: z.array(comparisonOptionSchema).max(2), targets: z.array(z.enum(['hospitals', 'packages', 'doctors'])).min(1).max(3),
   budget: z.object({ amount: z.number().positive().max(100000000), currency: z.enum(['USD', 'INR']), source: z.literal('user') }).strict().optional(),
   focus: z.enum(['catalog', 'package_price']),
@@ -120,6 +124,7 @@ export const comparisonSchema = z.object({ id: z.uuid(), request: comparisonRequ
 export type Comparison = z.infer<typeof comparisonSchema>;
 
 export const planningContextSchema = z.object({
+  requirements: requirementsSchema.optional(),
   goalType: z.enum(['treatment', 'consultation']),
   treatmentSlug: z.string().optional(), treatmentName: z.string().optional(), treatmentId: z.guid().optional(),
   specialty: z.string().optional(), city: z.string().optional(), country: z.string().optional(),
@@ -160,6 +165,7 @@ export interface AgentTaskView {
 }
 
 export interface AgentResponse {
+  requirements?: Requirement[];
   referenceContext?: ReferenceContext;
   referenceResolution?: ReferenceResolution;
   conversationId: string;
@@ -185,6 +191,7 @@ export interface AgentResponse {
 }
 
 export const assistantResponseSchema = z.object({
+  requirements: requirementsSchema.optional(),
   referenceContext: referenceContextSchema.optional(), referenceResolution: referenceResolutionSchema.optional(),
   conversationId: z.uuid(), runId: z.uuid(), agent: agentIdSchema,
   status: z.enum(['completed', 'awaiting_user_input', 'awaiting_approval', 'failed']),

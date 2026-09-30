@@ -78,7 +78,7 @@ export function searchPackages(catalog: CatalogSnapshot, parsed: ParsedQuery, fi
     (!country || item.country === country) && (!(filters.treatment || parsed.entities.procedure) || item.treatmentSlug === (filters.treatment || parsed.entities.procedure)) &&
     (!filters.hospital || item.hospitalSlug === filters.hospital) &&
     (!city || catalog.hospitals.some((hospital) => hospital.slug === item.hospitalSlug && normalize(hospital.city) === normalize(city))) &&
-    (!filters.budget || item.samplePriceUsd <= filters.budget),
+    (!filters.budget || !Number.isFinite(item.samplePriceUsd) || item.samplePriceUsd <= 0 || item.samplePriceUsd <= filters.budget),
   );
   return SearchRankingService.sort(matched("packages", results, parsed, (item) => ({
     country: item.country, city: catalog.hospitals.find((hospital) => hospital.slug === item.hospitalSlug)?.city, treatmentSlugs: [item.treatmentSlug],
