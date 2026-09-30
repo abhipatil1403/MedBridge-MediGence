@@ -1,5 +1,7 @@
 # Automation map
 
+Implemented ComparisonAgent is request-driven. Comparison intent selects two independent catalog search contexts; task completion records actual tool outcomes, and a separate review remains for the user. Identical completed inputs reuse saved results, and failed inputs can be retried on the next request while preserving the successful side. Budget updates refresh affected package inputs. No provider contact, booking, outbound notification, currency conversion or clinical decision is triggered by a comparison.
+
 Automations are event-driven service workflows with an owner, idempotency key, audit event and retry/dead-letter behavior. An AI draft is not an action. Rules and notifications must reflect persisted state; deadlines are configured by service and jurisdiction, not borrowed from marketing claims.
 
 Implemented assistant planning is request-driven: a planning goal creates/reuses one coordination plan, generates request-specific catalog searches, records real completion, and leaves review/preference tasks for the user. Stable task keys prevent duplicates; unchanged searches reuse saved results. A per-conversation lease prevents simultaneous turns and expires after a server interruption. User review updates derive plan status from actual tasks. No reminders, enquiries, payments, bookings, travel requests, or outbound messages are triggered by this milestone.

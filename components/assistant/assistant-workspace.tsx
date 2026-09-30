@@ -6,6 +6,7 @@ import Link from 'next/link';
 import type { AgentResponse, CarePlan } from '@/lib/agents/schemas';
 import { CarePlanPanel } from './care-plan-panel';
 import { FindingCards, PlanningResultGroups } from './catalog-results';
+import { ComparisonResults } from './comparison-results';
 
 type Conversation = { id: string; title: string; case_id: string | null; updated_at: string };
 type Case = { id: string; title: string; status: string; agentConsent: boolean; canManageConsent: boolean };
@@ -222,7 +223,7 @@ function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disable
         {response.discovery.recovered && <p>Catalog criteria were checked directly to complete this search.</p>}</div>}
       {response.status === 'failed' && <div className="assistant-recovery">{onRetry && <button type="button" disabled={disabled} onClick={onRetry}>Retry this request</button>}
         <Link href="/discover">Continue with standard catalog search →</Link></div>}
-      {response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : <FindingCards findings={response.findings} />}</div>
+      {response.comparison ? <ComparisonResults comparison={response.comparison} /> : response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : <FindingCards findings={response.findings} />}</div>
     {response.question && <div className="assistant-response__question"><small>WHAT I NEED FROM YOU</small><p>{response.question}</p></div>}
     {response.approvalProposal && <div className="assistant-response__approval"><small>PROPOSED ACTION</small><p>{response.approvalProposal.detail}</p>
       {response.approvalProposal.action === 'request_external_action' ? <p>External sharing and bookings are not connected. This request remains pending human review.</p>

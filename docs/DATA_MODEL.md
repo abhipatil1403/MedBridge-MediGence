@@ -15,6 +15,10 @@ Migration `20260930090000_care_planning.sql` adds `care_plans` and `care_plan_ta
 
 Task keys are unique within a plan. Tasks distinguish discovery, user review/preferences, required clarification, and an unimplemented external approval boundary. `agent_runs.care_plan_id` and `agent_tasks.care_plan_task_id` connect plans to existing actions/outputs; triggers enforce matching plan/conversation/task scope. No direct patient writes are granted. Owner reads use RLS and inherit current case access from the conversation. Service-only lease/save RPCs serialize turns and save plan/task changes atomically.
 
+## Implemented catalog comparison
+
+ComparisonAgent reuses `care_plan_tasks.metadata`: a discovery coordination task stores `comparisonRequest` and its validated `comparison` result (result ID, ordered options, subject, independent result groups, execution status, source records, missing fields and limitations). Existing discovery tasks store the actual approved search inputs and results; execution foreign keys link each side to its persistent task. A review task records the user's review separately. Context and result history remain scoped to the original owned conversation. The task type remains `discovery`; no table, SQL constraint, RPC or RLS migration is required.
+
 ## Future extensions
 
 ## Identity and access

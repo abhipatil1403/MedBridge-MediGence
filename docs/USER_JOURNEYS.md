@@ -21,6 +21,12 @@ At `/assistant`, “I need knee replacement treatment in Mumbai” creates a sav
 
 “Show me packages” or “Which hospitals do we have?” continues the same plan using saved treatment/location criteria. Identical successful searches reuse sourced findings; changing a USD budget refreshes the affected package search. The panel records actual search completion, pending reviews, optional preferences, and confirmation states. Users mark reviews/preferences done, reopen them, or cancel a plan. Refresh reloads the selected conversation and saved plan. Completion describes the coordination checklist, not treatment, booking, or provider contact.
 
+## Implemented assistant comparison journey
+
+“Compare knee replacement in Pune and Mumbai” keeps the two locations in that order and searches each independently. A location with no published matching records remains empty; the other side retains its sourced results. Hospital/package/doctor table values come from validated findings. Source details retain record IDs, dates, match reasons and synthetic labels. Package prices are listed samples, not quotes or clinical recommendations.
+
+“Which has the cheaper package?” reuses the saved comparison subject and options. If either side lacks a comparable price, the assistant reports the available price and the missing side without declaring a cheaper destination. A stated USD budget filters package searches only. “Compare it with Pune” after a Mumbai treatment plan adds the comparison to that same plan; it does not replace its destination. Missing subjects or second options produce one clarification and no provider search. Refresh restores the comparison from the conversation and care-plan task. On mobile, each comparison table scrolls inside its own labeled region.
+
 ## Cross-journey invariants
 
 - A person may have several cases; a service request belongs to one case and one patient profile. A caregiver needs an explicit grant, not a shared login.

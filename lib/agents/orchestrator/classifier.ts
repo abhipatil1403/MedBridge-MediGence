@@ -1,12 +1,15 @@
 import { z } from 'zod';
 import type { NormalizedDiscoveryQuery } from '@/lib/discovery/query-normalizer';
 import type { CarePlan } from '../schemas';
+import { isComparisonRequest } from '../comparison/normalize';
 
-export const workflowDecisionSchema = z.object({ workflow: z.enum(['discovery', 'treatment_planning']),
-  reason: z.enum(['catalog_request', 'planning_goal', 'plan_continuation', 'missing_context']) }).strict();
+export const workflowDecisionSchema = z.object({ workflow: z.enum(['discovery', 'treatment_planning', 'comparison']),
+  reason: z.enum(['catalog_request', 'planning_goal', 'plan_continuation', 'missing_context', 'comparison_request']) }).strict();
 export type WorkflowDecision = z.infer<typeof workflowDecisionSchema>;
 
 export function classifyWorkflow(content: string, normalized: NormalizedDiscoveryQuery, active?: CarePlan): WorkflowDecision {
+  if (isComparisonRequest(content, active) && !(active && /\bcompare (?:them|those|these)\b/i.test(content)
+    && /\b(find|show|i need)\b/i.test(content))) return workflowDecisionSchema.parse({ workflow: 'comparison', reason: 'comparison_request' });
   const wantsPlan = /\b(plan|planning|help me (?:understand|organize)|i need|i want|i am looking for)\b/i.test(content);
   const careGoal = Boolean(normalized.entities.procedure || normalized.entities.procedurePhrase || /\b(treatment|surgery|consultation)\b/i.test(content));
   const simpleDoctor = normalized.targets.length === 1 && normalized.targets[0] === 'doctors' && !normalized.entities.procedure && !/\b(plan|consultation)\b/i.test(content);

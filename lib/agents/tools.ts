@@ -112,14 +112,17 @@ const hrefKinds: Record<string, string> = { treatments: 'treatments', hospitals:
 function toFinding(kind: string, record: CatalogRecord, matchType: Finding['matchType'] = 'exact', matchReason = 'Selected catalog record.'): Finding {
   const facts: Record<string, string | number | null> = {};
   const item = record as unknown as Record<string, unknown>;
-  for (const key of ['city', 'country', 'specialty', 'hospitalSlug', 'hospitalName', 'samplePriceUsd', 'sampleBaseCostUsd', 'durationDays', 'verification', 'travelNote', 'consultationMode']) {
+  for (const key of ['city', 'country', 'specialty', 'hospitalSlug', 'hospitalName', 'samplePriceUsd', 'sampleBaseCostUsd', 'durationDays', 'verification', 'travelNote', 'consultationMode', 'sampleBedCount', 'sampleAccreditation', 'sampleExperienceYears']) {
     const value = item[key];
+    // The legacy catalog adapter uses zero for absent optional counts. Do not present these as sourced attributes.
+    if (['sampleBedCount', 'sampleExperienceYears'].includes(key) && (typeof value !== 'number' || value <= 0)) continue;
     if (typeof value === 'string' || typeof value === 'number') facts[key] = value;
   }
   if (Array.isArray(item.specialties)) facts.specialties = item.specialties.join(', ');
   if (Array.isArray(item.treatmentSlugs)) facts.treatments = item.treatmentSlugs.join(', ');
   if (Array.isArray(item.inclusions)) facts.inclusions = item.inclusions.join('; ');
   if (Array.isArray(item.exclusions)) facts.exclusions = item.exclusions.join('; ');
+  for (const key of ['qualifications', 'languages', 'infrastructure', 'countries']) if (Array.isArray(item[key])) facts[key] = item[key].join('; ');
   if (kind === 'packages') facts.currency = 'USD';
   return {
     kind, slug: record.slug, title: record.name, detail: record.description,

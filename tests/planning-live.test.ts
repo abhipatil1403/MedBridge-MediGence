@@ -73,6 +73,18 @@ it.skipIf(!ready)('persists and restores an authenticated multi-turn care plan w
     expect(freshNoModel.findings.some((item) => item.kind === 'hospitals')).toBe(true);
     expect(freshNoModel.findings.some((item) => item.kind === 'packages')).toBe(true);
     expect((await planningStore.load(freshNoModel.conversationId, user.id))?.id).toBe(freshNoModel.plan?.id);
+    const comparison = await orchestrate({ content: 'Compare it with Pune.', conversationId: first.conversationId }, base);
+    expect(comparison.agent).toBe('comparison'); expect(comparison.plan?.id).toBe(first.plan?.id);
+    expect(comparison.comparison?.sides.map((side) => side.option.value)).toEqual(['Mumbai', 'Pune']);
+    expect(comparison.comparison?.sides[0].groups.every((group) => group.matchType === 'exact')).toBe(true);
+    expect(comparison.comparison?.sides[1].groups.every((group) => group.matchType === 'none')).toBe(true);
+    const comparisonReload = await planningStore.load(first.conversationId, user.id);
+    expect(comparisonReload?.context.city).toBe('Mumbai');
+    expect(comparisonReload?.tasks.some((task) => task.comparison?.id === comparison.comparison?.id && task.status === 'completed')).toBe(true);
+    const privateComparisons = await other.db.from('care_plan_tasks').select('metadata').eq('care_plan_id', first.plan!.id);
+    expect(privateComparisons.error).toBeNull(); expect(privateComparisons.data).toEqual([]);
+    const cheaper = await orchestrate({ content: 'Which has the cheaper package?', conversationId: first.conversationId }, base);
+    expect(cheaper.question).toBeNull(); expect(cheaper.tasks).toHaveLength(0); expect(cheaper.summary).not.toMatch(/Mumbai is cheaper/);
     const regressionQueries = ['Find me a hospital.', 'I need a heart doctor in Mumbai.', 'Find hospitals for underwater brain surgery in Mumbai.'];
     for (const content of regressionQueries) {
       const response = await orchestrate({ content }, base); conversations.push(response.conversationId);

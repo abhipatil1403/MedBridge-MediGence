@@ -9,12 +9,13 @@ import { prepareTreatmentPlanning } from '../treatment-planning/agent';
 import type { PlanningStore } from '../treatment-planning/store';
 import { upsertTask } from '../treatment-planning/tasks';
 import { classifyWorkflow } from './classifier';
+import { prepareComparison } from '../comparison/agent';
 
 export interface OrchestratorContext extends RuntimeContext { planningStore: PlanningStore }
 
 /** One authenticated turn, one selected workflow, one bounded runtime. No recursive agent calls. */
 export async function orchestrate(rawRequest: unknown, context: OrchestratorContext): Promise<AgentResponse> {
-  context = { ...context, supportedAgents: ['discovery', 'treatment_planning'] };
+  context = { ...context, supportedAgents: ['discovery', 'treatment_planning', 'comparison'] };
   const request = userRequestSchema.parse(rawRequest);
   const caseContext = request.caseId ? await context.caseAccess.readContext(request.caseId) : undefined;
   const conversationId = request.conversationId ?? await context.store.createConversation(context.userId, request.caseId);
@@ -73,6 +74,12 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
       normalized = QueryNormalizer.normalize(content, snapshot);
     }
     const decision = classifyWorkflow(content, normalized, active);
+    if (decision.workflow === 'comparison') {
+      if (!hasPlanningSchema) throw new AgentError('PLANNING_MIGRATION_MISSING', 'Saved comparisons need the care-plan migration before they can run.');
+      const execution = await prepareComparison({ content: request.content, snapshot, active, userId: context.userId, conversationId,
+        store: context.planningStore, lease, tools: context.tools ?? defaultToolDependencies });
+      return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
+    }
     const unsupported = normalized.entities.procedurePhrase && ['related', 'none'].includes(normalized.entities.procedureMatchType);
     if (decision.workflow === 'treatment_planning' && !unsupported) {
       if (!hasPlanningSchema) throw new AgentError('PLANNING_MIGRATION_MISSING', 'Care planning needs its database migration before it can run. Catalog discovery is still available.');

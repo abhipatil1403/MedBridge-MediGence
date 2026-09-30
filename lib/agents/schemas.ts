@@ -97,6 +97,27 @@ export const planningResultGroupSchema = discoveryMatchSchema.extend({
 }, 'Group match status must describe its own findings');
 export type PlanningResultGroup = z.infer<typeof planningResultGroupSchema>;
 
+export const comparisonOptionSchema = z.object({ type: z.enum(['city', 'country']), value: z.string().min(1).max(100), label: z.string().min(1).max(100) }).strict();
+export const comparisonSubjectSchema = z.object({ type: z.enum(['treatment', 'specialty', 'catalog']), value: z.string().min(1).max(160),
+  slug: z.string().optional(), matchType: z.enum(['exact', 'related', 'none']), relatedSlug: z.string().optional() }).strict();
+export const comparisonRequestSchema = z.object({ intent: z.literal('comparison'), subject: comparisonSubjectSchema.optional(),
+  options: z.array(comparisonOptionSchema).max(2), targets: z.array(z.enum(['hospitals', 'packages', 'doctors'])).min(1).max(3),
+  budget: z.object({ amount: z.number().positive().max(100000000), currency: z.enum(['USD', 'INR']), source: z.literal('user') }).strict().optional(),
+  focus: z.enum(['catalog', 'package_price']),
+}).strict();
+export type ComparisonRequest = z.infer<typeof comparisonRequestSchema>;
+export const comparisonSchema = z.object({ id: z.uuid(), request: comparisonRequestSchema,
+  sides: z.tuple([z.object({ option: comparisonOptionSchema, groups: z.array(planningResultGroupSchema).max(3), missingFields: z.array(z.string()).max(30) }).strict(),
+    z.object({ option: comparisonOptionSchema, groups: z.array(planningResultGroupSchema).max(3), missingFields: z.array(z.string()).max(30) }).strict()]),
+  subjectFinding: findingSchema.optional(), sources: z.array(provenanceSchema).max(40), limitations: z.array(z.string().max(300)).max(6), createdAt: z.iso.datetime(),
+}).strict().refine((comparison) => comparison.request.subject && comparison.request.options.length === 2
+  && comparison.request.options[0].value !== comparison.request.options[1].value
+  && comparison.sides.every((side, index) => side.option.value === comparison.request.options[index].value
+    && side.option.type === comparison.request.options[index].type
+    && side.groups.length === comparison.request.targets.length
+    && side.groups.every((group, position) => group.target === comparison.request.targets[position])), 'Comparison sides must preserve the requested options and groups');
+export type Comparison = z.infer<typeof comparisonSchema>;
+
 export const planningContextSchema = z.object({
   goalType: z.enum(['treatment', 'consultation']),
   treatmentSlug: z.string().optional(), treatmentName: z.string().optional(), treatmentId: z.guid().optional(),
@@ -115,6 +136,7 @@ export const carePlanTaskSchema = z.object({
   tool: toolNameSchema.optional(), input: z.string().max(1000).optional(),
   runId: z.uuid().optional(), agentTaskId: z.uuid().optional(),
   discovery: discoveryMatchSchema.optional(),
+  comparisonRequest: comparisonRequestSchema.optional(), comparison: comparisonSchema.optional(),
   findings: z.array(findingSchema).max(30), updatedAt: z.iso.datetime(),
 }).strict();
 export type CarePlanTask = z.infer<typeof carePlanTaskSchema>;
@@ -151,7 +173,8 @@ export interface AgentResponse {
   resultGroups?: PlanningResultGroup[];
   approvalId?: string;
   approvalProposal?: { action: string; detail: string };
-  type?: 'discovery' | 'planning' | 'clarification' | 'progress' | 'result' | 'error';
+  type?: 'discovery' | 'planning' | 'comparison' | 'clarification' | 'progress' | 'result' | 'error';
+  comparison?: Comparison;
   plan?: CarePlan;
   questions?: string[];
   nextActions?: string[];
@@ -169,7 +192,8 @@ export const assistantResponseSchema = z.object({
   discovery: z.object({ normalizedQuery: z.string(), matchType: z.enum(['exact', 'related', 'none']), matchReason: z.string(), recovered: z.boolean() }).optional(),
   resultGroups: z.array(planningResultGroupSchema).max(4).optional(),
   approvalId: z.uuid().optional(), approvalProposal: z.object({ action: z.string(), detail: z.string() }).optional(),
-  type: z.enum(['discovery', 'planning', 'clarification', 'progress', 'result', 'error']).optional(),
+  type: z.enum(['discovery', 'planning', 'comparison', 'clarification', 'progress', 'result', 'error']).optional(),
+  comparison: comparisonSchema.optional(),
   plan: carePlanSchema.optional(), questions: z.array(z.string()).max(3).optional(),
   nextActions: z.array(z.string()).max(6).optional(), sources: z.array(provenanceSchema).max(30).optional(),
 }).strict();

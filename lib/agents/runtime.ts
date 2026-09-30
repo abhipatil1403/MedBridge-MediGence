@@ -28,7 +28,8 @@ export interface RuntimeContext {
     plan: AgentPlan; route?: DiscoveryRoute; carePlanId?: string;
     taskLinks?: Record<string, string>;
     diagnostics?: Record<string, string | boolean | null>;
-    finalize?: (response: AgentResponse, results: Array<{ tool: string; result: ToolResult }>) => Promise<AgentResponse>;
+    continueOnToolFailure?: boolean;
+    finalize?: (response: AgentResponse, results: Array<{ tool: string; input?: string; taskId?: string; result: ToolResult }>) => Promise<AgentResponse>;
   };
 }
 
@@ -184,7 +185,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
   const runId = await context.store.startRun(conversationId, context.userId, plan.agent, request.caseId, context.execution?.carePlanId);
   const tasks: AgentTaskView[] = [];
   const findings: Finding[] = [];
-  const results: Array<{ tool: string; result: ToolResult }> = [];
+  const results: Array<{ tool: string; input?: string; taskId?: string; result: ToolResult }> = [];
   let status: AgentResponse['status'] = 'completed';
   let question: string | null = null;
   let approval: string | undefined;
@@ -233,7 +234,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
               matchReason: 'A broader catalog topic only; it does not confirm the requested procedure or any provider.' })) }
             : rawResult);
           const duration = Date.now() - toolStarted;
-          results.push({ tool: step.tool, result });
+          results.push({ tool: step.tool, input: step.input, taskId, result });
           findings.push(...result.findings);
           if (result.approvalRequired) { status = 'awaiting_approval'; approval = result.approvalRequired; task.status = 'awaiting_approval'; }
           else if (result.requestedInformation) { status = 'awaiting_user_input'; question = result.requestedInformation; task.status = 'awaiting_user_input'; }
@@ -246,12 +247,13 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
             approvalProposal = { action: step.tool, detail: step.tool === 'create_case' || step.tool === 'update_case'
               ? `Case title: ${String(input.title)}` : step.tool === 'create_agent_task' ? `Task: ${String(input.objective)}` : result.approvalRequired };
           }
-          if (status !== 'completed') break;
+          if (result.approvalRequired || result.requestedInformation) break;
         } catch (error) {
           const failure = publicFailure(error);
           task.status = 'failed'; task.errorCode = failure.code; task.completedAt = new Date().toISOString();
           await context.store.updateTask(taskId, 'failed', failure.code);
           await context.store.recordAction(runId, taskId, step.tool, 'failed', Date.now() - toolStarted, step.input, undefined, failure.code);
+          if (context.execution?.continueOnToolFailure) { status = 'failed'; continue; }
           throw failure;
         }
       }
@@ -293,7 +295,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
     }
     const unique = [...new Map(findings.map((item) => [item.provenance.recordId, item])).values()];
     const unsupportedProcedure = Boolean(route?.normalized.entities.procedurePhrase && ['related', 'none'].includes(route.normalized.entities.procedureMatchType));
-    const discoveryResult = route ? discoveryResultSchema.parse({
+    const discoveryResult = route && plan.agent !== 'comparison' ? discoveryResultSchema.parse({
       query: request.content, normalizedQuery: route.normalized.normalizedQuery, intent: route.normalized.intent,
       entities: route.normalized.entities, results: unique, relatedResults: unique.filter((item) => item.matchType === 'related'),
       matchType: unsupportedProcedure ? 'none' : unique.some((item) => item.matchType === 'exact') ? 'exact' : unique.some((item) => item.matchType === 'related') ? 'related' : 'none',

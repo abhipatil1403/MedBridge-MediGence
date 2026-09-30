@@ -27,7 +27,7 @@ export const agents: Record<AgentId, AgentDefinition> = {
   },
   comparison: {
     id: 'comparison', name: 'ComparisonAgent', purpose: 'Compare catalog options and available estimates.',
-    allowedTools: ['compare_treatment_options', 'search_treatments', 'search_countries', 'search_hospitals', 'search_packages', 'get_treatment', 'get_country', ...common],
+    allowedTools: ['compare_treatment_options', 'search_treatments', 'search_countries', 'search_hospitals', 'search_packages', 'search_doctors', 'search_services', 'get_treatment', 'get_country', 'get_hospital', 'get_doctor', 'get_package', ...common],
     safety: 'Separate catalog facts, estimates, missing data, and user-specific questions. Never fabricate costs.',
   },
 };

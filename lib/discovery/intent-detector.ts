@@ -4,7 +4,8 @@ import { normalize } from "./normalize";
 export const IntentDetector = {
   detect(query: string): DiscoveryIntent {
     const text = normalize(query);
-    if (/\b(compare|comparison|versus|vs)\b/.test(text) || /\bbetween\b.+\band\b/.test(text)) return "comparison";
+    if (/\b(compare|comparison|versus|vs)\b/.test(text) || /\bbetween\b.+\band\b/.test(text)
+      || /\bwhich\b.*\b(cheaper|lower|lowest)\b.*\b(package|cost|price)\b/.test(text)) return "comparison";
     if (/\b(second opinion|another opinion|review my diagnosis)\b/.test(text)) return "second-opinion";
     if (/\b(physiotherapy|physical therapy|rehab|recovery|aftercare|post surgery)\b/.test(text)) return "recovery";
     if (/\b(visa|flight|travel|airport|accommodation|hotel|transport)\b/.test(text)) return "travel";

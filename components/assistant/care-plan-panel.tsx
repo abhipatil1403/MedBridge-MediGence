@@ -1,6 +1,7 @@
 'use client';
 import type { CarePlan } from '@/lib/agents/schemas';
 import { planningResultGroup, resultGroupLabel } from '@/lib/agents/treatment-planning/results';
+import { ComparisonResults } from './comparison-results';
 
 export function CarePlanPanel({ plan, busy, onTaskAction }: { plan: CarePlan; busy: boolean;
   onTaskAction: (taskId: string, action: 'complete' | 'reopen') => void }) {
@@ -18,6 +19,7 @@ export function CarePlanPanel({ plan, busy, onTaskAction }: { plan: CarePlan; bu
       <strong>{task.title}</strong><span>{task.status.replaceAll('_', ' ')}</span>
       {group && <small>{resultGroupLabel(group)}</small>}
       {task.description && <p>{task.description}</p>}
+      {task.comparison && <details><summary>Saved comparison</summary><ComparisonResults comparison={task.comparison} /></details>}
       {task.requiresApproval && <p>Confirmation required · {task.approvalStatus}. This action is not connected.</p>}
       {plan.status !== 'cancelled' && task.requiresUserAction && ['review', 'preferences'].includes(task.taskType) && !task.requiresApproval
         && !['blocked', 'cancelled'].includes(task.status) && <button type="button" disabled={busy}
