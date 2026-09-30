@@ -90,11 +90,12 @@ describe('central orchestrator and treatment planning', () => {
         then: (resolve: (value: unknown) => unknown) => Promise.resolve(resolve({ error: null, data: table === 'care_plan_tasks' ? plan.tasks.map((task) => ({
           id: task.id, task_key: task.key, title: task.title, description: task.description, task_type: task.taskType, status: task.status,
           priority: task.priority, requires_user_action: task.requiresUserAction, requires_approval: task.requiresApproval, approval_status: task.approvalStatus,
-          metadata: { findings: task.findings }, updated_at: offsetTime })) : [] })),
+          metadata: { findings: task.findings, position: plan.tasks.indexOf(task) }, updated_at: offsetTime })).reverse() : [] })),
       }; return query;
     } } as unknown as ConstructorParameters<typeof SupabasePlanningStore>[1];
     const restored = await new SupabasePlanningStore(db, db).load(plan.conversationId, userId);
     expect(restored?.createdAt).toBe('2026-09-30T12:15:30.123Z'); expect(restored?.tasks[0].updatedAt).toBe(restored?.createdAt);
+    expect(restored?.tasks.map((task) => task.id)).toEqual(plan.tasks.map((task) => task.id));
     expect(() => carePlanSchema.parse(restored)).not.toThrow();
   });
   it('creates a sourced plan with hospital and package tasks, with model failure fallback', async () => {
@@ -113,6 +114,7 @@ describe('central orchestrator and treatment planning', () => {
     const second = await h.send('Show me packages.', first.conversationId);
     expect(second.plan?.id).toBe(first.plan?.id); expect(second.question).toBeNull(); expect(second.tasks).toEqual([]);
     expect(second.findings.map((finding) => finding.kind)).toEqual(['packages']); expect(h.actions).toHaveLength(2);
+    expect(second.discovery?.matchType).toBe('exact'); expect(second.discovery?.matchReason).not.toMatch(/no provider/i);
     expect(second.plan?.tasks.map((task) => task.id)).toEqual(first.plan?.tasks.map((task) => task.id));
     expect(h.planningStore.plans.size).toBe(1); expect(second.plan?.context.city).toBe('Mumbai');
   });

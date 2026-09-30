@@ -35,8 +35,11 @@ it.skipIf(!ready)('persists and restores an authenticated multi-turn care plan w
     expect(first.tasks.map((task) => task.tool)).toEqual(expect.arrayContaining(['search_hospitals', 'search_packages']));
     expect(first.findings.some((item) => item.kind === 'hospitals')).toBe(true); expect(first.findings.some((item) => item.kind === 'packages')).toBe(true);
     expect(first.findings.every((item) => item.provenance.sourceKind === 'synthetic')).toBe(true);
+    const firstReload = await new SupabasePlanningStore(admin, user.db).load(first.conversationId, user.id);
+    expect(firstReload?.tasks.map((task) => task.id)).toEqual(first.plan!.tasks.map((task) => task.id));
     const packageFollowUp = await orchestrate({ content: 'Show me packages.', conversationId: first.conversationId }, base);
     expect(packageFollowUp.plan?.id).toBe(first.plan?.id); expect(packageFollowUp.question).toBeNull(); expect(packageFollowUp.tasks).toHaveLength(0);
+    expect(packageFollowUp.discovery?.matchType).toBe('exact');
     const budget = await orchestrate({ content: 'My budget is around $6000.', conversationId: first.conversationId }, base);
     expect(budget.plan?.context.budget?.amount).toBe(6000); expect(budget.plan?.id).toBe(first.plan?.id);
     const multi = await orchestrate({ content: 'I need knee replacement in Mumbai. Find hospitals, packages and doctors.', conversationId: first.conversationId }, base);
@@ -58,6 +61,15 @@ it.skipIf(!ready)('persists and restores an authenticated multi-turn care plan w
       ...base, provider: { generateStructured: async () => { throw new AgentError('MODEL_UNAVAILABLE', 'Unavailable'); } },
     });
     expect(noModel.status).toBe('completed'); expect(noModel.findings.some((item) => item.kind === 'hospitals')).toBe(true);
+    const freshNoModel = await orchestrate({ content: 'I need knee replacement treatment in Mumbai.' }, {
+      ...base, provider: { generateStructured: async () => { throw new AgentError('MODEL_UNAVAILABLE', 'Unavailable'); } },
+    });
+    conversations.push(freshNoModel.conversationId);
+    expect(freshNoModel.status).toBe('completed');
+    expect(freshNoModel.tasks.map((task) => task.tool)).toEqual(['search_hospitals', 'search_packages']);
+    expect(freshNoModel.findings.some((item) => item.kind === 'hospitals')).toBe(true);
+    expect(freshNoModel.findings.some((item) => item.kind === 'packages')).toBe(true);
+    expect((await planningStore.load(freshNoModel.conversationId, user.id))?.id).toBe(freshNoModel.plan?.id);
     const regressionQueries = ['Find me a hospital.', 'I need a heart doctor in Mumbai.', 'Find hospitals for underwater brain surgery in Mumbai.'];
     for (const content of regressionQueries) {
       const response = await orchestrate({ content }, base); conversations.push(response.conversationId);

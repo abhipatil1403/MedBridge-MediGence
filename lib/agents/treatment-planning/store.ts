@@ -22,10 +22,14 @@ export class SupabasePlanningStore implements PlanningStore {
     if (!data) return undefined;
     const tasks = await this.userDb.from('care_plan_tasks').select('*').eq('care_plan_id', data.id).order('created_at').order('id');
     if (tasks.error) throw new AgentError('DATABASE_FAILURE', 'The saved plan could not be loaded.');
+    const orderedTasks = (tasks.data ?? []).map((task, fallbackPosition) => {
+      const { position, ...metadata } = task.metadata as Record<string, Json>;
+      return { task, metadata, position: typeof position === 'number' ? position : fallbackPosition };
+    }).sort((a, b) => a.position - b.position);
     return carePlanSchema.parse({ id: data.id, userId: data.user_id, conversationId: data.conversation_id,
       title: data.title, goal: data.goal, status: data.status, context: data.context, findings: data.findings,
       createdAt: new Date(data.created_at).toISOString(), updatedAt: new Date(data.updated_at).toISOString(),
-      tasks: (tasks.data ?? []).map((task) => ({ ...(task.metadata as Record<string, Json>),
+      tasks: orderedTasks.map(({ task, metadata }) => ({ ...metadata,
         id: task.id, key: task.task_key, title: task.title, description: task.description, taskType: task.task_type,
         status: task.status, priority: task.priority, requiresUserAction: task.requires_user_action,
         requiresApproval: task.requires_approval, approvalStatus: task.approval_status, updatedAt: new Date(task.updated_at).toISOString() })),
@@ -33,7 +37,9 @@ export class SupabasePlanningStore implements PlanningStore {
   }
   async save(plan: CarePlan, lease: string) {
     const validated = carePlanSchema.parse(plan);
-    const result = await this.admin.rpc('save_care_plan', { p_plan: JSON.parse(JSON.stringify(validated)) as Json, p_token: lease });
+    // All rows in one atomic save share a timestamp. Preserve their real plan order in metadata.
+    const payload = { ...validated, tasks: validated.tasks.map((task, position) => ({ ...task, position })) };
+    const result = await this.admin.rpc('save_care_plan', { p_plan: JSON.parse(JSON.stringify(payload)) as Json, p_token: lease });
     if (result.error) throw new AgentError('DATABASE_FAILURE', 'The care plan could not be saved. Please try again.');
     return validated;
   }

@@ -130,7 +130,14 @@ export async function prepareTreatmentPlanning(input: { content: string; userId:
             : 'No catalog options meet the saved criteria. Your plan is saved so you can adjust the treatment or destination.');
       const nextSteps = question ? [question] : ['Review the sourced options in your plan.', 'Confirm preferences or share an optional budget or preferred provider.'];
       if (context.budget?.currency === 'INR') nextSteps.push('Your INR budget is saved. USD sample prices have not been converted or filtered by it.');
+      // Reused findings are not in this run's tool outputs; describe the findings actually returned.
+      const matchType = selectedFindings.some((finding) => finding.matchType === 'exact') ? 'exact'
+        : selectedFindings.length ? 'related' : 'none';
+      const discovery = response.discovery && !question ? { ...response.discovery, matchType: matchType as 'exact' | 'related' | 'none',
+        matchReason: selectedFindings.length ? 'Saved catalog records meet the current planning search criteria.'
+          : 'No saved catalog records meet the current planning search criteria.' } : response.discovery;
       return { ...response, understanding, summary, findings: selectedFindings, plan: saved, question,
+        discovery,
         status: response.status === 'failed' ? 'failed' : question ? 'awaiting_user_input' : 'completed',
         type: response.status === 'failed' ? 'error' : question ? 'clarification' : runnable.length ? 'planning' : 'progress',
         nextSteps, questions: question ? [question] : [], nextActions: nextSteps,
