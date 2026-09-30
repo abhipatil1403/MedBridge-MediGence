@@ -31,6 +31,7 @@ export interface RuntimeContext {
     taskLinks?: Record<string, string>;
     diagnostics?: Record<string, string | boolean | null>;
     continueOnToolFailure?: boolean;
+    nextSteps?: (results: Array<{ tool: string; input?: string; taskId?: string; result: ToolResult }>, tasks: AgentTaskView[]) => Promise<AgentPlan['steps']>;
     finalize?: (response: AgentResponse, results: Array<{ tool: string; input?: string; taskId?: string; result: ToolResult }>) => Promise<AgentResponse>;
   };
 }
@@ -259,6 +260,12 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
           if (context.execution?.continueOnToolFailure) { status = 'failed'; continue; }
           throw failure;
         }
+      }
+      if (context.execution?.nextSteps && status !== 'awaiting_approval' && status !== 'awaiting_user_input'
+        && iteration + 1 < AGENT_LIMITS.maxPlanIterations) {
+        const next = await context.execution.nextSteps(results, tasks);
+        activePlan = planSchema.parse({ ...plan, steps: next });
+        if (next.length && tasks.length < AGENT_LIMITS.maxToolCalls) continue;
       }
       if (status !== 'completed') break;
       if (activePlan.missingInformation && findings.length === 0) { status = 'awaiting_user_input'; question = activePlan.missingInformation; break; }

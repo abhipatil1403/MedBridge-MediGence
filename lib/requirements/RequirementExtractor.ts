@@ -29,7 +29,7 @@ export const RequirementExtractor = {
     if (places.length) put('location', (cities.length ? cities : places).map((p) => p.label).join(' or '), { places: cities.length ? cities : places });
     const budget = extractBudget(content); if (budget) result.set('budget', budget);
     if (/\b(no|remove|drop)\s+(?:the\s+)?budget\b/i.test(content)) result.delete('budget');
-    if (!result.has('package') && /\bpackages?|bundles?\b/i.test(content) && !/\btell me|\bits package|\b(?:this|that|the) package|\b(?:first|second|third) package/i.test(content)) put('package', 'Package', { desired: true });
+    if (!result.has('package') && /\bpackages?|bundles?\b/i.test(content) && !/^\s*tell me(?: more)? about\b|\bits package|\b(?:this|that|the) package|\b(?:first|second|third) package/i.test(content)) put('package', 'Package', { desired: true });
     if (/\bverified (?:hospital|provider|doctor)\b/i.test(content)) put('verified', 'Verified provider');
     const preferredHospital = snapshot.hospitals.find((item) => /\bprefer|\bat\b/i.test(content) && content.toLowerCase().includes(item.name.toLowerCase()));
     if (preferredHospital) put('hospital', preferredHospital.name, { value: preferredHospital.slug });

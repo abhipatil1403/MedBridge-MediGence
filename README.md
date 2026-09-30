@@ -50,6 +50,7 @@ After migrations and seed, regenerate database types from a migrated PostgreSQL 
 - [User journeys](docs/USER_JOURNEYS.md) and [route map](docs/ROUTE_MAP.md): target flows and URL structure.
 - [Data model](docs/DATA_MODEL.md): normalized entities, relationships and access boundaries.
 - [AI agent architecture](docs/AI_AGENT_ARCHITECTURE.md) and [automation map](docs/AUTOMATION_MAP.md): validated tools, human gates and event workflows.
+- [Compound intent validation](docs/COMPOUND_INTENT_VALIDATION.md): shared requirements, dependent catalog operations, saved references, partial results, and automated/browser verification.
 - [UI system](docs/UI_SYSTEM.md), [design quality](docs/DESIGN_QUALITY_RULES.md) and [content rules](docs/CONTENT_RULES.md): product and editorial standards.
 - [Implementation roadmap](docs/IMPLEMENTATION_ROADMAP.md): milestone gates.
 

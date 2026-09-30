@@ -6,6 +6,8 @@ const ordinalWords = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 's
 export const ReferenceDetector = {
   detect(content: string): ReferenceQuery | undefined {
     const text = normalize(content);
+    if (/\b(?:is|does)\s+(?:it|this|that|this package|that package)\b.*\b(?:under|below|within|over|above|less than|more than)\b/.test(text))
+      return referenceQuerySchema.parse({ entityType: 'package', operation: 'price' });
     if (/\bcompare\b|\bcomparison\b|\bversus\b|\bvs\b|\bbudget\b/.test(text)
       || /which has (?:the )?cheaper package/.test(text)) return undefined;
     const ordinalMatch = /\b(?:the )?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|\d+(?:st|nd|rd|th))\s+(?:one|item|result|hospital|doctor|package|treatment|provider)s?\b/.exec(text);

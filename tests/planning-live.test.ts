@@ -123,6 +123,42 @@ it.skipIf(!ready)('persists and restores an authenticated multi-turn care plan w
     expect(savedRequired?.findings[0].requirementEvaluation?.overallStatus).toBe('partially_satisfies');
     const foreignRequired = await other.db.from('care_plans').select('context,findings').eq('id', savedRequired!.id);
     expect(foreignRequired.error).toBeNull(); expect(foreignRequired.data).toEqual([]);
+    const compound = await orchestrate({ content: "I need knee replacement in Mumbai under $6,000. Find hospitals that fit, check their packages, tell me what's missing, and help me compare them." }, {
+      ...base, provider: { generateStructured: async () => { throw new Error('Compound execution must not use the model'); } },
+    });
+    conversations.push(compound.conversationId);
+    expect(compound.question).toBeNull(); expect(compound.tasks.map((task) => task.tool)).toEqual(['search_hospitals', 'search_packages']);
+    const compoundHospital = compound.findings.find((f) => f.kind === 'hospitals')!;
+    const compoundPackage = compound.findings.find((f) => f.kind === 'packages')!;
+    expect(compoundPackage.facts.hospitalId).toBe(compoundHospital.provenance.recordId);
+    expect(compound.summary).toContain("isn't a second sourced hospital");
+    const compoundReload = await new SupabasePlanningStore(admin, user.db).load(compound.conversationId, user.id);
+    expect(compoundReload?.context.compoundRequest).toEqual(compound.compoundRequest);
+    expect(compoundReload?.tasks.filter((t) => t.tool).every((t) => /^[a-f0-9]{24}$/.test(t.catalogSignature ?? ''))).toBe(true);
+    expect(compoundReload?.context.requirements?.some((r) => r.type === 'package')).toBe(true);
+    const compoundForeign = await other.db.from('care_plans').select('context,findings').eq('id', compound.plan!.id);
+    expect(compoundForeign.error).toBeNull(); expect(compoundForeign.data).toEqual([]);
+    const freshBase = { ...base, planningStore: new SupabasePlanningStore(admin, user.db) };
+    const replay = await orchestrate({ content: compound.plan!.goal, conversationId: compound.conversationId }, freshBase);
+    expect(replay.tasks).toEqual([]); expect(replay.findings.map((f) => f.provenance.recordId)).toEqual(compound.findings.map((f) => f.provenance.recordId));
+    const hospitalAfterReload = await orchestrate({ content: 'Tell me more about the first hospital.', conversationId: compound.conversationId }, freshBase);
+    expect(hospitalAfterReload.findings[0].provenance.recordId).toBe(compoundHospital.provenance.recordId);
+    const linkedAfterReload = await orchestrate({ content: 'Show me its package.', conversationId: compound.conversationId }, freshBase);
+    expect(linkedAfterReload.findings[0].slug).toBe(compoundPackage.slug);
+    const newBudget = await orchestrate({ content: 'Is it under $5,000?', conversationId: compound.conversationId }, freshBase);
+    expect(newBudget.findings[0].provenance.recordId).toBe(compoundPackage.provenance.recordId);
+    expect(newBudget.requirements?.find((r) => r.type === 'budget')?.maximum).toBe(5000);
+    expect(newBudget.plan?.context.budget?.amount).toBe(5000);
+    expect(newBudget.findings[0].requirementEvaluation?.evaluations.find((e) => e.type === 'budget')?.status).toBe('exact');
+    const newCity = await orchestrate({ content: 'What about Pune?', conversationId: compound.conversationId }, freshBase);
+    expect(newCity.plan?.context).toMatchObject({ treatmentSlug: 'knee-replacement', city: 'Pune', budget: { amount: 5000 } });
+    expect(newCity.requirements?.some((r) => r.type === 'package')).toBe(true);
+    const bothCities = await orchestrate({ content: 'Compare Mumbai and Pune.', conversationId: compound.conversationId }, freshBase);
+    expect(bothCities.question).toBeNull(); expect(bothCities.comparison?.request.subject?.slug).toBe('knee-replacement');
+    expect(bothCities.comparison?.sides.map((s) => s.option.value)).toEqual(['Mumbai', 'Pune']);
+    const persistedCompoundMessages = await user.db.from('conversation_messages').select('metadata').eq('run_id', compound.runId).eq('role', 'assistant').single();
+    expect((persistedCompoundMessages.data?.metadata as { response?: { compoundRequest?: unknown; referenceContext?: unknown } })?.response?.compoundRequest).toEqual(compound.compoundRequest);
+    expect((persistedCompoundMessages.data?.metadata as { response?: { referenceContext?: unknown } })?.response?.referenceContext).toBeDefined();
   } finally {
     // Cleanup only the temporary identities and their owned test data.
     const ownedConversations = await admin.from('conversations').select('id').in('owner_id', users);

@@ -94,6 +94,10 @@ Peers are ranked by documented requirement satisfaction before the existing tool
 
 The runtime applies deterministic evaluations after each agent's finalization and before response/output persistence. Existing care-plan JSON stores requirements; plan/task findings store evaluations and existing catalog references. Follow-ups retain criteria, destination changes replace the location criterion, and comparisons evaluate each side against its own destination. Inclusion questions use the existing reference resolver and detail tools. “Another package” excludes the latest displayed packages from the response and honestly reports when no additional record exists. No new agent, framework or table is introduced.
 
+## Compound intent orchestration
+
+Compound catalog goals are decomposed before mutually exclusive workflow routing. The strict shared request and ordered dependency graph live in `lib/orchestration/`; the existing runtime executes independent reads followed by hospital-linked package reads under its existing limits. Requirement evaluation precedes candidate comparison, and the final response uses the existing plan, task, output and reference persistence. Cache signatures account for current catalog records, associations and requirements. Successful partial results survive a failed operation; empty sides and missing comparison candidates remain explicit. See [compound validation](COMPOUND_INTENT_VALIDATION.md) for supported operations and verification evidence.
+
 ## Explicit prohibitions
 
 No direct SQL, unmediated database mutation, invented hospitals/doctors/prices/accreditation/availability, diagnosis, prescription, unsupported outcome claims, or false assertion that an external service was contacted. AI-generated clinical summaries are labelled **draft — requires professional review** until signed. The product does not imply regulatory compliance without a separate assessment.

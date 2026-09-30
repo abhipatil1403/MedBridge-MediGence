@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { normalizedDiscoveryQuerySchema } from '@/lib/discovery/query-normalizer';
 import { referenceContextSchema, referenceResolutionSchema, type ReferenceContext, type ReferenceResolution } from '@/lib/conversation/schemas';
 import { requirementsSchema, resultRequirementEvaluationSchema, type Requirement, type ResultRequirementEvaluation } from '@/lib/requirements/RequirementTypes';
+import { compoundRequestSchema, type CompoundRequest } from '@/lib/orchestration/CompoundRequest';
 
 export const agentIdSchema = z.enum(['discovery', 'treatment_planning', 'hospital_matching', 'comparison']);
 export type AgentId = z.infer<typeof agentIdSchema>;
@@ -124,6 +125,7 @@ export const comparisonSchema = z.object({ id: z.uuid(), request: comparisonRequ
 export type Comparison = z.infer<typeof comparisonSchema>;
 
 export const planningContextSchema = z.object({
+  compoundRequest: compoundRequestSchema.optional(),
   requirements: requirementsSchema.optional(),
   goalType: z.enum(['treatment', 'consultation']),
   treatmentSlug: z.string().optional(), treatmentName: z.string().optional(), treatmentId: z.guid().optional(),
@@ -140,6 +142,7 @@ export const carePlanTaskSchema = z.object({
   status: careTaskStatusSchema, priority: z.enum(['normal', 'high']), requiresUserAction: z.boolean(),
   requiresApproval: z.boolean(), approvalStatus: z.enum(['not_required', 'pending', 'approved', 'rejected']),
   tool: toolNameSchema.optional(), input: z.string().max(1000).optional(),
+  catalogSignature: z.string().regex(/^[a-f0-9]{24}$/).optional(),
   runId: z.uuid().optional(), agentTaskId: z.uuid().optional(),
   discovery: discoveryMatchSchema.optional(),
   comparisonRequest: comparisonRequestSchema.optional(), comparison: comparisonSchema.optional(),
@@ -165,6 +168,7 @@ export interface AgentTaskView {
 }
 
 export interface AgentResponse {
+  compoundRequest?: CompoundRequest;
   requirements?: Requirement[];
   referenceContext?: ReferenceContext;
   referenceResolution?: ReferenceResolution;
@@ -191,6 +195,7 @@ export interface AgentResponse {
 }
 
 export const assistantResponseSchema = z.object({
+  compoundRequest: compoundRequestSchema.optional(),
   requirements: requirementsSchema.optional(),
   referenceContext: referenceContextSchema.optional(), referenceResolution: referenceResolutionSchema.optional(),
   conversationId: z.uuid(), runId: z.uuid(), agent: agentIdSchema,

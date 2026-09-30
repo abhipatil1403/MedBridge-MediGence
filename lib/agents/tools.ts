@@ -112,7 +112,7 @@ const tableLists = {
 } as const;
 const hrefKinds: Record<string, string> = { treatments: 'treatments', hospitals: 'hospitals', doctors: 'doctors', packages: 'packages' };
 
-function toFinding(kind: string, record: CatalogRecord, matchType: Finding['matchType'] = 'exact', matchReason = 'Selected catalog record.'): Finding {
+export function toFinding(kind: string, record: CatalogRecord, matchType: Finding['matchType'] = 'exact', matchReason = 'Selected catalog record.'): Finding {
   const facts: Record<string, string | number | null> = {};
   const item = record as unknown as Record<string, unknown>;
   for (const key of ['city', 'country', 'specialty', 'hospitalSlug', 'hospitalName', 'treatmentSlug', 'samplePriceUsd', 'sampleBaseCostUsd', 'durationDays', 'verification', 'travelNote', 'consultationMode', 'sampleBedCount', 'sampleAccreditation', 'sampleExperienceYears']) {

@@ -109,6 +109,8 @@ Requirement-aware matching adds optional, Zod-validated `requirements` to existi
 
 ## Access, integrity and retention
 
+Compound orchestration stores optional `compoundRequest` in the existing care-plan context and assistant response metadata. Search task metadata may include `catalogSignature` to invalidate stale catalog/requirement caches. Dependencies/statuses, evaluated findings and existing result references use the same authenticated owner-scoped stores and lease-protected save RPC. Legacy rows remain readable. No additional table or SQL/RLS migration is required.
+
 - Enable RLS before patient tables are exposed. Patient sees own records; caregiver sees only explicit grant scope; assigned staff sees only case tasks; clinician sees assigned clinical material; finance sees billing metadata, not clinical documents. Server service role is never sent to the browser.
 - Use short-lived signed URLs for private objects, malware scanning, MIME validation, size limits, audit on read/download, and DICOM de-identification policy before processing.
 - Use database transactions for status transitions, outbox events for notifications, webhook signature verification and idempotency for payment/booking callbacks.

@@ -14,6 +14,9 @@ import { prepareReferenceExecution } from '@/lib/conversation/execution';
 import { persistedResponses } from '@/lib/conversation/context';
 import { RequirementExtractor } from '@/lib/requirements/RequirementExtractor';
 import { applyRequirements } from '@/lib/requirements/response';
+import { parseCompoundIntent } from '@/lib/orchestration/CompoundIntentParser';
+import { prepareCompoundExecution } from '@/lib/orchestration/OperationExecutor';
+import { prepareReferenceComparison } from '@/lib/conversation/comparison-execution';
 
 export interface OrchestratorContext extends RuntimeContext { planningStore: PlanningStore }
 
@@ -78,7 +81,15 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
       return evaluated;
     } };
     if (active) active.context.requirements = requirements;
-    const referenceExecution = await prepareReferenceExecution({ content: request.content, conversationId, recent, active, snapshot,
+    const compound = parseCompoundIntent(request.content, requirements, newGoal ? undefined : active?.context.compoundRequest);
+    if (compound) {
+      if (!hasPlanningSchema) throw new AgentError('PLANNING_MIGRATION_MISSING', 'Saved operations need the care-plan migration before they can run.');
+      const execution = await prepareCompoundExecution({ content: request.content, request: compound, snapshot, active, caseContext,
+        userId: context.userId, conversationId, store: context.planningStore, lease });
+      return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
+    }
+    const referenceExecution = await prepareReferenceComparison({ content: request.content, conversationId, recent, active, snapshot,
+      store: context.planningStore, lease }) ?? await prepareReferenceExecution({ content: request.content, conversationId, recent, active, snapshot,
       store: context.planningStore, lease });
     if (referenceExecution) return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution: referenceExecution }));
     const goalText = request.content.split(/[.!?]/)[0].replace(/,?\s+(?:under|below|within|less than|maximum|budget|with|and I want)\b.*$/i, '').replace(/\s+treatment(?=\s+(?:in|at|near)\b|$)/i, '');

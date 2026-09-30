@@ -217,6 +217,10 @@ function agentsLabel(agent: AgentResponse['agent']) {
 function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disabled }: { response: AgentResponse; approvalStatus?: string;
   onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; onRetry?: () => void; disabled: boolean }) {
   return <div className="assistant-response"><div><small>WHAT I UNDERSTOOD</small><p>{response.understanding}</p></div>
+    {response.compoundRequest && <details><summary>Request progress</summary><ul className="assistant-source-list">
+      {response.compoundRequest.operations.map((operation) => <li key={operation.id}><strong>{({ discover_hospitals: 'Hospital search', discover_doctors: 'Doctor search', discover_packages: 'Package search', evaluate_requirements: 'Requirement check', compare_results: 'Comparison' })[operation.type]}</strong>
+        {' · '}{operation.status}{operation.note && <p>{operation.note}</p>}</li>)}
+    </ul></details>}
     <div><small>FINDINGS</small><p>{response.summary}</p>
       {!response.resultGroups?.length && response.discovery && <div className="assistant-match-state" role="status"><strong>{response.status === 'awaiting_user_input' ? 'One detail needed' : response.findings.some((f) => f.requirementEvaluation && f.requirementEvaluation.overallStatus !== 'fully_satisfies') ? 'Catalog results · review requirements' : response.discovery.matchType === 'exact' ? 'Exact catalog matches' : response.discovery.matchType === 'related' ? 'Related catalog information' : 'No exact catalog match'}</strong>
         <p>{response.discovery.matchReason}</p>

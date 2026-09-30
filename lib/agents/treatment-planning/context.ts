@@ -24,7 +24,7 @@ export function resolvePlanningContext(content: string, snapshot: CatalogSnapsho
   const requirements = RequirementExtractor.extract(content, snapshot, previous?.requirements);
   if (/\bhospitals?\b/i.test(content)) explicitTargets.push('hospitals');
   if (/\bpackages?\b/i.test(content)) explicitTargets.push('packages');
-  if (requirements.some((item) => item.type === 'package') && !explicitTargets.includes('packages')) explicitTargets.push('packages');
+  if (requirements.some((item) => item.type === 'package' && item.originalExpression === content) && !explicitTargets.includes('packages')) explicitTargets.push('packages');
   if (/\b(doctors?|cardiologists?|specialists?|clinicians?)\b/i.test(content)) explicitTargets.push('doctors');
   if (consultation && !treatment) explicitTargets.push('doctors', 'services');
   const requestedTargets = [...new Set(explicitTargets.length ? explicitTargets : previous?.requestedTargets.length ? previous.requestedTargets : ['hospitals', 'packages'] as const)];

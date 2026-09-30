@@ -11,6 +11,8 @@ import { ReferenceResolver } from './ReferenceResolver';
 import type { EntityReference, ReferenceContext } from './schemas';
 import { normalize } from '@/lib/discovery/normalize';
 import { packageAttributes } from '@/lib/requirements/RequirementTypes';
+import { legacyBudget } from '@/lib/requirements/RequirementNormalizer';
+import { evaluateFindings } from '@/lib/requirements/response';
 
 const lists = { hospital: 'hospitals', package: 'packages', doctor: 'doctors', treatment: 'treatments', country: 'countries', service: 'services' } as const;
 
@@ -77,13 +79,14 @@ export async function prepareReferenceExecution(input: { content: string; conver
     taskLinks: task && step ? { [`${step.tool}:${step.input}`]: task.id } : undefined,
     diagnostics: { workflow: 'reference_resolution', resolutionStatus: resolution.status, modelAttempts: '0' },
     finalize: async (response) => {
-      const findings = response.findings.map((finding) => chosen && finding.provenance.recordId === chosen.entityId ? { ...finding,
-        matchType: chosen.matchType, matchReason: `Previously shown ${chosen.matchType} catalog result; resolving a reference does not establish medical suitability.` } : finding);
+      const findings = evaluateFindings(response.findings.map((finding) => chosen && finding.provenance.recordId === chosen.entityId ? { ...finding,
+        matchType: chosen.matchType, matchReason: `Previously shown ${chosen.matchType} catalog result; resolving a reference does not establish medical suitability.` } : finding), input.active?.context.requirements ?? [], input.snapshot);
       let finalResolution = resolution;
       if (chosen && query.operation !== 'packages' && !findings.some((finding) => finding.provenance.recordId === chosen.entityId))
         finalResolution = { ...resolution, status: 'unresolved', reference: undefined, reason: 'The previously shown record could not be retrieved. Please try again or choose another result.' };
       const question = chosen ? null : resolution.reason.slice(0, 300);
       if (task && input.active) {
+        input.active.context.budget = legacyBudget(input.active.context.requirements ?? []) ?? input.active.context.budget;
         task.status = response.tasks[0]?.status === 'completed' ? 'completed' : 'blocked';
         task.findings = findings; task.runId = response.runId; task.agentTaskId = response.tasks[0]?.id;
         task.updatedAt = new Date().toISOString(); input.active.updatedAt = task.updatedAt;
@@ -105,6 +108,8 @@ function referenceSummary(reference: EntityReference, findings: AgentResponse['f
   const item = findings[0];
   if (operation === 'packages') return `I found ${findings.length} catalog package${findings.length === 1 ? '' : 's'} associated with ${reference.displayName}. Listed sample prices are not provider quotes.`;
   const price = item.facts.samplePriceUsd;
+  const budget = item.requirementEvaluation?.evaluations.find((e) => e.type === 'budget');
+  if (operation === 'price' && budget) return `${item.title}: ${budget.label} — ${budget.status.replaceAll('_', ' ')}. ${budget.explanation} Listed sample prices are not provider quotes.`.slice(0, 1600);
   if ((operation === 'price' || attribute === 'cheaper' || attribute === 'expensive') && typeof price === 'number')
     return `${item.title} lists ${item.provenance.sourceKind === 'synthetic' ? 'a synthetic' : 'a catalog'} sample price of USD ${price.toLocaleString('en-US')}.${attribute ? ' This identifies the requested price extreme among the previously returned records only.' : ''} This is not a provider quote or a clinical recommendation.`;
   return `Here are the sourced catalog details for ${reference.displayName}.${item.provenance.sourceKind === 'synthetic' ? ' This is synthetic demo data.' : ''} Resolving this reference does not recommend the provider or treatment.`;
