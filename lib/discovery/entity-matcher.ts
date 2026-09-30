@@ -37,7 +37,7 @@ function bestNameMatch<T extends { slug: string; name: string; aliases: readonly
 export const EntityMatcher = {
   match(query: string, catalog: MatchCatalog) {
     const countries = catalog.countries.filter((country) => [country.name, ...country.aliases].some((name) => includesPhrase(query, name))).map((country) => country.slug);
-    const specialty = Object.entries(specialtyAliases).find(([, aliases]) => aliases.some((alias) => includesPhrase(query, alias)))?.[0]
+    const specialty = Object.entries(specialtyAliases).find(([name, aliases]) => includesPhrase(query, name) || aliases.some((alias) => includesPhrase(query, alias)))?.[0]
       ?? [...new Set(catalog.treatments.map((item) => item.specialty))].find((name) => includesPhrase(query, name));
     const city = Object.entries(cityAliases).find(([, aliases]) => aliases.some((alias) => includesPhrase(query, alias)))?.[0]
       ?? [...new Set([...catalog.hospitals.map((hospital) => hospital.city), ...catalog.doctors.map((doctor) => doctor.city)])]

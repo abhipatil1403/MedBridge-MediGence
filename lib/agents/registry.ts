@@ -17,7 +17,7 @@ export const agents: Record<AgentId, AgentDefinition> = {
   },
   treatment_planning: {
     id: 'treatment_planning', name: 'TreatmentPlanningAgent', purpose: 'Organize non-clinical treatment travel and coordination steps.',
-    allowedTools: ['search_treatments', 'search_hospitals', 'search_packages', 'search_countries', 'get_treatment', 'get_country', 'get_case_documents_metadata', 'create_case', 'update_case', 'create_agent_task', 'request_external_action', ...common],
+    allowedTools: ['search_treatments', 'search_hospitals', 'search_doctors', 'search_packages', 'search_countries', 'search_services', 'get_treatment', 'get_hospital', 'get_doctor', 'get_package', 'get_country', 'get_case_documents_metadata', 'create_case', 'update_case', 'create_agent_task', 'request_external_action', ...common],
     safety: 'Never diagnose, prescribe, determine treatment necessity, or send documents. Case writes need approval.',
   },
   hospital_matching: {

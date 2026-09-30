@@ -74,5 +74,18 @@
 .assistant-task-list span { color: var(--teal); text-transform: capitalize; }
 .assistant-source-list { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .assistant-source-list li + li { margin-top: 8px; }
+.assistant-care-plan { min-width: 0; overflow-wrap: anywhere; }
+.assistant-care-plan__progress { font-weight: 700; color: var(--deep); }
+.assistant-care-plan__tasks { margin: 16px 0; padding-left: 20px; display: grid; gap: 14px; }
+.assistant-care-plan__tasks li { font-size: 12px; }
+.assistant-care-plan__tasks strong, .assistant-care-plan__tasks span { display: block; }
+.assistant-care-plan__tasks span { color: var(--teal); text-transform: capitalize; margin-top: 4px; }
+.assistant-care-plan__tasks p { margin: 5px 0; }
+.assistant-care-plan summary { cursor: pointer; color: var(--deep); font-size: 12px; font-weight: 700; }
+.assistant-care-plan__findings { padding-left: 18px; font-size: 12px; }
+.assistant-care-plan__findings li { margin: 12px 0; }
+.assistant-care-plan__findings small { display: block; margin-top: 4px; }
+.assistant-care-plan__findings a { text-decoration: underline; }
+.assistant-shell, .assistant-context, .assistant-context__panel, .assistant-finding { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 1080px) { .assistant-shell { grid-template-columns: 180px minmax(0, 1fr); }.assistant-context { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, 1fr); border-left: 0; border-top: 1px solid #d1ddd0; }.assistant-context__panel { border-right: 1px solid #d1ddd0; } }
 @media (max-width: 700px) { .assistant-signin { grid-template-columns: 1fr; gap: 20px; }.assistant-shell { display: block; }.assistant-rail { border-right: 0; border-bottom: 1px solid #d1ddd0; }.assistant-rail__list { display: flex; overflow-x: auto; }.assistant-rail__list button { min-width: 150px; }.assistant-context { display: block; }.assistant-main__intro, .assistant-messages, .assistant-composer { padding-inline: 17px; }.assistant-composer > div { align-items: stretch; flex-direction: column; } }

@@ -12,6 +12,14 @@ export function cloudflareConfigured() {
   return Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN);
 }
 
+export function configuredProvider(): LLMProvider {
+  if (cloudflareConfigured()) {
+    try { return new CloudflareProvider(); }
+    catch { console.error(JSON.stringify({ event: 'model_configuration_unavailable' })); }
+  }
+  return { generateStructured: async () => { throw new AgentError('MODEL_UNAVAILABLE', 'Model assistance is unavailable; catalog search can continue.'); } };
+}
+
 function responseContent(result: unknown): unknown {
   if (!result || typeof result !== 'object') return undefined;
   const value = result as Record<string, unknown>;

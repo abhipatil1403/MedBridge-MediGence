@@ -135,6 +135,7 @@ export type Database = {
           created_at: string;
           updated_at: string;
           conversation_id: string | null;
+          care_plan_id: string | null;
         };
         Insert: {
           id?: string;
@@ -151,6 +152,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           conversation_id?: string | null;
+          care_plan_id?: string | null;
         };
         Update: {
           id?: string;
@@ -167,6 +169,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           conversation_id?: string | null;
+          care_plan_id?: string | null;
         };
         Relationships: [];
       };
@@ -187,6 +190,7 @@ export type Database = {
           started_at: string | null;
           completed_at: string | null;
           error_code: string | null;
+          care_plan_task_id: string | null;
         };
         Insert: {
           id?: string;
@@ -204,6 +208,7 @@ export type Database = {
           started_at?: string | null;
           completed_at?: string | null;
           error_code?: string | null;
+          care_plan_task_id?: string | null;
         };
         Update: {
           id?: string;
@@ -221,6 +226,7 @@ export type Database = {
           started_at?: string | null;
           completed_at?: string | null;
           error_code?: string | null;
+          care_plan_task_id?: string | null;
         };
         Relationships: [];
       };
@@ -257,6 +263,105 @@ export type Database = {
           case_id?: string | null;
           occurred_at?: string;
           metadata?: Json;
+        };
+        Relationships: [];
+      };
+      care_plan_tasks: {
+        Row: {
+          id: string;
+          care_plan_id: string;
+          task_key: string;
+          title: string;
+          description: string;
+          task_type: string;
+          status: string;
+          priority: string;
+          requires_user_action: boolean;
+          requires_approval: boolean;
+          approval_status: string;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          care_plan_id: string;
+          task_key: string;
+          title: string;
+          description?: string;
+          task_type: string;
+          status?: string;
+          priority?: string;
+          requires_user_action?: boolean;
+          requires_approval?: boolean;
+          approval_status?: string;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          care_plan_id?: string;
+          task_key?: string;
+          title?: string;
+          description?: string;
+          task_type?: string;
+          status?: string;
+          priority?: string;
+          requires_user_action?: boolean;
+          requires_approval?: boolean;
+          approval_status?: string;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      care_plans: {
+        Row: {
+          id: string;
+          user_id: string;
+          conversation_id: string;
+          title: string;
+          goal: string;
+          status: string;
+          destination_country: string | null;
+          destination_city: string | null;
+          treatment_id: string | null;
+          context: Json;
+          findings: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          conversation_id: string;
+          title: string;
+          goal: string;
+          status?: string;
+          destination_country?: string | null;
+          destination_city?: string | null;
+          treatment_id?: string | null;
+          context?: Json;
+          findings?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          conversation_id?: string;
+          title?: string;
+          goal?: string;
+          status?: string;
+          destination_country?: string | null;
+          destination_city?: string | null;
+          treatment_id?: string | null;
+          context?: Json;
+          findings?: Json;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -551,6 +656,8 @@ export type Database = {
           status: string;
           created_at: string;
           updated_at: string;
+          execution_token: string | null;
+          execution_expires_at: string | null;
         };
         Insert: {
           id?: string;
@@ -560,6 +667,8 @@ export type Database = {
           status?: string;
           created_at?: string;
           updated_at?: string;
+          execution_token?: string | null;
+          execution_expires_at?: string | null;
         };
         Update: {
           id?: string;
@@ -569,6 +678,8 @@ export type Database = {
           status?: string;
           created_at?: string;
           updated_at?: string;
+          execution_token?: string | null;
+          execution_expires_at?: string | null;
         };
         Relationships: [];
       };
@@ -1389,6 +1500,9 @@ export type Database = {
         Args: { p_terms: string; p_treatment_slug?: string | null; p_specialty?: string | null; p_countries?: string[]; p_city?: string | null };
         Returns: { kind: string; slug: string }[];
       };
+      acquire_assistant_turn: { Args: { p_conversation_id: string; p_user_id: string; p_token: string }; Returns: boolean };
+      release_assistant_turn: { Args: { p_conversation_id: string; p_token: string }; Returns: undefined };
+      save_care_plan: { Args: { p_plan: Json; p_token: string }; Returns: undefined };
     };
     Enums: {
       case_lifecycle_status: "draft" | "intake" | "planning" | "awaiting_patient" | "awaiting_provider" | "in_progress" | "completed" | "cancelled";

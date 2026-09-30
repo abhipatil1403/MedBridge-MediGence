@@ -3,7 +3,6 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Json } from '@/types/database';
 import { AgentError } from './errors';
-import { cloudflareConfigured } from './cloudflare-provider';
 import type { AgentId, AgentResponse, AgentTaskView, ToolName, ToolResult } from './schemas';
 import type { CaseAccess } from './tools';
 
@@ -20,7 +19,7 @@ function config() {
   return { url, publicKey, secret };
 }
 export function isAgentConfigured() {
-  return Boolean(cloudflareConfigured() && process.env.SUPABASE_SECRET_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  return Boolean(process.env.SUPABASE_SECRET_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 export function createUserClient(token: string): Db {
   const { url, publicKey } = config();
@@ -55,9 +54,11 @@ export class SupabaseCaseAccess implements CaseAccess {
 
   async readContext(caseId: string): Promise<Record<string, unknown>> {
     const data = await this.authorizedCase(caseId);
+    const city = data.preferred_city_id ? await this.db.from('cities').select('name').eq('id', data.preferred_city_id).maybeSingle() : undefined;
+    if (city?.error) throw new AgentError('DATABASE_FAILURE', 'Case preferences are temporarily unavailable.');
     return { caseId: data.id, title: data.title, status: data.status,
       preferredCountryId: data.preferred_country_id, preferredCityId: data.preferred_city_id,
-      preferredTreatmentId: data.preferred_treatment_id };
+      preferredTreatmentId: data.preferred_treatment_id, preferredCity: city?.data?.name };
   }
 
   async readDocumentMetadata(caseId: string): Promise<Record<string, unknown>[]> {
@@ -72,8 +73,8 @@ export interface AgentStore {
   createConversation(userId: string, caseId?: string): Promise<string>;
   assertConversation(conversationId: string, userId: string, caseId?: string): Promise<void>;
   addMessage(conversationId: string, role: 'user' | 'assistant', content: string, runId?: string, metadata?: Record<string, unknown>): Promise<void>;
-  startRun(conversationId: string, userId: string, agent: AgentId, caseId?: string): Promise<string>;
-  createTask(runId: string, agent: AgentId, objective: string, tool: ToolName, caseId?: string): Promise<string>;
+  startRun(conversationId: string, userId: string, agent: AgentId, caseId?: string, carePlanId?: string): Promise<string>;
+  createTask(runId: string, agent: AgentId, objective: string, tool: ToolName, caseId?: string, carePlanTaskId?: string): Promise<string>;
   updateTask(taskId: string, status: AgentTaskView['status'], errorCode?: string, output?: ToolResult): Promise<void>;
   recordAction(runId: string, taskId: string, tool: ToolName, status: 'completed' | 'failed' | 'proposed', durationMs: number, input: unknown, output?: ToolResult, errorCode?: string): Promise<string | undefined>;
   saveOutput(runId: string, response: AgentResponse): Promise<void>;
@@ -97,21 +98,23 @@ export class SupabaseAgentStore implements AgentStore {
     const touch = await this.admin.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId);
     if (touch.error) throw new AgentError('DATABASE_FAILURE', 'The conversation could not be updated.');
   }
-  async startRun(conversationId: string, userId: string, agent: AgentId, caseId?: string) {
+  async startRun(conversationId: string, userId: string, agent: AgentId, caseId?: string, carePlanId?: string) {
     const trace = randomUUID();
     const { data, error } = await this.admin.from('agent_runs').insert({
       conversation_id: conversationId, initiated_by: userId, case_id: caseId ?? null,
       agent_name: agent, agent_version: '1', purpose: 'care_coordination', status: 'running',
       started_at: new Date().toISOString(), trace_id: trace,
+      ...(carePlanId ? { care_plan_id: carePlanId } : {}),
     }).select('id').single();
     const id = checked(data, error).id;
     await this.admin.from('conversations').update({ title: `${agent.replaceAll('_', ' ')} workspace` }).eq('id', conversationId).eq('title', 'New care workspace');
     console.info(JSON.stringify({ event: 'agent_run_started', runId: id, agent, trace }));
     return id;
   }
-  async createTask(runId: string, agent: AgentId, objective: string, tool: ToolName, caseId?: string) {
+  async createTask(runId: string, agent: AgentId, objective: string, tool: ToolName, caseId?: string, carePlanTaskId?: string) {
     const { data, error } = await this.admin.from('agent_tasks').insert({ run_id: runId, case_id: caseId ?? null,
-      task_type: agent, objective, tool_name: tool, status: 'pending', input_summary: {} }).select('id').single();
+      task_type: agent, objective, tool_name: tool, status: 'pending', input_summary: {},
+      ...(carePlanTaskId ? { care_plan_task_id: carePlanTaskId } : {}) }).select('id').single();
     return checked(data, error).id;
   }
   async updateTask(taskId: string, status: AgentTaskView['status'], errorCode?: string, output?: ToolResult) {

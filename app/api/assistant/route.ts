@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { CloudflareProvider } from '@/lib/agents/cloudflare-provider';
+import { configuredProvider } from '@/lib/agents/cloudflare-provider';
 import { AgentError } from '@/lib/agents/errors';
 import { createAdminClient, createUserClient, isAgentConfigured, SupabaseAgentStore, SupabaseCaseAccess, verifyUser } from '@/lib/agents/persistence';
-import { runAgent } from '@/lib/agents/runtime';
-import { userRequestSchema } from '@/lib/agents/schemas';
+import { orchestrate } from '@/lib/agents/orchestrator';
+import { SupabasePlanningStore } from '@/lib/agents/treatment-planning/store';
+import { assistantResponseSchema, userRequestSchema } from '@/lib/agents/schemas';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -43,7 +44,12 @@ export async function GET(request: NextRequest) {
       if (!(conversationQuery.data ?? []).some((item) => item.id === conversationId)) throw new AgentError('CONVERSATION_ACCESS_DENIED', 'This conversation is unavailable.');
       const query = await db.from('conversation_messages').select('id,role,content,metadata,created_at').eq('conversation_id', conversationId).order('created_at').limit(100);
       if (query.error) throw new AgentError('DATABASE_FAILURE', 'Conversation messages are temporarily unavailable.');
-      messages = query.data ?? [];
+      messages = (query.data ?? []).map((message) => {
+        const metadata = message.metadata && typeof message.metadata === 'object' && !Array.isArray(message.metadata) ? message.metadata : {};
+        if (!metadata.response) return message;
+        const parsed = assistantResponseSchema.safeParse(metadata.response);
+        return { ...message, metadata: parsed.success ? { ...metadata, response: parsed.data } : {} };
+      });
       const actionIds = (messages as Array<{ metadata: { response?: { approvalId?: string } } }>).map((item) => item.metadata?.response?.approvalId).filter((id): id is string => Boolean(id));
       if (actionIds.length) {
         const actions = await createAdminClient().from('agent_actions').select('id,status').in('id', actionIds);
@@ -55,7 +61,8 @@ export async function GET(request: NextRequest) {
         }
       }
     }
-    return NextResponse.json({ conversations: conversationQuery.data ?? [], cases: (caseQuery.data ?? []).map((item) => ({ ...item, canManageConsent: item.owner_id === user.id, agentConsent: consent.get(item.id) === 'granted' })), messages },
+    const plan = conversationId ? await new SupabasePlanningStore(createAdminClient(), db).load(conversationId, user.id) : undefined;
+    return NextResponse.json({ conversations: conversationQuery.data ?? [], cases: (caseQuery.data ?? []).map((item) => ({ ...item, canManageConsent: item.owner_id === user.id, agentConsent: consent.get(item.id) === 'granted' })), messages, plan },
       { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) { return errorResponse(error); }
 }
@@ -68,11 +75,13 @@ export async function POST(request: NextRequest) {
     const body = userRequestSchema.safeParse(await request.json());
     if (!body.success) throw new AgentError('INVALID_REQUEST', 'Enter a request of up to 2,000 characters.');
     const userDb = createUserClient(token);
-    const response = await runAgent(body.data, {
+    const admin = createAdminClient();
+    const response = await orchestrate(body.data, {
       userId: user.id,
       caseAccess: new SupabaseCaseAccess(userDb),
-      store: new SupabaseAgentStore(createAdminClient(), userDb),
-      provider: new CloudflareProvider(),
+      store: new SupabaseAgentStore(admin, userDb),
+      planningStore: new SupabasePlanningStore(admin, userDb),
+      provider: configuredProvider(),
     });
     return NextResponse.json(response);
   } catch (error) { return errorResponse(error); }

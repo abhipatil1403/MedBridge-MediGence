@@ -17,6 +17,7 @@ const searchInput = z.object({
   hospital: z.string().max(100).describe('Catalog hospital slug').optional(),
   mode: z.enum(['video', 'in-person']).optional(),
   verification: z.enum(['verified', 'demo']).optional(),
+  budget: z.number().positive().max(100000000).describe('User-provided USD package budget only; do not convert currencies').optional(),
 }).strict();
 const slugInput = z.object({ slug: z.string().regex(/^[a-z0-9-]{2,100}$/) }).strict();
 const comparisonInput = z.object({ treatment: slugInput.shape.slug, firstCountry: slugInput.shape.slug, secondCountry: slugInput.shape.slug }).strict();
@@ -84,7 +85,7 @@ export interface ToolContext {
 }
 export interface ToolDependencies {
   repository: CatalogRepository;
-  search: (query: string, type: ResultType, filters: Pick<DiscoveryFilters, 'country' | 'city' | 'treatment' | 'specialty' | 'hospital' | 'mode'>) => Promise<DiscoveryResults>;
+  search: (query: string, type: ResultType, filters: Pick<DiscoveryFilters, 'country' | 'city' | 'treatment' | 'specialty' | 'hospital' | 'mode' | 'budget'>) => Promise<DiscoveryResults>;
   compare: typeof getComparison;
 }
 
@@ -111,7 +112,7 @@ const hrefKinds: Record<string, string> = { treatments: 'treatments', hospitals:
 function toFinding(kind: string, record: CatalogRecord, matchType: Finding['matchType'] = 'exact', matchReason = 'Selected catalog record.'): Finding {
   const facts: Record<string, string | number | null> = {};
   const item = record as unknown as Record<string, unknown>;
-  for (const key of ['city', 'country', 'specialty', 'hospitalName', 'samplePriceUsd', 'sampleBaseCostUsd', 'durationDays', 'verification', 'travelNote', 'consultationMode']) {
+  for (const key of ['city', 'country', 'specialty', 'hospitalSlug', 'hospitalName', 'samplePriceUsd', 'sampleBaseCostUsd', 'durationDays', 'verification', 'travelNote', 'consultationMode']) {
     const value = item[key];
     if (typeof value === 'string' || typeof value === 'number') facts[key] = value;
   }
@@ -140,11 +141,11 @@ export async function executeTool(name: ToolName, rawInput: unknown, context: To
   if (!definition?.allowedAgents.includes(context.agent)) throw new AgentError('TOOL_DENIED', 'This agent cannot perform that action.');
   const validated = definition.inputSchema.safeParse(rawInput);
   if (!validated.success) throw new AgentError('TOOL_INPUT_INVALID', 'The assistant requested invalid search information.');
-  const input = validated.data as Record<string, string>;
+  const input = validated.data as Record<string, string> & { budget?: number };
   if (name in searchKinds) {
     const kind = searchKinds[name as keyof typeof searchKinds];
     const result = await dependencies.search(input.query, kind, { country: input.country, city: input.city, treatment: input.treatment, specialty: input.specialty,
-      hospital: input.hospital, mode: input.mode as DiscoveryFilters['mode'] });
+      hospital: input.hospital, mode: input.mode as DiscoveryFilters['mode'], budget: input.budget });
     const matches = result.sections[kind].filter(({ item }) => !input.verification || (input.verification === 'demo' ? item.sourceKind === 'synthetic' : item.sourceKind !== 'synthetic'));
     return { findings: matches.slice(0, 5).map(({item, matchType, reason}) => toFinding(kind, item, matchType, reason)),
       note: matches.length === 0 ? 'No matching catalog records were found.' : undefined };

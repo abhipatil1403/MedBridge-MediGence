@@ -15,6 +15,12 @@ These are MedBridge target workflows derived from the [public reference audit](M
 | 9. Package booking | Package discovery → offer detail → inclusions/exclusions and validity → linked hospital and confirmed clinician if named → optional travel services → patient details → provider confirmation → order/payment → booking reference → coordinator tasks. | Expired offers cannot be checked out. Reconfirm dates and medical eligibility before collecting payment. Partial payment, provider rejection and refund paths are explicit. |
 | 10. Returning patient | Login → dashboard active case → current stage and next action → appointments/documents/messages/payment/travel/recovery, each with timestamp and owner → complete task → status updated. | No active case shows a useful discovery path. Access expired: reauthenticate and return to intended page. A case with no pending patient action explains what the care team is doing and when it last changed. |
 
+## Implemented assistant planning journey
+
+At `/assistant`, “I need knee replacement treatment in Mumbai” creates a saved coordination plan and uses existing catalog tools to find hospitals and packages. Including doctors adds a doctor search. Simple discovery such as “heart doctor in Mumbai” remains a DiscoveryAgent request. Unsupported procedures retain zero-exact-match behavior and do not create a false provider plan.
+
+“Show me packages” or “Which hospitals do we have?” continues the same plan using saved treatment/location criteria. Identical successful searches reuse sourced findings; changing a USD budget refreshes the affected package search. The panel records actual search completion, pending reviews, optional preferences, and confirmation states. Users mark reviews/preferences done, reopen them, or cancel a plan. Refresh reloads the selected conversation and saved plan. Completion describes the coordination checklist, not treatment, booking, or provider contact.
+
 ## Cross-journey invariants
 
 - A person may have several cases; a service request belongs to one case and one patient profile. A caregiver needs an explicit grant, not a shared login.

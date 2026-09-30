@@ -45,6 +45,7 @@ export function searchHospitals(catalog: CatalogSnapshot, parsed: ParsedQuery, f
   const city = filters.city || parsed.entities.city;
   const results = catalog.hospitals.filter((item) =>
     (!country || item.country === country) && (!city || normalize(item.city) === normalize(city)) &&
+    (!filters.hospital || item.slug === filters.hospital) &&
     (!(filters.specialty || (!parsed.entities.procedure && parsed.entities.specialty)) || item.specialties.includes(filters.specialty || parsed.entities.specialty!)) &&
     (!filters.accreditation || (filters.accreditation === "sample" ? item.sampleAccreditation === "Sample credential listed" : item.sampleAccreditation === "No sample credential")) &&
     (!(filters.treatment || parsed.entities.procedure) || item.treatmentSlugs.includes(filters.treatment || parsed.entities.procedure!)),

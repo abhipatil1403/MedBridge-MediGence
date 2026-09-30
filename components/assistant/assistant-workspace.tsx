@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { createClient, type Session } from '@supabase/supabase-js';
 import Link from 'next/link';
-import type { AgentResponse } from '@/lib/agents/schemas';
+import type { AgentResponse, CarePlan } from '@/lib/agents/schemas';
+import { CarePlanPanel } from './care-plan-panel';
 
 type Conversation = { id: string; title: string; case_id: string | null; updated_at: string };
 type Case = { id: string; title: string; status: string; agentConsent: boolean; canManageConsent: boolean };
@@ -24,6 +25,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
   const [cases, setCases] = useState<Case[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [latest, setLatest] = useState<AgentResponse | null>(null);
+  const [carePlan, setCarePlan] = useState<CarePlan | undefined>();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const activeUser = useRef<string | undefined>(undefined);
@@ -46,6 +48,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
       setConversations(data.conversations);
       setCases(data.cases);
       if (selectedId) {
+        setCarePlan(data.plan);
         setMessages(data.messages);
         const final = [...(data.messages as Message[])].reverse().find((message) => message.role === 'assistant' && message.metadata?.response);
         setLatest(final?.metadata.response ?? null);
@@ -58,7 +61,10 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
     function applySession(next: Session | null) {
       const nextUser = next?.user.id;
       if (activeUser.current !== nextUser) {
-        setConversationId(undefined); setCaseId(''); setMessages([]); setLatest(null); setConversations([]); setCases([]);
+        const saved = nextUser ? localStorage.getItem(`medbridge-active-conversation:${nextUser}`) : null;
+        let restored: { id?: string; caseId?: string } | undefined;
+        try { restored = saved ? JSON.parse(saved) as typeof restored : undefined; } catch { /* Ignore a stale browser preference. */ }
+        setConversationId(restored?.id); setCaseId(restored?.caseId ?? ''); setMessages([]); setLatest(null); setCarePlan(undefined); setConversations([]); setCases([]);
       }
       activeUser.current = nextUser;
       setSession(next);
@@ -67,6 +73,12 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
     const { data: subscription } = auth.auth.onAuthStateChange((_event, next) => applySession(next));
     return () => subscription.subscription.unsubscribe();
   }, [auth]);
+  useEffect(() => {
+    if (!session) return;
+    const key = `medbridge-active-conversation:${session.user.id}`;
+    if (conversationId) localStorage.setItem(key, JSON.stringify({ id: conversationId, caseId }));
+    else localStorage.removeItem(key);
+  }, [conversationId, caseId, session]);
   useEffect(() => {
     if (!session || !configured) return;
     const timer = setTimeout(() => void refresh(conversationId), 0);
@@ -94,6 +106,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
       const result: AgentResponse = await api('/api/assistant', { method: 'POST', body: JSON.stringify({ content: text, conversationId, caseId: caseId || undefined }) });
       setConversationId(result.conversationId);
       setLatest(result);
+      setCarePlan(result.plan);
       setContent(result.status === 'failed' ? text : '');
       await refresh(result.conversationId);
     } catch (error) { setNotice(error instanceof Error ? error.message : 'The assistant could not run.'); }
@@ -124,8 +137,19 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
     finally { setBusy(false); }
   }
 
+  async function completePlanTask(taskId: string, action: 'complete' | 'reopen') {
+    if (!carePlan || busy) return;
+    setBusy(true); setNotice('');
+    try {
+      const result = await api('/api/assistant/plan-tasks', { method: 'POST', body: JSON.stringify({
+        conversationId: carePlan.conversationId, planId: carePlan.id, taskId, action, caseId: caseId || undefined }) });
+      setCarePlan(result.plan);
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Your planning progress could not be saved.'); }
+    finally { setBusy(false); }
+  }
+
   if (!configured) return <section className="assistant-state" role="status"><h2>Assistant configuration needed</h2>
-    <p>Care workspace runs require server-side <code>CLOUDFLARE_ACCOUNT_ID</code>, <code>CLOUDFLARE_API_TOKEN</code>, and <code>SUPABASE_SECRET_KEY</code>, plus the conversation migration. Add these in your local or deployment environment, then reload this page.</p>
+    <p>Care workspace runs need the Supabase server configuration and workspace migrations. Add these in your local or deployment environment, then reload this page. Structured catalog searches and planning can continue when model assistance is unavailable.</p>
     <Link href="/discover">Explore the catalog meanwhile →</Link></section>;
 
   if (!session) return <section className="assistant-state assistant-signin"><div><p className="eyebrow">PRIVATE WORKSPACE</p><h2>Sign in to begin</h2>
@@ -139,9 +163,9 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
   const sources = latest ? [...new Map(latest.findings.map((finding) => [finding.provenance.table, finding.provenance])).values()] : [];
   return <div className="assistant-shell">
     <aside className="assistant-rail" aria-label="Conversations"><div className="assistant-rail__head"><h2>Workspace</h2>
-      <button type="button" onClick={() => { setConversationId(undefined); setCaseId(''); setMessages([]); setLatest(null); setNotice(''); }}>New conversation</button></div>
+      <button type="button" disabled={busy} onClick={() => { setConversationId(undefined); setCaseId(''); setMessages([]); setLatest(null); setCarePlan(undefined); setNotice(''); }}>New conversation</button></div>
       <div className="assistant-rail__list">{conversations.map((item) => <button key={item.id} type="button" className={item.id === conversationId ? 'active' : ''}
-        onClick={() => { setConversationId(item.id); setCaseId(item.case_id ?? ''); setLatest(null); }}>{item.title}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}</div>
+        disabled={busy} onClick={() => { setConversationId(item.id); setCaseId(item.case_id ?? ''); setLatest(null); setCarePlan(undefined); }}>{item.title}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}</div>
       <button type="button" className="assistant-signout" onClick={() => auth?.auth.signOut()}>Sign out</button></aside>
 
     <section className="assistant-main" aria-label="Care conversation">
@@ -170,6 +194,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
       {selectedCase && <><p>{selectedCase.agentConsent ? 'Assistant access granted for this case.' : 'Case owner consent is needed before the assistant reads this case.'}</p>
         {selectedCase.canManageConsent && <button type="button" disabled={busy} onClick={() => changeConsent(selectedCase)}>{selectedCase.agentConsent ? 'Revoke assistant consent' : 'Grant assistant consent'}</button>}</>}
       <small>Case information stays within the selected conversation. Document contents are not sent to the assistant.</small></div>
+      {carePlan && <CarePlanPanel plan={carePlan} busy={busy} onTaskAction={completePlanTask} />}
       <div className="assistant-context__panel"><p className="eyebrow">CURRENT REQUEST</p><p>{busy ? content.trim() : latestRequest || 'Describe what you want to explore.'}</p></div>
       <div className="assistant-context__panel"><p className="eyebrow">CURRENT PLAN</p><h2>{latest ? agentsLabel(latest.agent) : 'No run yet'}</h2>
         {latest ? <ol className="assistant-task-list">{latest.tasks.map((task) => <li key={task.id}><strong>{task.objective}</strong><span>{task.status.replaceAll('_', ' ')}</span></li>)}</ol>

@@ -10,14 +10,18 @@ export interface DiscoveryRoute {
   snapshot: CatalogSnapshot;
 }
 
-export async function discoveryRoute(content: string, repository: CatalogRepository): Promise<DiscoveryRoute | undefined> {
-  const snapshot = repository.loadSnapshot ? await repository.loadSnapshot() : await (async () => {
+export async function loadDiscoverySnapshot(repository: CatalogRepository): Promise<CatalogSnapshot> {
+  return repository.loadSnapshot ? await repository.loadSnapshot() : await (async () => {
     const [treatments, hospitals, doctors, packages, countries, services, estimates] = await Promise.all([
       repository.listTreatments(), repository.listHospitals(), repository.listDoctors(), repository.listPackages(),
       repository.listCountries(), repository.listServices(), repository.listPriceEstimates(),
     ]);
     return { treatments, hospitals, doctors, packages, countries, services, estimates };
   })();
+}
+
+export async function discoveryRoute(content: string, repository: CatalogRepository): Promise<DiscoveryRoute | undefined> {
+  const snapshot = await loadDiscoverySnapshot(repository);
   const { treatments, hospitals, doctors, countries, services } = snapshot;
   const normalized = QueryNormalizer.normalize(content, { treatments, hospitals, doctors, countries, services });
   const { entities, targets, missingEntities } = normalized;

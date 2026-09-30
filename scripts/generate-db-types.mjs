@@ -61,6 +61,9 @@ lines.push('    };', '    Views: Record<string, never>;', '    Functions: {',
   '        Args: { p_terms: string; p_treatment_slug?: string | null; p_specialty?: string | null; p_countries?: string[]; p_city?: string | null };',
   '        Returns: { kind: string; slug: string }[];',
   '      };',
+  '      acquire_assistant_turn: { Args: { p_conversation_id: string; p_user_id: string; p_token: string }; Returns: boolean };',
+  '      release_assistant_turn: { Args: { p_conversation_id: string; p_token: string }; Returns: undefined };',
+  '      save_care_plan: { Args: { p_plan: Json; p_token: string }; Returns: undefined };',
   '    };', '    Enums: {');
 for (const [name, values] of Object.entries(enums).sort(([a], [b]) => a.localeCompare(b))) {
   lines.push(`      ${name}: ${values.map((value) => JSON.stringify(value)).join(' | ')};`);

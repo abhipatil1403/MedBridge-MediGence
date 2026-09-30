@@ -9,6 +9,12 @@ The implemented foundation is in `supabase/migrations/`: 35 PostgreSQL tables, t
 - Consent events are append-only for the subject. Documents and case history are readable by authorized case members. Agent execution, workflow internals, source records, and audit events have no direct patient mutation grant.
 - External or first-party catalog records require a source record. `source_records` captures source name, URL/identifier, retrieval date, extraction method, verification and validity metadata.
 
+## Implemented coordination planning
+
+Migration `20260930090000_care_planning.sql` adds `care_plans` and `care_plan_tasks`. These are nonclinical coordination records, not clinician-approved treatment instructions. One plan belongs to one owned conversation; a composite foreign key prevents a mismatched owner. Treatment/destination references use existing catalog tables. Structured context stores stated preferences; sourced findings keep record IDs, source kind, match reasons, and retrieval times.
+
+Task keys are unique within a plan. Tasks distinguish discovery, user review/preferences, required clarification, and an unimplemented external approval boundary. `agent_runs.care_plan_id` and `agent_tasks.care_plan_task_id` connect plans to existing actions/outputs; triggers enforce matching plan/conversation/task scope. No direct patient writes are granted. Owner reads use RLS and inherit current case access from the conversation. Service-only lease/save RPCs serialize turns and save plan/task changes atomically.
+
 ## Future extensions
 
 ## Identity and access
