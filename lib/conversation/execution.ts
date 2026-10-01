@@ -4,11 +4,11 @@ import type { AgentResponse, CarePlan, ToolName } from '@/lib/agents/schemas';
 import type { RuntimeContext } from '@/lib/agents/runtime';
 import type { PlanningStore } from '@/lib/agents/treatment-planning/store';
 import { derivePlanStatus, upsertTask } from '@/lib/agents/treatment-planning/tasks';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { buildReferenceContext, persistedResponses, planReferenceContext, type ConversationMessage } from './context';
 import { ReferenceDetector } from './ReferenceDetector';
 import { ReferenceResolver } from './ReferenceResolver';
-import type { EntityReference, ReferenceContext } from './schemas';
+import type { EntityReference, ReferenceContext, ReferenceClarification } from './schemas';
 import { normalize } from '@/lib/discovery/normalize';
 import { packageAttributes } from '@/lib/requirements/RequirementTypes';
 import { legacyBudget } from '@/lib/requirements/RequirementNormalizer';
@@ -19,24 +19,34 @@ const lists = { hospital: 'hospitals', package: 'packages', doctor: 'doctors', t
 export async function prepareReferenceExecution(input: { content: string; conversationId: string; recent: ConversationMessage[]; active?: CarePlan;
   snapshot: CatalogSnapshot; store: PlanningStore; lease: string }): Promise<NonNullable<RuntimeContext['execution']> | undefined> {
   let query = ReferenceDetector.detect(input.content);
-  if (query?.entityType === 'case') return undefined; // handled by CaseIntakeAgent using the same resolver
+  if (query?.entityType === 'case') return undefined; // handled by CaseIntakeAgent
   const responses = persistedResponses(input.recent, input.conversationId);
   const latest = responses.at(-1);
+  const pending = latest?.pendingClarification ?? input.active?.context.pendingClarification;
+  const previousResolution = latest?.referenceResolution;
+  const acknowledgement = /^(?:yes|yeah|yep|ok|okay|sure|no|nope|please|go ahead|do it)[.!?]*$/i.test(input.content.trim());
+  const explicitGoal = /\b(?:find|search|look for|i need|i want|new search|new plan)\b/i.test(input.content) && !query
+    || /\bcompare\b/i.test(input.content) && !/compare (?:the|these|those) (?:two|hospitals|packages|doctors)/i.test(input.content);
+  let namedCandidates: EntityReference[] | undefined;
+  let repeatClarification = false;
+  const pendingQuery = pending?.query ?? (previousResolution?.status !== 'resolved' ? previousResolution?.query : undefined);
+  // The pending query keeps list scope even when the clarification has no findings.
+  if (query && pendingQuery && !query.entityType) query = { ...query, entityType: pendingQuery.entityType };
   if (query?.ordinal && !query.entityType && !query.attribute && query.operation === 'details'
     && latest?.agent === 'hospital_matching' && !latest.comparison && latest.hospitalMatches?.length)
     query = { ...query, entityType: 'hospital' };
-  let namedCandidates: EntityReference[] | undefined;
-  // Resolve a short clarification against the actual candidates; no catalog or prose reconstruction.
-  if (!query && latest?.referenceResolution?.status === 'ambiguous' && !/\b(find|compare|i need|i want|show|budget)\b/i.test(input.content)) {
+  if (!query && !explicitGoal && (pendingQuery || acknowledgement && previousResolution)) {
+    const candidates = pending?.candidates ?? previousResolution?.candidates ?? [];
     const type = /\bhospital\b/i.test(input.content) ? 'hospital' : /\bpackage\b/i.test(input.content) ? 'package' : /\bdoctor\b/i.test(input.content) ? 'doctor' : undefined;
     const text = input.content.trim().replace(/[.!?]+$/, '').toLowerCase();
-    const matches = latest.referenceResolution.candidates.filter((item) => type ? item.entityType === type
+    const matches = candidates.filter((item) => type ? item.entityType === type
       : [item.displayName, item.city, item.country, item.location].some((value) => value?.toLowerCase().replaceAll('-', ' ') === text));
-    if (matches.length) {
-      query = { ...latest.referenceResolution.query, ordinal: type ? latest.referenceResolution.query.ordinal : undefined, attribute: undefined, entityType: type,
-        location: type ? latest.referenceResolution.query.location : undefined };
-      if (!type) namedCandidates = matches;
-    }
+    query = { ...(pendingQuery ?? previousResolution!.query), entityType: type ?? pendingQuery?.entityType, attribute: undefined };
+    if (!acknowledgement && matches.length) {
+      namedCandidates = matches;
+      // Candidate choice is already positional; retain the original operation without reapplying its ordinal.
+      query = { ...query, ordinal: undefined, location: undefined };
+    } else repeatClarification = true;
   }
   if (!query) return undefined;
   const contexts = [...responses].reverse().map((response) => buildReferenceContext(response, response.referenceContext?.createdAt));
@@ -46,7 +56,8 @@ export async function prepareReferenceExecution(input: { content: string; conver
     && (!query!.location || [group.location, ...group.references.flatMap((item) => [item.city, item.country, item.location])]
       .some((place) => place && normalize(place.replaceAll('-', ' ')) === normalize(query!.location!))));
   // Never fall back because an ordinal is out of range or a current group is empty.
-  let current = contexts[0] && relevant(contexts[0]) ? contexts[0] : undefined;
+  let current = pending?.context?.conversationId === input.conversationId ? pending.context : contexts[0] && relevant(contexts[0]) ? contexts[0] : undefined;
+  if (!current && input.active?.context.referenceContext && relevant(input.active.context.referenceContext)) current = input.active.context.referenceContext;
   if (!current && input.active && input.active.status !== 'cancelled') {
     const plan = planReferenceContext(input.active, requestedType); if (relevant(plan)) current = plan;
   }
@@ -54,6 +65,10 @@ export async function prepareReferenceExecution(input: { content: string; conver
   if (namedCandidates && current) current = { ...current, groups: current.groups.map((group) => ({ ...group,
     references: group.references.filter((item) => namedCandidates!.some((candidate) => candidate.entityId === item.entityId && candidate.entityType === item.entityType)) })) };
   let resolution = ReferenceResolver.resolve({ conversationId: input.conversationId, userMessage: input.content, currentContext: current, query });
+  if (repeatClarification) resolution = { ...resolution, status: previousResolution?.status === 'ambiguous' ? 'ambiguous' : 'unresolved', reference: undefined,
+    candidates: pending?.candidates ?? previousResolution?.candidates ?? resolution.candidates,
+    reason: pending?.question ?? (previousResolution?.status !== 'resolved' ? previousResolution?.reason : undefined)
+      ?? 'Which result would you like to open? Specify its type, name or position.' };
   const reference = resolution.reference;
   // Both slug and record ID must still identify the same currently published catalog entity.
   if (reference && reference.entityType !== 'case' && !input.snapshot[lists[reference.entityType]].some((item) => item.slug === reference.slug && item.recordId === reference.entityId))
@@ -79,7 +94,7 @@ export async function prepareReferenceExecution(input: { content: string; conver
     task.status = 'in_progress'; task.updatedAt = new Date().toISOString();
     await input.store.save(input.active, input.lease);
   }
-  return { plan, route: { plan, snapshot: input.snapshot, normalized }, carePlanId: input.active?.id,
+  return { plan, referenceBoundary: { status: resolution.status, allowedCalls: steps.map(s => ({ tool: s.tool, input: JSON.parse(s.input) })) }, route: { plan, snapshot: input.snapshot, normalized }, carePlanId: input.active?.id,
     taskLinks: task && step ? { [`${step.tool}:${step.input}`]: task.id } : undefined,
     diagnostics: { workflow: 'reference_resolution', resolutionStatus: resolution.status, modelAttempts: '0' },
     finalize: async (response) => {
@@ -88,7 +103,21 @@ export async function prepareReferenceExecution(input: { content: string; conver
       let finalResolution = resolution;
       if (chosen && query.operation !== 'packages' && !findings.some((finding) => finding.provenance.recordId === chosen.entityId))
         finalResolution = { ...resolution, status: 'unresolved', reference: undefined, reason: 'The previously shown record could not be retrieved. Please try again or choose another result.' };
-      const question = chosen ? null : resolution.reason.slice(0, 300);
+      const question = finalResolution.status === 'resolved' ? null : finalResolution.reason.slice(0, 300);
+      const clarification: ReferenceClarification | undefined = question ? {
+        id: pending?.id ?? randomUUID(), type: 'reference_disambiguation', conversationId: input.conversationId, runId: response.runId,
+        originalRequest: pending?.originalRequest ?? input.content, question, candidates: finalResolution.candidates,
+        expectedAnswer: 'entity_selection', query, context: current, createdAt: pending?.createdAt ?? new Date().toISOString(),
+      } : undefined;
+      if (input.active) {
+        if (clarification) {
+          input.active.context.pendingClarification = clarification;
+          if (current) input.active.context.referenceContext = current;
+        } else {
+          delete input.active.context.pendingClarification;
+          delete input.active.context.referenceContext;
+        }
+      }
       if (task && input.active) {
         input.active.context.budget = legacyBudget(input.active.context.requirements ?? []) ?? input.active.context.budget;
         task.status = response.tasks[0]?.status === 'completed' ? 'completed' : 'blocked';
@@ -98,7 +127,8 @@ export async function prepareReferenceExecution(input: { content: string; conver
         input.active.status = derivePlanStatus(input.active.tasks, input.active.findings.length > 0);
         await input.store.save(input.active, input.lease);
       }
-      return { ...response, findings, discovery: undefined, plan: input.active, referenceResolution: finalResolution,
+      if (input.active && !task) await input.store.save(input.active, input.lease);
+      return { ...response, pendingClarification: clarification, findings, discovery: undefined, plan: input.active, referenceResolution: finalResolution,
         status: question ? 'awaiting_user_input' : response.status, type: question ? 'clarification' : 'result', question,
         summary: question ? resolution.reason : response.status === 'failed' ? 'I could not retrieve that referenced record. Please try again.'
           : !findings.length ? query.operation === 'packages' ? 'No matching published packages are associated with that hospital and the current plan criteria.' : finalResolution.reason

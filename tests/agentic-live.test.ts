@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { expect, it, vi } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 vi.mock('server-only', () => ({}));
+import { orchestrate } from '@/lib/agents/orchestrator';
+import { SupabasePlanningStore } from '@/lib/agents/treatment-planning/store';
+import type { LLMProvider } from '@/lib/ai/contracts';
 import { runAgent } from '@/lib/agents/runtime';
 import { createAdminClient, createUserClient, SupabaseAgentStore, SupabaseCaseAccess } from '@/lib/agents/persistence';
 import { catalogRepository } from '@/lib/catalog/repository';
@@ -69,6 +72,29 @@ it.skipIf(!ready)('persists real execution records, reloads owner activity, enfo
     expect(failure.status).toBe('failed'); await state.transition('partially_completed');
     const reloaded = await new SupabaseAgentStore(admin, owner.db).readActivity(conversationId, owner.id);
     expect(reloaded?.state).toBe('partially_completed'); expect(reloaded?.steps.map((s) => s.status)).toEqual(['completed', 'failed']);
+    const referenceConversation = await store.createConversation(owner.id); conversations.push(referenceConversation);
+    const provider = { generateStructured: vi.fn(async () => { throw new Error('No model permitted for deterministic references'); }) };
+    const base = { userId: owner.id, store, caseAccess: access.caseAccess, provider: provider as LLMProvider,
+      planningStore: new SupabasePlanningStore(admin, owner.db) };
+    const first = await orchestrate({ conversationId: referenceConversation,
+      content: "Find knee replacement hospitals in Mumbai under $6,000, check their packages, tell me what's missing, and compare them." }, base);
+    expect(first.findings.some(f => f.provenance.recordId.startsWith('cddb10ae'))).toBe(true);
+    expect(first.findings.some(f => f.provenance.recordId.startsWith('1ec68b66'))).toBe(true);
+    const before = provider.generateStructured.mock.calls.length;
+    const invalid = await orchestrate({ conversationId: referenceConversation, content: 'Tell me more about the second one.' }, base);
+    expect(invalid.pendingClarification?.query.entityType).toBe('hospital');
+    const fresh = { ...base, planningStore: new SupabasePlanningStore(admin, owner.db), store: new SupabaseAgentStore(admin, owner.db) };
+    const corrected = await orchestrate({ conversationId: referenceConversation, content: 'first one then' }, fresh);
+    expect(corrected.referenceResolution?.reference?.entityId.startsWith('cddb10ae')).toBe(true);
+    const yes = await orchestrate({ conversationId: referenceConversation, content: 'yes' }, fresh);
+    expect(yes.tasks).toEqual([]); expect(yes.question).toBeTruthy(); expect(yes.pendingClarification).toBeDefined();
+    expect((await fresh.planningStore.load(referenceConversation, owner.id))?.context.pendingClarification?.id).toBe(yes.pendingClarification?.id);
+    const packages = await orchestrate({ conversationId: referenceConversation, content: 'Show me its packages.' }, fresh);
+    expect(packages.findings.some(f => f.provenance.recordId.startsWith('1ec68b66'))).toBe(true);
+    expect(provider.generateStructured).toHaveBeenCalledTimes(before);
+    expect(await new SupabasePlanningStore(admin, other.db).load(referenceConversation, other.id)).toBeUndefined();
+    const records = await admin.from('agent_outputs').select('content').eq('run_id', yes.runId);
+    expect(records.data).toHaveLength(1); expect(JSON.stringify(records.data)).not.toMatch(/facial plastic surgery/i);
   } finally {
     if (conversations.length) {
       const runs = await admin.from('agent_runs').select('id').in('conversation_id', conversations), runIds = runs.data?.map((r) => r.id) ?? [];

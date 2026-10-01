@@ -5,6 +5,7 @@ import { HospitalMatchResults } from './hospital-match-results';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { createClient, type Session } from '@supabase/supabase-js';
 import Link from 'next/link';
+import { ClarificationQuestion, RequestProgress, visibleText } from './response-status';
 import { ExecutionActivity } from './execution-activity';
 import type { RunActivity } from '@/lib/agents/execution-schemas';
 import type { AgentResponse, CarePlan } from '@/lib/agents/schemas';
@@ -247,10 +248,7 @@ function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disable
       <small>Derived from {analysis.recordIds.length} sourced catalog records · {analysis.complete ? 'Evidence review completed' : 'Incomplete evidence'}</small></div>)}<div><small>WHAT I UNDERSTOOD</small><p>{response.understanding}</p></div>
     {response.workflow === 'case_intake' && response.caseSummary && <CaseSummaryContent summary={response.caseSummary} />}
     {response.caseHandoff && <p>Using the reviewed case for catalog coordination. Reported medical information is separate from search requirements and does not establish treatment suitability. No case has been submitted to a provider.</p>}
-    {response.compoundRequest && <details><summary>Request progress</summary><ul className="assistant-source-list">
-      {response.compoundRequest.operations.map((operation) => <li key={operation.id}><strong>{({ discover_hospitals: 'Hospital search', discover_doctors: 'Doctor search', discover_packages: 'Package search', discover_services: 'General services · hospital availability unconfirmed', evaluate_requirements: 'Requirement check', compare_results: 'Comparison' })[operation.type]}</strong>
-        {' · '}{operation.status}{operation.note && <p>{operation.note}</p>}</li>)}
-    </ul></details>}
+    <RequestProgress request={response.compoundRequest} />
     <div><small>FINDINGS</small><p>{response.summary}</p>{response.summarySource === 'model' && <small>Model-generated coordination explanation. Catalog facts are sourced below.</small>}
       {!response.resultGroups?.length && response.discovery && <div className="assistant-match-state" role="status"><strong>{response.status === 'awaiting_user_input' ? 'One detail needed' : response.findings.some((f) => f.requirementEvaluation && f.requirementEvaluation.overallStatus !== 'fully_satisfies') ? 'Catalog results · review requirements' : response.discovery.matchType === 'exact' ? 'Exact catalog matches' : response.discovery.matchType === 'related' ? 'Related catalog information' : 'No exact catalog match'}</strong>
         <p>{response.discovery.matchReason}</p>
@@ -260,13 +258,13 @@ function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disable
       {response.hospitalMatches && <HospitalMatchResults matches={response.hospitalMatches} />}
       {response.comparison ? <ComparisonResults comparison={response.comparison} /> : response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : <FindingCards findings={response.findings} />}</div>
     {response.comparison && response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : null}
-    {response.question && <div className="assistant-response__question"><small>WHAT I NEED FROM YOU</small><p>{response.question}</p></div>}
+    <ClarificationQuestion question={response.question} />
     {response.approvalProposal && <div className="assistant-response__approval"><small>PROPOSED ACTION</small><p>{response.approvalProposal.detail}</p>
       {response.approvalProposal.action === 'request_external_action' ? <p>External sharing and bookings are not connected. This request remains pending human review.</p>
         : approvalStatus === 'proposed' && response.approvalId ? <div className="assistant-approval-actions">
           <button type="button" disabled={disabled} onClick={() => onDecision(response.approvalId!, 'approved')}>Approve this change</button>
           <button type="button" disabled={disabled} onClick={() => onDecision(response.approvalId!, 'rejected')}>Reject</button></div>
           : <p>Status: {approvalStatus ?? 'pending'}</p>}</div>}
-    {response.nextSteps.length > 0 && <div><small>NEXT STEPS</small><ul>{response.nextSteps.map((step) => <li key={step}>{step}</li>)}</ul></div>}
+    {response.nextSteps.length > 0 && <div><small>NEXT STEPS</small><ul>{response.nextSteps.filter(step => visibleText(step)).map((step) => <li key={step}>{step}</li>)}</ul></div>}
   </div>;
 }

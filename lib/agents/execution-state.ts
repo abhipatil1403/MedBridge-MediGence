@@ -47,6 +47,7 @@ export interface ExecutionCall {
   error?: { code: string; message: string }; provenance: ToolObservation['provenance'];
 }
 export class ExecutionState {
+  conversation?: import('@/lib/conversation/context').ValidatedConversationContext;
   readonly started = Date.now();
   agent = 'discovery';
   state: RunState = 'queued'; calls: ExecutionCall[] = []; observations: ToolObservation[] = [];
@@ -61,6 +62,7 @@ export class ExecutionState {
   async persist(finalOutput?: unknown) {
     await this.store.saveExecutionState?.(this.runId, { version: '1', runId: this.runId, conversationId: this.conversationId,
       ownerId: this.ownerId, agent: this.agent, originalRequest: safeText(this.request), goal: safeText(this.goal), state: this.state,
+      continuation: this.conversation ? safeValue({ references: this.conversation.references, pendingClarification: this.conversation.pendingClarification, requirements: this.conversation.requirements, sourceRecordIds: this.conversation.findings.map(f => f.provenance.recordId) }) : undefined,
       currentStep: this.calls.length, calls: safeValue(this.calls), observations: safeValue(this.observations),
       errors: [...this.planningErrors, ...this.calls.flatMap((c) => c.error ? [c.error] : [])],
       provenance: { request: { kind: 'user' }, results: this.observations.flatMap((o) => o.provenance) },

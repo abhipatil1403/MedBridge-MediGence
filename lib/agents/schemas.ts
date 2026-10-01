@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { activitySchema, type RunActivity } from './execution-schemas';
 import { normalizedDiscoveryQuerySchema } from '@/lib/discovery/query-normalizer';
-import { referenceContextSchema, referenceResolutionSchema, type ReferenceContext, type ReferenceResolution } from '@/lib/conversation/schemas';
+import { referenceContextSchema, referenceResolutionSchema, referenceClarificationSchema, type ReferenceContext, type ReferenceResolution, type ReferenceClarification } from '@/lib/conversation/schemas';
 import { requirementsSchema, requirementEvaluationSchema, resultRequirementEvaluationSchema, type Requirement, type ResultRequirementEvaluation } from '@/lib/requirements/RequirementTypes';
 import { compoundRequestSchema, type CompoundRequest } from '@/lib/orchestration/CompoundRequest';
 import { patientCaseSchema, caseSummarySchema, caseHandoffSchema } from '@/lib/case/CaseSchema';
@@ -37,7 +37,7 @@ export const synthesisSchema = z.object({
 export type AgentSynthesis = z.infer<typeof synthesisSchema>;
 
 export const userRequestSchema = z.object({
-  content: z.string().trim().min(3).max(2000),
+  content: z.string().trim().min(1).max(2000),
   conversationId: z.uuid().optional(),
   caseId: z.uuid().optional(),
 }).strict();
@@ -161,6 +161,8 @@ export const comparisonSchema = z.object({ id: z.uuid(), request: comparisonRequ
 export type Comparison = z.infer<typeof comparisonSchema>;
 
 export const planningContextSchema = z.object({
+  referenceContext: referenceContextSchema.optional(),
+  pendingClarification: referenceClarificationSchema.optional(),
   patientCase: patientCaseSchema.optional(),
   caseHandoff: caseHandoffSchema.optional(),
   compoundRequest: compoundRequestSchema.optional(),
@@ -207,6 +209,7 @@ export interface AgentTaskView {
 }
 
 export interface AgentResponse {
+  pendingClarification?: ReferenceClarification;
   analyses?: NonNullable<ToolResult['analysis']>[];
   summarySource?: 'model' | 'derived' | 'application';
   activity?: RunActivity;
@@ -242,6 +245,7 @@ export interface AgentResponse {
 }
 
 export const assistantResponseSchema = z.object({
+  pendingClarification: referenceClarificationSchema.optional(),
   activity: activitySchema.optional(),
   analyses: z.array(toolResultSchema.shape.analysis.unwrap()).max(8).optional(),
   summarySource: z.enum(['model', 'derived', 'application']).optional(),

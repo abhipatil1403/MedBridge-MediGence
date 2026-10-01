@@ -30,3 +30,11 @@ export const referenceResolutionSchema = z.object({ status: z.enum(['resolved', 
 }).strict().refine((value) => value.status === 'resolved' ? Boolean(value.reference) : !value.reference,
   'Only resolved references may select an entity');
 export type ReferenceResolution = z.infer<typeof referenceResolutionSchema>;
+
+export const referenceClarificationSchema = z.object({
+  id: z.uuid(), type: z.literal('reference_disambiguation'), conversationId: z.uuid(), runId: z.uuid(),
+  originalRequest: z.string().max(2000), question: z.string().min(1).max(600),
+  candidates: z.array(entityReferenceSchema).max(30), expectedAnswer: z.literal('entity_selection'),
+  query: referenceQuerySchema, context: referenceContextSchema.optional(), createdAt: z.iso.datetime(),
+}).strict();
+export type ReferenceClarification = z.infer<typeof referenceClarificationSchema>;

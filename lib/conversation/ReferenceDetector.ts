@@ -6,6 +6,10 @@ const ordinalWords = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 's
 export const ReferenceDetector = {
   detect(content: string): ReferenceQuery | undefined {
     const text = normalize(content);
+    // A relationship inside a complete new search is an intra-request dependency,
+    // not a continuation of an older displayed list.
+    if (/^(?:find|search|look for|i need|i want)\b/.test(text)
+      && !/^(?:find|search|look for)\s+(?:its|their|this|that|the (?:first|second|third|last))\b/.test(text)) return undefined;
     if (/\b(?:my|this|the) case\b|\b(?:what (?:am i|are you|information (?:are you|do you have|is)) missing|show me (?:my |the )?(?:case )?summary|update (?:the |my )?(?:MRI|CT|scan|investigation) date|what information are you missing)\b/i.test(text))
       return referenceQuerySchema.parse({ entityType: 'case', operation: 'details' });
     if (/\b(?:is|does)\s+(?:it|this|that|this package|that package)\b.*\b(?:under|below|within|over|above|less than|more than)\b/.test(text))
@@ -24,6 +28,7 @@ export const ReferenceDetector = {
     const typedDemonstrative = demonstrative && /\b(?:hospital|provider|doctor|package|treatment)s?\b/.test(text);
     if (!ordinalMatch && !relation && !(attribute && /\b(?:which|one|package)\b/.test(text))
       && !typedDemonstrative && !/^(?:this|that|this one|that one)$/.test(text)
+      && !/\b(?:what about|show me|tell me more about) (?:this|that|the other) one\b/.test(text)
       && !(detail && (demonstrative || location || inclusionQuestion && /\bit\b/.test(text) || /\bthe (?:hospital|doctor|package|treatment|provider)\b/.test(text)))) return undefined;
     const entityType = /\b(?:hospital|provider)s?\b/.test(text) ? 'hospital' : /\bdoctors?\b/.test(text) ? 'doctor'
       : /\bpackages?\b/.test(text) ? 'package' : /\btreatments?\b/.test(text) ? 'treatment' : undefined;

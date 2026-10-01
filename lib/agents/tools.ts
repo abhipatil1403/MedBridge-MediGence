@@ -102,6 +102,7 @@ export interface CaseAccess {
   readDocumentMetadata(caseId: string): Promise<Record<string, unknown>[]>;
 }
 export interface ToolContext {
+  referenceBoundary?: import('./runtime').ToolContextReferenceBoundary;
   agent: AgentId;
   userId: string;
   caseId?: string;

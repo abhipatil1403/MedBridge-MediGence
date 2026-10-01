@@ -7,8 +7,10 @@ import { assistantResponseSchema, discoveryResultSchema, planSchema, synthesisSc
 import { toolRegistry, type CaseAccess, type ToolDependencies, defaultToolDependencies, toolDescriptions, toolSchemas } from './tools';
 import type { AgentStore } from './persistence';
 import { attachReferences } from '@/lib/conversation/context';
+import type { ValidatedConversationContext } from '@/lib/conversation/context';
+import { ReferenceDetector } from '@/lib/conversation/ReferenceDetector';
 
-import { AGENT_LIMITS, ExecutionState, terminalStates, canonicalInput, safeText } from './execution-state';
+import { AGENT_LIMITS, ExecutionState, terminalStates, canonicalInput, safeText, safeValue } from './execution-state';
 import { executeRegisteredTool } from './tool-execution';
 import { observeNext } from './observation';
 export { AGENT_LIMITS } from './execution-state';
@@ -22,6 +24,7 @@ const externalPatterns: Array<[RegExp, 'share_records' | 'booking' | 'payment' |
 ];
 
 export interface RuntimeContext {
+  conversation?: ValidatedConversationContext;
   userId: string;
   caseAccess: CaseAccess;
   store: AgentStore;
@@ -30,6 +33,7 @@ export interface RuntimeContext {
   supportedAgents?: readonly AgentId[];
   finalizeResponse?: (response: AgentResponse) => Promise<AgentResponse>;
   execution?: {
+    referenceBoundary?: ToolContextReferenceBoundary;
     plan: AgentPlan; route?: DiscoveryRoute; carePlanId?: string;
     messageSourceId?: string;
     synthesis?: { summary: string; nextSteps: string[]; question: string | null };
@@ -39,6 +43,10 @@ export interface RuntimeContext {
     nextSteps?: (results: Array<{ tool: string; input?: string; taskId?: string; result: ToolResult }>, tasks: AgentTaskView[]) => Promise<AgentPlan['steps']>;
     finalize?: (response: AgentResponse, results: Array<{ tool: string; input?: string; taskId?: string; result: ToolResult }>) => Promise<AgentResponse>;
   };
+}
+export interface ToolContextReferenceBoundary {
+  status: 'resolved' | 'ambiguous' | 'unresolved';
+  allowedCalls: Array<{ tool: string; input: unknown }>;
 }
 
 export function requestBoundary(content: string): 'clinical' | 'external' | undefined {
@@ -67,14 +75,14 @@ export function safetyPlan(content: string): AgentPlan | undefined {
 }
 
 async function planRequest(provider: LLMProvider, content: string, caseContext?: Record<string, unknown>,
-  followUp?: { agent: AgentPlan['agent']; findings: Finding[]; usedTools: string[] }, onValidationError?: (failure: AgentError) => void, supportedAgents?: readonly AgentId[]): Promise<AgentPlan> {
+  followUp?: { agent: AgentPlan['agent']; findings: Finding[]; usedTools: string[] }, onValidationError?: (failure: AgentError) => void, supportedAgents?: readonly AgentId[], conversation?: ValidatedConversationContext): Promise<AgentPlan> {
   const definitions = Object.values(agents).filter((agent) => !supportedAgents || supportedAgents.includes(agent.id)).map(({ id, purpose, allowedTools, safety }) => ({ id, purpose, allowedTools, safety }));
   const system = `You are MedBridge's non-clinical care coordination planner. Select one agent and up to ${AGENT_LIMITS.maxToolCalls} allowed tools. Never invent catalog entities or treat a related procedure as an exact match. A hospital offers a procedure only when a tool confirms an explicit treatment link. Do not ask for a locality when a city is supplied, or for a budget unless required. Ask only for genuinely missing information. Never diagnose, prescribe, invent prices or availability, or expose tool errors. The catalog contains synthetic/demo records. ${followUp ? `This is iteration two. Keep agent ${followUp.agent}; use only needed new tools with returned slugs.` : ''} Agent definitions: ${JSON.stringify(definitions)}. Tool descriptions: ${JSON.stringify(toolDescriptions)}. Tool input JSON schemas: ${JSON.stringify(Object.fromEntries(Object.entries(toolSchemas).map(([name, schema]) => [name, schema.toJSONSchema()])))}.`;
   let lastError: unknown;
   for (let attempt = 0; attempt < AGENT_LIMITS.maxPlanningAttempts; attempt++) {
     try {
       const raw = await provider.generateStructured({ purpose: 'plan', system,
-        input: JSON.stringify({ request: safeText(content), caseContext: caseContext ?? null,
+        input: JSON.stringify({ request: safeText(content), conversation: conversation ? safeValue(conversation) : undefined, caseContext: caseContext ?? null,
           previousResults: followUp ? { agent: followUp.agent, usedTools: followUp.usedTools,
             findings: followUp.findings.map(({ kind, slug, title, facts }) => ({ kind, slug, title, facts })) } : undefined,
           correction: attempt ? 'Previous plan was invalid. Use only tools allowed for the selected agent and valid inputs.' : undefined }),
@@ -143,10 +151,16 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
   const runId = await context.store.startRun(conversationId, context.userId, context.execution?.plan.agent ?? 'discovery', request.caseId, context.execution?.carePlanId);
   const execution = new ExecutionState(runId, conversationId, context.userId, request.content, 'Understand the catalog request', context.store);
   execution.agent = context.execution?.plan.agent ?? 'discovery';
+  execution.conversation = context.conversation;
   await execution.persist();
   await execution.transition('planning');
   try {
-    if (context.execution && !clinical) { plan = planSchema.parse(context.execution.plan); route = context.execution.route; }
+    const requiresReference = ReferenceDetector.detect(request.content)?.entityType !== 'case' && Boolean(ReferenceDetector.detect(request.content))
+      || Boolean(context.conversation?.pendingClarification && /^(yes|no|ok|okay|sure|go ahead)[.!?]*$/i.test(request.content.trim()));
+    if (requiresReference && !context.execution?.referenceBoundary && !clinical && !context.execution?.diagnostics?.workflow?.toString().startsWith('reference') && !context.execution?.messageSourceId) {
+      plan = { agent: 'discovery', understanding: 'Identify the previously shown result before continuing.', steps: [], missingInformation: 'Which sourced result do you mean? Specify its type, name or position.' };
+      context = { ...context, execution: { plan, synthesis: { summary: plan.missingInformation!, question: plan.missingInformation, nextSteps: [] }, referenceBoundary: { status: 'unresolved', allowedCalls: [] } } };
+    } else if (context.execution && !clinical) { plan = planSchema.parse(context.execution.plan); route = context.execution.route; }
     else if (clinical) plan = { agent: 'discovery', understanding: 'This request may need clinical assessment.', steps: [], missingInformation: null };
     else {
       const guarded = safetyPlan(request.content);
@@ -163,7 +177,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
                 diagnostics.modelPlanError = failure.code;
                 diagnostics.validationError = typeof failure.cause === 'string' ? failure.cause.slice(0, 300) : null;
                 diagnostics.recoveryAttempted = true;
-              }, context.supportedAgents);
+              }, context.supportedAgents, context.conversation);
               if (suggested.agent !== route.plan.agent || JSON.stringify(suggested.steps) !== JSON.stringify(route.plan.steps)) {
                 diagnostics.modelPlanError ??= 'PLAN_RELEVANCE_OVERRIDE';
                 diagnostics.recoveryAttempted = true;
@@ -175,7 +189,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
               diagnostics.recoveryAttempted = true;
             }
           }
-        } else plan = await planRequest(context.provider, request.content, caseContext, undefined, (failure) => execution.planningErrors.push({ code: failure.code, message: failure.publicMessage }), context.supportedAgents);
+        } else plan = await planRequest(context.provider, request.content, caseContext, undefined, (failure) => execution.planningErrors.push({ code: failure.code, message: failure.publicMessage }), context.supportedAgents, context.conversation);
       }
     }
   } catch (error) {
@@ -250,6 +264,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
           let input: unknown; try { input = JSON.parse(step.input); } catch { input = null; }
           const observation = await executeRegisteredTool(execution, { tool: step.tool, input, taskId }, {
             agent: plan.agent, userId: context.userId, caseId: request.caseId, caseAccess: context.caseAccess,
+            referenceBoundary: context.execution?.referenceBoundary,
             observedRecordIds: findings.map((f) => f.provenance.recordId),
           }, dependencies);
           if (observation.error) throw new AgentError(observation.error.code, observation.error.message);
@@ -293,6 +308,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
       if (['awaiting_approval', 'awaiting_user_input'].includes(status) || limited) break;
       if (activePlan.missingInformation && findings.length === 0) { status = 'awaiting_user_input'; question = activePlan.missingInformation; break; }
       const mayExtend = execution.calls.length > 0 && !requestBoundary(request.content) && !context.execution?.messageSourceId && !(typeof context.execution?.diagnostics?.workflow === 'string' && context.execution.diagnostics.workflow.startsWith('reference'))
+        && !context.execution?.referenceBoundary
         && (!route && !context.execution || /\b(compare|check|missing|included|accommodation)\b/i.test(request.content));
       if (!mayExtend) break;
       if (iteration + 1 >= AGENT_LIMITS.maxPlanIterations || tasks.length >= AGENT_LIMITS.maxToolCalls || execution.failures >= AGENT_LIMITS.maxFailures) {
@@ -332,7 +348,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
         // Compatibility with existing providers that only support plan/synthesis.
         if (requiredSteps.length && modelControlsReads) { activePlan = { ...plan, steps: requiredSteps.splice(0, 1) }; continue; }
         if (route || context.execution || legacyFollowUps++ >= 1 || !findings.length) break;
-        activePlan = await planRequest(context.provider, request.content, caseContext, { agent: plan.agent, findings, usedTools: results.map((r) => r.tool) }, undefined, context.supportedAgents);
+        activePlan = await planRequest(context.provider, request.content, caseContext, { agent: plan.agent, findings, usedTools: results.map((r) => r.tool) }, undefined, context.supportedAgents, context.conversation);
         if (!activePlan.steps.some((step) => !used.has(`${step.tool}:${step.input}`))) break;
       }
     }

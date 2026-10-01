@@ -23,6 +23,9 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
     const parsed = definition.inputSchema.safeParse(proposal.input);
     if (!parsed.success || safeText(JSON.stringify(proposal.input)) !== JSON.stringify(proposal.input)) throw new AgentError('TOOL_INPUT_INVALID', 'The requested tool arguments are invalid.');
     call.validatedInput = safeValue(parsed.data);
+    const reference = context.referenceBoundary;
+    if (reference && (reference.status !== 'resolved' || !reference.allowedCalls.some(c => c.tool === name && canonicalInput(c.input) === canonicalInput(parsed.data))))
+      throw new AgentError('REFERENCE_TOOL_BLOCKED', 'Identify the referenced result before continuing.');
     const canonicalName = name in toolAliases ? toolAliases[name as keyof typeof toolAliases] : name;
     call.canonicalTool = canonicalName;
     const key = `${canonicalName}:${canonicalInput(parsed.data)}`;

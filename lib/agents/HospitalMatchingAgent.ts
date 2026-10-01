@@ -86,7 +86,8 @@ export const HospitalMatchingAgent = {
 export function hospitalMatchSummary(matches: HospitalMatch[]) {
   if (!matches.length) return 'No sourced hospital record was found for the requested criteria.';
   return matches.slice(0, 5).map((m) => `${m.hospital.title}: ${m.classification.replaceAll('_', ' ')}. `
-    + `Documented: ${m.criteria.filter((c) => c.evaluation.status === 'exact').map((c) => c.evaluation.label).join(', ') || 'none'}. `
+    + `Documented hospital criteria: ${m.criteria.filter(c => c.level === 'hospital' && c.evaluation.status === 'exact').map(c => c.evaluation.label).join(', ') || 'none'}. `
+    + (m.packageEvidenceRequested ? `Documented separately through a linked package: ${m.criteria.filter(c => c.level === 'package' && c.evaluation.status === 'exact').map(c => c.evaluation.label).join(', ') || 'none'}. ` : '')
     + m.criteria.filter((c) => c.evaluation.status !== 'exact').map((c) => `${c.evaluation.label}: ${c.evaluation.status.replaceAll('_', ' ')}${c.level === 'package' ? ' (package level)' : ''}.`).join(' ')
   ).join(' ');
 }

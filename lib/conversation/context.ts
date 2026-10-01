@@ -84,3 +84,23 @@ export function planReferenceContext(plan: CarePlan, requestedType?: ReferenceEn
     return source?.runId ? [{ ...reference, sourceRunId: source.runId }] : [];
   }) })) };
 }
+
+/** Server-loaded, schema-validated coordination context; private case data is not copied. */
+export function validatedConversationContext(conversationId: string, messages: ConversationMessage[], plan?: CarePlan) {
+  const responses = persistedResponses(messages, conversationId);
+  const latest = responses.at(-1);
+  const source = [...responses].reverse().find(r => r.findings.length || r.resultGroups?.length || r.comparison);
+  return {
+    conversationId,
+    history: messages.slice(-20).map(m => ({ role: m.role, content: m.content })),
+    activePlan: plan ? { id: plan.id, goal: plan.goal, title: plan.title, status: plan.status,
+      treatmentSlug: plan.context.treatmentSlug, city: plan.context.city, country: plan.context.country } : undefined,
+    findings: source?.findings ?? plan?.findings ?? [], resultGroups: source?.resultGroups,
+    references: latest?.pendingClarification?.context ?? (source ? buildReferenceContext(source, source.referenceContext?.createdAt) : plan?.context.referenceContext),
+    resolution: latest?.referenceResolution,
+    pendingClarification: latest?.pendingClarification ?? plan?.context.pendingClarification,
+    previousToolResults: source?.tasks.map(t => ({ tool: t.tool, status: t.status })) ?? [],
+    requirements: plan?.context.requirements ?? source?.requirements ?? [], comparison: source?.comparison,
+  };
+}
+export type ValidatedConversationContext = ReturnType<typeof validatedConversationContext>;

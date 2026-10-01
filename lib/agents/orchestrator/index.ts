@@ -11,7 +11,7 @@ import { upsertTask } from '../treatment-planning/tasks';
 import { classifyWorkflow } from './classifier';
 import { prepareComparison } from '../comparison/agent';
 import { prepareReferenceExecution } from '@/lib/conversation/execution';
-import { persistedResponses } from '@/lib/conversation/context';
+import { validatedConversationContext, persistedResponses } from '@/lib/conversation/context';
 import { RequirementExtractor } from '@/lib/requirements/RequirementExtractor';
 import { applyRequirements } from '@/lib/requirements/response';
 import { parseCompoundIntent, parseHospitalMatchingIntent } from '@/lib/orchestration/CompoundIntentParser';
@@ -54,6 +54,7 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
   }
   try {
     const [active, recent] = await Promise.all([hasPlanningSchema ? context.planningStore.load(conversationId, context.userId) : undefined, context.planningStore.recentMessages(conversationId)]);
+    context = { ...context, conversation: validatedConversationContext(conversationId, recent, active) };
     const boundary = requestBoundary(request.content);
     if (boundary) {
       const guarded = safetyPlan(request.content);
@@ -145,6 +146,14 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
       return evaluated;
     } };
     if (active) active.context.requirements = requirements;
+    const referenceExecution = wantsHandoff ? undefined : await prepareReferenceComparison({ content: request.content, conversationId, recent, active, snapshot,
+      store: context.planningStore, lease }) ?? await prepareReferenceExecution({ content: request.content, conversationId, recent, active, snapshot,
+      store: context.planningStore, lease });
+    if (referenceExecution) return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution: referenceExecution }));
+    if (active && (active.context.pendingClarification || active.context.referenceContext)) {
+      delete active.context.pendingClarification; delete active.context.referenceContext;
+      if (hasPlanningSchema) await context.planningStore.save(active, lease);
+    }
     const compound = parseCompoundIntent(routingContent, requirements, newGoal ? undefined : active?.context.compoundRequest);
     if (compound) {
       if (!hasPlanningSchema) throw new AgentError('PLANNING_MIGRATION_MISSING', 'Saved operations need the care-plan migration before they can run.');
@@ -153,10 +162,6 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
       execution.messageSourceId = handoffMessageSourceId;
       return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
     }
-    const referenceExecution = wantsHandoff ? undefined : await prepareReferenceComparison({ content: request.content, conversationId, recent, active, snapshot,
-      store: context.planningStore, lease }) ?? await prepareReferenceExecution({ content: request.content, conversationId, recent, active, snapshot,
-      store: context.planningStore, lease });
-    if (referenceExecution) return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution: referenceExecution }));
     const hospitalRequest = parseHospitalMatchingIntent(routingContent, requirements, newGoal ? undefined : active?.context.compoundRequest);
     if (hospitalRequest && hasPlanningSchema) {
       const execution = await prepareCompoundExecution({ content: routingContent, request: hospitalRequest, snapshot, active, caseContext,
