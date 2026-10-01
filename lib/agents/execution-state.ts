@@ -58,7 +58,7 @@ export class ExecutionState {
     readonly request: string, public goal: string, private readonly store: AgentStore) {}
   activity(): RunActivity { return activitySchema.parse({ runId: this.runId, state: this.state, updatedAt: new Date().toISOString(),
     steps: this.calls.map((c) => ({ id: c.id, number: c.step, label: label(c.tool), status: c.status,
-      recordCount: c.output?.findings.length ?? 0, ...(c.error ? { error: c.error.message } : {}) })), warnings: this.warnings.slice(0, 8) }); }
+      recordCount: (c.output?.findings.length ?? 0) + (c.output?.research?.findings.length ?? 0), ...(c.error ? { error: c.error.message } : {}) })), warnings: this.warnings.slice(0, 8) }); }
   async persist(finalOutput?: unknown) {
     await this.store.saveExecutionState?.(this.runId, { version: '1', runId: this.runId, conversationId: this.conversationId,
       ownerId: this.ownerId, agent: this.agent, originalRequest: safeText(this.request), goal: safeText(this.goal), state: this.state,
@@ -88,7 +88,7 @@ export class ExecutionState {
   }
 }
 export function label(tool: string) {
-  const known: Record<string, string> = { check_requirements: 'Check documented requirements', compare_providers: 'Compare sourced options',
+  const known: Record<string, string> = { research_healthcare_information: 'Research official healthcare sources', check_requirements: 'Check documented requirements', compare_providers: 'Compare sourced options',
     search_locations: 'Search catalog locations', request_user_information: 'Request missing information', request_external_action: 'Record action for review' };
   return known[tool] ?? `${tool.startsWith('search_') ? 'Search' : tool.startsWith('get_') ? 'Read' : 'Review'} ${tool.replace(/^(?:search_|get_)/, '').replaceAll('_', ' ')}`;
 }

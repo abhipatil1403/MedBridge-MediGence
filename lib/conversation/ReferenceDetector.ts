@@ -16,7 +16,7 @@ export const ReferenceDetector = {
       return referenceQuerySchema.parse({ entityType: 'package', operation: 'price' });
     if (/\bcompare\b|\bcomparison\b|\bversus\b|\bvs\b|\bbudget\b/.test(text)
       || /which has (?:the )?cheaper package/.test(text)) return undefined;
-    const ordinalMatch = /\b(?:the )?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|\d+(?:st|nd|rd|th))\s+(?:one|item|result|hospital|doctor|package|treatment|provider)s?\b/.exec(text);
+    const ordinalMatch = /\b(?:the )?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|\d+(?:st|nd|rd|th))\s+(?:(?:external|researched) )?(?:one|item|result|hospital|doctor|package|treatment|provider)s?\b/.exec(text);
     const location = /\bthe\s+([a-z]+(?:\s+[a-z]+){0,3}?)\s+(?:one|result)\b/.exec(text)?.[1];
     const relation = /\b(?:its|their|that hospital(?:'s|s)?|this hospital(?:'s|s)?)\s+(?:have\s+(?:a\s+)?)?packages?\b|\bdoes (?:that|this|the) hospital have (?:a )?package\b/.test(text);
     const attribute = /\b(?:cheaper|less expensive|lowest (?:price|cost))\b/.test(text) ? 'cheaper'
@@ -34,7 +34,7 @@ export const ReferenceDetector = {
       : /\bpackages?\b/.test(text) ? 'package' : /\btreatments?\b/.test(text) ? 'treatment' : undefined;
     const word = ordinalMatch?.[1];
     const ordinal = word === 'last' ? 'last' : word ? ordinalWords.includes(word) ? ordinalWords.indexOf(word) + 1 : parseInt(word, 10) : undefined;
-    return referenceQuerySchema.parse({ ordinal, entityType: relation ? 'hospital' : entityType ?? (inclusionQuestion ? 'package' : undefined),
+    return referenceQuerySchema.parse({ sourceKind: /\b(?:external|researched)\b/.test(text) ? 'external_source' : undefined, ordinal, entityType: relation ? 'hospital' : entityType ?? (inclusionQuestion ? 'package' : undefined),
       location: location && !ordinalWords.includes(location) && !['last', 'cheaper', 'more expensive', 'longer', 'shorter'].includes(location) ? location : undefined,
       attribute, operation: relation ? 'packages' : /\bhow much\b/.test(text) ? 'price' : 'details' });
   },

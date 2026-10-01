@@ -1,3 +1,5 @@
+import { withResearchRecovery } from '@/lib/research/recovery';
+import { prepareResearchExecution, wantsExternalResearch } from '@/lib/research/agent';
 import { randomUUID } from 'node:crypto';
 import { QueryNormalizer } from '@/lib/discovery/query-normalizer';
 import { discoveryRoute, loadDiscoverySnapshot, routeToolDependencies } from '../discovery-routing';
@@ -38,7 +40,7 @@ export interface OrchestratorContext extends RuntimeContext { planningStore: Pla
 
 /** One authenticated turn, one selected workflow, one bounded runtime. No recursive agent calls. */
 export async function orchestrate(rawRequest: unknown, context: OrchestratorContext): Promise<AgentResponse> {
-  context = { ...context, supportedAgents: ['discovery', 'treatment_planning', 'hospital_matching', 'comparison'] };
+  context = { ...context, supportedAgents: ['discovery', 'treatment_planning', 'hospital_matching', 'comparison', 'research'] };
   const request = userRequestSchema.parse(rawRequest);
   const caseContext = request.caseId ? await context.caseAccess.readContext(request.caseId) : undefined;
   const conversationId = request.conversationId ?? await context.store.createConversation(context.userId, request.caseId);
@@ -154,12 +156,15 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
       delete active.context.pendingClarification; delete active.context.referenceContext;
       if (hasPlanningSchema) await context.planningStore.save(active, lease);
     }
+    if (wantsExternalResearch(routingContent)) return validateResponse(await runAgent({ ...request, conversationId }, { ...context,
+      execution: prepareResearchExecution(routingContent, snapshot) }));
     const compound = parseCompoundIntent(routingContent, requirements, newGoal ? undefined : active?.context.compoundRequest);
     if (compound) {
       if (!hasPlanningSchema) throw new AgentError('PLANNING_MIGRATION_MISSING', 'Saved operations need the care-plan migration before they can run.');
       const execution = await prepareCompoundExecution({ content: routingContent, request: compound, snapshot, active, caseContext,
         userId: context.userId, conversationId, store: context.planningStore, lease });
       execution.messageSourceId = handoffMessageSourceId;
+      if (!wantsHandoff) withResearchRecovery(execution, routingContent, snapshot);
       return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
     }
     const hospitalRequest = parseHospitalMatchingIntent(routingContent, requirements, newGoal ? undefined : active?.context.compoundRequest);
@@ -167,6 +172,7 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
       const execution = await prepareCompoundExecution({ content: routingContent, request: hospitalRequest, snapshot, active, caseContext,
         userId: context.userId, conversationId, store: context.planningStore, lease });
       execution.messageSourceId = handoffMessageSourceId;
+      if (!wantsHandoff) withResearchRecovery(execution, routingContent, snapshot);
       return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
     }
     const goalText = request.content.split(/[.!?]/)[0].replace(/,?\s+(?:under|below|within|less than|maximum|budget|with|and I want)\b.*$/i, '').replace(/\s+treatment(?=\s+(?:in|at|near)\b|$)/i, '');

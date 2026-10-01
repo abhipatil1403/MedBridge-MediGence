@@ -70,8 +70,21 @@ export async function prepareReferenceExecution(input: { content: string; conver
     reason: pending?.question ?? (previousResolution?.status !== 'resolved' ? previousResolution?.reason : undefined)
       ?? 'Which result would you like to open? Specify its type, name or position.' };
   const reference = resolution.reference;
+  if (reference?.sourceKind === 'external_source') {
+    const research = responses.find(r => r.runId === reference.sourceRunId)?.research;
+    const findings = research?.findings.filter(f => f.entity.id === reference.entityId && (query!.operation !== 'packages' || ['package_information', 'published_pricing', 'accommodation'].includes(f.field)));
+    if (research && findings?.length) {
+      const selected = { ...research, findings, conflicts: research.conflicts.filter(c => c.entityId === reference.entityId),
+        missingInformation: research.missingInformation.filter(m => m.startsWith(`${reference.displayName}:`)) };
+      return { plan: { agent: 'research', understanding: `Read the persisted external evidence for ${reference.displayName}.`, steps: [], missingInformation: null },
+        referenceBoundary: { status: 'resolved', allowedCalls: [] }, synthesis: { summary: 'Previously retrieved external source evidence; no new search or provider verification.', nextSteps: ['Review the original source and retrieval date.'], question: null },
+        diagnostics: { workflow: 'reference_external_research', modelAttempts: '0' },
+        finalize: async response => ({ ...response, research: selected, referenceResolution: resolution, summarySource: 'application' }) };
+    }
+    resolution = { ...resolution, status: 'unresolved', reference: undefined, reason: 'The requested information is not present in the saved external evidence. Specify the public information you would like researched.' };
+  }
   // Both slug and record ID must still identify the same currently published catalog entity.
-  if (reference && reference.entityType !== 'case' && !input.snapshot[lists[reference.entityType]].some((item) => item.slug === reference.slug && item.recordId === reference.entityId))
+  if (reference && reference.entityType !== 'case' && reference.sourceKind !== 'external_source' && !input.snapshot[lists[reference.entityType]].some((item) => item.slug === reference.slug && item.recordId === reference.entityId))
     resolution = { ...resolution, status: 'unresolved', reference: undefined, reason: 'That previously shown record is no longer available in the current catalog. Which result would you like to explore?' };
   if (resolution.reference?.entityType === 'service') resolution = { ...resolution, status: 'unresolved', reference: undefined,
     reason: 'This service has no supported detail tool. Please open its catalog page or specify another result.' };

@@ -131,3 +131,13 @@
 
 .assistant-request-progress { margin: 0; padding-left: 20px; color: var(--ink); font-size: 14px; line-height: 1.6; }
 .assistant-request-progress li + li { margin-top: 8px; }
+
+.assistant-research { border-top: 2px solid var(--teal, #147d80); padding-top: 1rem; }
+.assistant-research h3 { margin: 1rem 0 .5rem; }
+.assistant-research dl > div { padding: .6rem 0; border-bottom: 1px solid #dce4e6; }
+.assistant-research dt { text-transform: capitalize; font-weight: 600; }
+.assistant-research dd { margin: .3rem 0 0; overflow-wrap: anywhere; }
+.assistant-research small { display: inline; }
+.assistant-research blockquote { margin: .5rem 0; padding-left: .75rem; border-left: 2px solid #dce4e6; }
+.assistant-research details { margin-top: .5rem; }
+.assistant-research a { text-decoration: underline; }

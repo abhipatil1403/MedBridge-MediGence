@@ -1,3 +1,4 @@
+import { compareResearchEvidence } from '@/lib/agents/comparison/research';
 import type { AgentResponse, Comparison, Finding } from '@/lib/agents/schemas';
 import type { CatalogSnapshot } from '@/types/catalog';
 import { RequirementEvaluator } from './RequirementEvaluator';
@@ -30,7 +31,7 @@ export function evaluateComparison(comparison: Comparison, requirements: Require
 export function applyRequirements(response: AgentResponse, requirements: Requirement[], snapshot: CatalogSnapshot, excludedIds: string[] = []): AgentResponse {
   if (!requirements.length) return response;
   const visible = (findings: Finding[]) => evaluateFindings(findings.filter((f) => !excludedIds.includes(f.provenance.recordId)), requirements, snapshot);
-  const result = { ...response, requirements, findings: visible(response.findings),
+  const result = { ...response, requirements, researchComparison: response.research ? compareResearchEvidence(response.research, requirements) : response.researchComparison, findings: visible(response.findings),
     resultGroups: response.resultGroups?.map((group) => ({ ...group, findings: visible(group.findings) })),
     comparison: response.comparison && evaluateComparison(response.comparison, requirements, snapshot) };
   // Group catalog match labels retain their original meaning and must describe the displayed records.
@@ -72,7 +73,7 @@ export function applyRequirements(response: AgentResponse, requirements: Require
   });
   const hasFeatures = requirements.some((r) => (packageAttributes as readonly string[]).includes(r.type));
   if (excludedIds.length && !result.findings.length && !result.question) result.summary = 'No additional catalog package is available for the retained requirements. I have kept your requirements; no alternative has been invented.';
-  else if (hasFeatures && !result.compoundRequest && result.findings.length && !result.question && result.status !== 'failed') {
+  else if (hasFeatures && !result.research && !result.compoundRequest && result.findings.length && !result.question && result.status !== 'failed') {
     const packages = result.findings.filter((f) => f.kind === 'packages');
     const evaluations = packages.flatMap((f) => f.requirementEvaluation!.evaluations);
     const gaps = [...new Map(evaluations.filter((e) => ['unknown', 'incomplete', 'not_met', 'related'].includes(e.status)).map((e) => [e.requirementId, e])).values()];

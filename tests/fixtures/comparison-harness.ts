@@ -31,7 +31,7 @@ const repository: CatalogRepository = { loadSnapshot: async () => snapshot, list
   findCandidateSlugs: async () => ({ treatments: new Set(snapshot.treatments.map((item) => item.slug)), hospitals: new Set([hospital.slug]), doctors: new Set(snapshot.doctors.map((item) => item.slug)),
     packages: new Set([pkg.slug]), countries: new Set(['india']), services: new Set(['consultation']) }) };
 const search = new SearchService(repository);
-const tools: ToolDependencies = { repository, search: (query, type, filters) => search.search({ q: query, type, ...filters, sort: 'relevance' }),
+const tools: ToolDependencies = { researchRetrieve: async () => { throw new Error('Network disabled in the unit harness'); }, repository, search: (query, type, filters) => search.search({ q: query, type, ...filters, sort: 'relevance' }),
   compare: async () => undefined };
 const caseAccess = { readContext: async () => ({}), readDocumentMetadata: async () => [] };
 const unavailable: LLMProvider = { generateStructured: async () => { throw new AgentError('MODEL_UNAVAILABLE', 'Unavailable'); } };

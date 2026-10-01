@@ -33,6 +33,7 @@ export interface RuntimeContext {
   supportedAgents?: readonly AgentId[];
   finalizeResponse?: (response: AgentResponse) => Promise<AgentResponse>;
   execution?: {
+    researchAuthorization?: import('@/lib/research/schemas').ResearchAuthorization;
     referenceBoundary?: ToolContextReferenceBoundary;
     plan: AgentPlan; route?: DiscoveryRoute; carePlanId?: string;
     messageSourceId?: string;
@@ -264,7 +265,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
           let input: unknown; try { input = JSON.parse(step.input); } catch { input = null; }
           const observation = await executeRegisteredTool(execution, { tool: step.tool, input, taskId }, {
             agent: plan.agent, userId: context.userId, caseId: request.caseId, caseAccess: context.caseAccess,
-            referenceBoundary: context.execution?.referenceBoundary,
+            referenceBoundary: context.execution?.referenceBoundary, researchAuthorization: context.execution?.researchAuthorization,
             observedRecordIds: findings.map((f) => f.provenance.recordId),
           }, dependencies);
           if (observation.error) throw new AgentError(observation.error.code, observation.error.message);
@@ -308,7 +309,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
       if (['awaiting_approval', 'awaiting_user_input'].includes(status) || limited) break;
       if (activePlan.missingInformation && findings.length === 0) { status = 'awaiting_user_input'; question = activePlan.missingInformation; break; }
       const mayExtend = execution.calls.length > 0 && !requestBoundary(request.content) && !context.execution?.messageSourceId && !(typeof context.execution?.diagnostics?.workflow === 'string' && context.execution.diagnostics.workflow.startsWith('reference'))
-        && !context.execution?.referenceBoundary
+        && !context.execution?.referenceBoundary && context.execution?.diagnostics?.workflow !== 'external_research' && !results.some(r => r.result.research)
         && (!route && !context.execution || /\b(compare|check|missing|included|accommodation)\b/i.test(request.content));
       if (!mayExtend) break;
       if (iteration + 1 >= AGENT_LIMITS.maxPlanIterations || tasks.length >= AGENT_LIMITS.maxToolCalls || execution.failures >= AGENT_LIMITS.maxFailures) {
@@ -405,7 +406,8 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
       if (response.status === 'completed' && !results.length && failedCalls.length) response.status = 'failed';
     }
     const catalogIncomplete = response.compoundRequest?.operations.some((o) => o.status === 'incomplete' || o.status === 'skipped')
-      || response.analyses?.some((a) => !a.complete);
+      || response.analyses?.some((a) => !a.complete) || response.research && response.research.status !== 'completed'
+      || response.researchComparison && !response.researchComparison.complete;
     if (response.compoundRequest || response.comparison) response.summarySource = 'derived';
     const finalState = response.status === 'awaiting_user_input' ? 'waiting_for_input' : response.status === 'awaiting_approval' ? 'awaiting_confirmation'
       : response.status === 'failed' && !response.findings.length ? 'failed' : failedCalls.length || limited || catalogIncomplete ? 'partially_completed' : 'completed';

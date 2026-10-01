@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import { researchInputSchema, type ResearchAuthorization } from '@/lib/research/schemas';
+import { researchHealthcare, validateResearchPrivacy } from '@/lib/research/service';
+import type { ResearchRetriever } from '@/lib/research/sources';
+import { canonicalInput } from './execution-state';
 import { loadDiscoverySnapshot } from './discovery-routing';
 import { compareCandidates } from './comparison/candidates';
 import { AGENT_LIMITS, safeText } from './execution-state';
@@ -14,6 +18,7 @@ import { evaluateFindings } from '@/lib/requirements/response';
 
 const searchInput = z.object({
   query: z.string().trim().min(2).max(240),
+  providerNames: z.array(z.string().trim().min(2).max(160)).min(1).max(3).optional(),
   country: z.string().max(80).describe('Catalog country slug, e.g. india').optional(),
   city: z.string().max(80).optional(),
   treatment: z.string().max(100).describe('Catalog treatment slug, e.g. knee-replacement').optional(),
@@ -35,6 +40,7 @@ const externalActionInput = z.object({ action: z.enum(['share_records', 'booking
 const analysisInput = z.object({ recordIds: z.array(z.guid()).min(1).max(10) }).strict();
 export const toolAliases = { get_hospital_details: 'get_hospital', get_doctor_details: 'get_doctor', get_treatment_details: 'get_treatment', get_package_details: 'get_package', search_locations: 'search_countries' } as const;
 export const toolSchemas = {
+  research_healthcare_information: researchInputSchema,
   get_hospital_details: slugInput, get_doctor_details: slugInput, get_treatment_details: slugInput, get_package_details: slugInput,
   search_locations: searchInput, check_requirements: analysisInput, compare_providers: analysisInput,
   search_treatments: searchInput, search_hospitals: searchInput, search_doctors: searchInput,
@@ -47,6 +53,7 @@ export const toolSchemas = {
 } satisfies Record<ToolName, z.ZodType>;
 
 export const toolDescriptions: Record<ToolName, string> = {
+  research_healthcare_information: 'Read bounded approved official healthcare sources only after a server-authorized internal information gap. Returns separate attributed external evidence. No arbitrary URL browsing.',
   get_hospital_details: 'Read a published hospital by slug.', get_doctor_details: 'Read a published doctor by slug.',
   get_treatment_details: 'Read a published treatment by slug.', get_package_details: 'Read a published package by slug.',
   search_locations: 'Search published catalog countries and travel notes; city-level records are not a separate location search.',
@@ -68,7 +75,7 @@ export const toolDescriptions: Record<ToolName, string> = {
 };
 
 export interface ToolDefinition {
-  id: ToolName; displayName: string; category: 'catalog' | 'analysis' | 'case' | 'coordination';
+  id: ToolName; displayName: string; category: 'catalog' | 'analysis' | 'case' | 'coordination' | 'research';
   permission: 'read' | 'confirmation' | 'case_consent' | 'professional'; mode: 'read' | 'proposal' | 'ask' | 'write' | 'external' | 'clinical';
   provenance: readonly ('catalog' | 'synthetic' | 'external' | 'user' | 'derived')[];
   timeoutMs: number; failureHandling: 'observe_and_recover';
@@ -86,7 +93,7 @@ const protectedTools = new Set<ToolName>(['get_case_context', 'get_case_document
 const proposedTools = new Set<ToolName>(['create_case', 'update_case', 'create_agent_task', 'request_external_action']);
 export const toolRegistry = Object.fromEntries((Object.keys(toolSchemas) as ToolName[]).map((name) => [name, {
   id: name, displayName: name.replaceAll('_', ' '),
-  category: ['check_requirements', 'compare_providers'].includes(name) ? 'analysis' : name.includes('case') ? 'case' : name.startsWith('search_') || name.startsWith('get_') || name === 'compare_treatment_options' ? 'catalog' : 'coordination',
+  category: name === 'research_healthcare_information' ? 'research' : ['check_requirements', 'compare_providers'].includes(name) ? 'analysis' : name.includes('case') ? 'case' : name.startsWith('search_') || name.startsWith('get_') || name === 'compare_treatment_options' ? 'catalog' : 'coordination',
   permission: proposedTools.has(name) ? 'confirmation' : protectedTools.has(name) ? 'case_consent' : 'read',
   mode: proposedTools.has(name) ? 'proposal' : name === 'request_user_information' ? 'ask' : 'read',
   provenance: ['catalog', 'synthetic', 'external', 'user', 'derived'], timeoutMs: AGENT_LIMITS.toolTimeoutMs, failureHandling: 'observe_and_recover',
@@ -102,6 +109,7 @@ export interface CaseAccess {
   readDocumentMetadata(caseId: string): Promise<Record<string, unknown>[]>;
 }
 export interface ToolContext {
+  researchAuthorization?: ResearchAuthorization;
   referenceBoundary?: import('./runtime').ToolContextReferenceBoundary;
   agent: AgentId;
   userId: string;
@@ -110,6 +118,7 @@ export interface ToolContext {
   observedRecordIds?: readonly string[];
 }
 export interface ToolDependencies {
+  researchRetrieve?: ResearchRetriever;
   requirements?: import('@/lib/requirements/RequirementTypes').Requirement[];
   evaluationSnapshot?: import('@/types/catalog').CatalogSnapshot;
   repository: CatalogRepository;
@@ -153,7 +162,7 @@ export function toFinding(kind: string, record: CatalogRecord, matchType: Findin
   for (const key of ['qualifications', 'languages', 'infrastructure', 'countries']) if (Array.isArray(item[key])) facts[key] = item[key].join('; ');
   if (kind === 'packages') facts.currency = 'USD';
   return {
-    kind, slug: record.slug, title: record.name, detail: record.description,
+    sourceKind: 'medbridge_catalog', kind, slug: record.slug, title: record.name, detail: record.description,
     href: hrefKinds[kind] ? `/${hrefKinds[kind]}/${record.slug}` : undefined,
     facts, matchType, matchReason,
     provenance: { kind: 'catalog', table: kind === 'services' ? 'healthcare_services' : kind,
@@ -175,6 +184,13 @@ export async function executeTool(name: ToolName, rawInput: unknown, context: To
   const input = validated.data as Record<string, string> & { budget?: number };
   if (!context.userId) throw new AgentError('AUTH_REQUIRED', 'Sign in to use catalog tools.');
   if (safeText(JSON.stringify(rawInput)) !== JSON.stringify(rawInput)) throw new AgentError('TOOL_INPUT_INVALID', 'Credentials cannot be used as tool arguments.');
+  if (name === 'research_healthcare_information') {
+    const args = researchInputSchema.parse(rawInput);
+    const authorization = context.researchAuthorization;
+    if (!authorization?.internalToolCompleted || canonicalInput(args) !== canonicalInput(authorization.input)) throw new AgentError('RESEARCH_NOT_AUTHORIZED', 'External research needs an identified internal information gap.');
+    try { validateResearchPrivacy(args); } catch { throw new AgentError('RESEARCH_PRIVACY_DENIED', 'Use public healthcare terms only for external research.'); }
+    return { findings: [], research: await researchHealthcare(args, authorization.reason, dependencies.researchRetrieve) };
+  }
   if (name in toolAliases) return executeTool(toolAliases[name as keyof typeof toolAliases], rawInput, context, dependencies);
   if (name === 'check_requirements' || name === 'compare_providers') {
     const args = analysisInput.parse(rawInput);
@@ -198,7 +214,9 @@ export async function executeTool(name: ToolName, rawInput: unknown, context: To
     const kind = searchKinds[name as keyof typeof searchKinds];
     const result = await dependencies.search(input.query, kind, { country: input.country, city: input.city, treatment: input.treatment, specialty: input.specialty,
       hospital: input.hospital, mode: input.mode as DiscoveryFilters['mode'], budget: input.budget });
-    const matches = result.sections[kind].filter(({ item }) => !input.verification || (input.verification === 'demo' ? item.sourceKind === 'synthetic' : item.sourceKind !== 'synthetic'));
+    const providerNames = searchInput.parse(rawInput).providerNames;
+    const normalizedName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const matches = result.sections[kind].filter(({ item }) => !providerNames || providerNames.some(name => [item.name, ...item.aliases, ...('hospitalName' in item ? [String(item.hospitalName)] : [])].some(value => normalizedName(value) === normalizedName(name)))).filter(({ item }) => !input.verification || (input.verification === 'demo' ? item.sourceKind === 'synthetic' : item.sourceKind !== 'synthetic'));
     const findings = matches.map(({ item, matchType, reason }) => toFinding(kind, item, matchType, reason));
     return { findings: (dependencies.requirements?.length && dependencies.evaluationSnapshot ? evaluateFindings(findings, dependencies.requirements, dependencies.evaluationSnapshot) : findings).slice(0, 5),
       note: matches.length === 0 ? 'No matching catalog records were found.' : undefined };

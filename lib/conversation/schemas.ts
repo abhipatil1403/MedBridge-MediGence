@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const referenceEntityTypeSchema = z.enum(['hospital', 'doctor', 'package', 'treatment', 'country', 'service', 'case']);
 export type ReferenceEntityType = z.infer<typeof referenceEntityTypeSchema>;
 export const entityReferenceSchema = z.object({
+  sourceKind: z.enum(['medbridge_catalog', 'external_source']).optional(),
   referenceId: z.string().min(1).max(200), entityType: referenceEntityTypeSchema, entityId: z.guid(),
   slug: z.string().min(1).max(200), displayName: z.string().min(1).max(300),
   city: z.string().optional(), country: z.string().optional(), location: z.string().optional(),
@@ -18,7 +19,7 @@ export const referenceContextSchema = z.object({ conversationId: z.uuid(), respo
   }).strict()).max(30),
 }).strict();
 export type ReferenceContext = z.infer<typeof referenceContextSchema>;
-export const referenceQuerySchema = z.object({ ordinal: z.union([z.number().int().positive().max(100), z.literal('last')]).optional(),
+export const referenceQuerySchema = z.object({ sourceKind: z.enum(['medbridge_catalog', 'external_source']).optional(), ordinal: z.union([z.number().int().positive().max(100), z.literal('last')]).optional(),
   entityType: referenceEntityTypeSchema.optional(), location: z.string().optional(),
   attribute: z.enum(['cheaper', 'expensive', 'longer', 'shorter']).optional(),
   operation: z.enum(['details', 'packages', 'price']),

@@ -26,6 +26,10 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
     const reference = context.referenceBoundary;
     if (reference && (reference.status !== 'resolved' || !reference.allowedCalls.some(c => c.tool === name && canonicalInput(c.input) === canonicalInput(parsed.data))))
       throw new AgentError('REFERENCE_TOOL_BLOCKED', 'Identify the referenced result before continuing.');
+    if (name === 'research_healthcare_information' && (!context.researchAuthorization?.internalToolCompleted
+      || !state.observations.some(o => ['search_hospitals', 'search_packages'].includes(o.tool) && ['completed', 'empty', 'reused'].includes(o.status))
+      || canonicalInput(parsed.data) !== canonicalInput(context.researchAuthorization.input)))
+      throw new AgentError('RESEARCH_NOT_AUTHORIZED', 'External research needs an identified internal information gap.');
     const canonicalName = name in toolAliases ? toolAliases[name as keyof typeof toolAliases] : name;
     call.canonicalTool = canonicalName;
     const key = `${canonicalName}:${canonicalInput(parsed.data)}`;
@@ -53,6 +57,7 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
     // Case context stays in existing consent-controlled storage, not the new model observations.
     call.output = { ...output, caseContext: undefined };
     call.provenance = [
+      ...(output.research ? [{ kind: 'external_source', recordIds: output.research.sources.map(s => s.id) }] : []),
       ...['synthetic', 'external', 'first_party'].flatMap((kind) => {
         const ids = output!.findings.filter((f) => f.provenance.sourceKind === kind).map((f) => f.provenance.recordId);
         return ids.length ? [{ kind: kind === 'first_party' ? 'catalog' : kind, recordIds: ids }] : [];
@@ -66,7 +71,7 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
   }
   call.endedAt = new Date().toISOString();
   const observation: ToolObservation = { id: call.id, tool: call.tool,
-    status: call.status === 'failed' ? 'failed' : call.status === 'reused' ? 'reused' : !output?.findings.length && !output?.requestedInformation && !output?.approvalRequired ? 'empty' : 'completed',
+    status: call.status === 'failed' ? 'failed' : call.status === 'reused' ? 'reused' : !output?.findings.length && !output?.research?.findings.length && !output?.requestedInformation && !output?.approvalRequired ? 'empty' : 'completed',
     ...(output ? { data: { ...output, caseContext: undefined } } : {}), provenance: call.provenance,
     missingInformation: output?.analysis?.missingInformation ?? (output?.requestedInformation ? [output.requestedInformation] : []),
     warnings: output?.note ? [output.note] : [], error: call.error,

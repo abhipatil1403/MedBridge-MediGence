@@ -130,3 +130,7 @@ The authenticated history endpoint projects compact activity only after conversa
 Validation and deployment evidence: [AGENTIC_TOOL_EXECUTION_VALIDATION.md](./AGENTIC_TOOL_EXECUTION_VALIDATION.md).
 
 Reference continuations now carry server-loaded structured conversation context and a persisted reference clarification through the existing runtime. An unresolved/ambiguous continuation authorizes zero tools; a resolved continuation authorizes only its deterministic tool/input pair. Neither can fall back to model discovery. See [the context regression validation](./AGENTIC_CONTEXT_REGRESSION_VALIDATION.md) for the confirmed failure path, correction and deployed verification.
+
+## External healthcare research (2026-10-01)
+
+The existing registry includes one `research_healthcare_information` read tool. ResearchAgent checks internal findings before bounded retrieval from reviewed official healthcare pages. Server-authorized inputs and an actual completed internal observation are required; no model can browse arbitrary URLs. External structured evidence and catalog records remain separate. ComparisonAgent and external requirement evaluation preserve original currencies, citations, missing facts and unresolved conflicts. The same owner-only response/run JSON persists external references across refresh. There is no additional model provider or agent loop. See [EXTERNAL_RESEARCH_AGENT_VALIDATION.md](EXTERNAL_RESEARCH_AGENT_VALIDATION.md) for source scope, security and actual gates. Case Intake remains parked.

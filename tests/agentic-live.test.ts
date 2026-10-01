@@ -95,6 +95,23 @@ it.skipIf(!ready)('persists real execution records, reloads owner activity, enfo
     expect(await new SupabasePlanningStore(admin, other.db).load(referenceConversation, other.id)).toBeUndefined();
     const records = await admin.from('agent_outputs').select('content').eq('run_id', yes.runId);
     expect(records.data).toHaveLength(1); expect(JSON.stringify(records.data)).not.toMatch(/facial plastic surgery/i);
+    // Real retrieval only: no injected source fixtures or catalog writes.
+    const researchConversation = await store.createConversation(owner.id); conversations.push(researchConversation);
+    const researched = await orchestrate({ conversationId: researchConversation,
+      content: 'Find current publicly listed knee replacement package information for hospitals in Mumbai.' }, fresh);
+    expect(researched.research?.sources.length).toBeGreaterThan(0);
+    expect(researched.research?.sources.every(s => s.sourceKind === 'external_source' && s.url.startsWith('https://'))).toBe(true);
+    expect(researched.findings.every(f => f.sourceKind === 'medbridge_catalog')).toBe(true);
+    const persisted = await admin.from('agent_outputs').select('content').eq('run_id', researched.runId).single();
+    expect(readObject(persisted.data?.content).research).toBeDefined();
+    const freshResearch = await orchestrate({ conversationId: researchConversation, content: 'Tell me more about the first external hospital.' },
+      { ...fresh, store: new SupabaseAgentStore(admin, owner.db), planningStore: new SupabasePlanningStore(admin, owner.db) });
+    expect(freshResearch.referenceResolution?.reference?.sourceKind).toBe('external_source');
+    expect(freshResearch.tasks).toEqual([]);
+    expect(freshResearch.research?.sources).toEqual(researched.research?.sources);
+    const privateResearch = await other.db.from('conversation_messages').select('id').eq('conversation_id', researchConversation);
+    expect(privateResearch.data).toEqual([]);
+    expect((await catalogRepository.listHospitals()).map(h => h.recordId)).toEqual(hospitals.map(h => h.recordId));
   } finally {
     if (conversations.length) {
       const runs = await admin.from('agent_runs').select('id').in('conversation_id', conversations), runIds = runs.data?.map((r) => r.id) ?? [];

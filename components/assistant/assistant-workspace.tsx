@@ -1,5 +1,6 @@
 'use client';
 
+import { ResearchResults } from './research-results';
 import { HospitalMatchResults } from './hospital-match-results';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -195,7 +196,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
 
     <section className="assistant-main" aria-label="Care conversation">
       <div className="assistant-main__intro"><span className="eyebrow">CARE COORDINATION</span><h2>{conversationId ? 'Your conversation' : 'What can we help you explore?'}</h2>
-        <p>Searches use MedBridge catalog records. Demo providers, costs, and packages are labelled below.</p></div>
+        <p>Catalog records and external research are labelled separately. Demo providers, costs, and packages remain marked as samples.</p></div>
       <div className="assistant-messages" aria-live="polite">{messages.length === 0 && <div className="assistant-empty"><p>Try a specific care planning request:</p>
         {['I need a cardiologist in India.', 'Find hospitals for knee replacement in Mumbai.', 'Compare knee replacement in India and Turkey.'].map((example) =>
           <button key={example} type="button" onClick={() => setContent(example)}>{example}</button>)}</div>}
@@ -226,17 +227,17 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
       <div className="assistant-context__panel"><p className="eyebrow">CURRENT PLAN</p><h2>{latest?.workflow === 'case_intake' ? 'Case intake agent' : latest ? agentsLabel(latest.agent) : 'No run yet'}</h2>
         {latest ? <ol className="assistant-task-list">{latest.tasks.map((task) => <li key={task.id}><strong>{task.objective}</strong><span>{task.status.replaceAll('_', ' ')}</span></li>)}</ol>
           : <p>Actual tasks appear here after a request runs.</p>}</div>
-      <div className="assistant-context__panel"><p className="eyebrow">FINDINGS</p><strong>{latest?.findings.length ?? 0} sourced records</strong>
-        <p>Source labels reflect each catalog record. Synthetic records are demo data.</p></div>
+      <div className="assistant-context__panel"><p className="eyebrow">FINDINGS</p><strong>{latest?.findings.length ?? 0} catalog records</strong>
+        <p>Source labels reflect each catalog record. Synthetic records are demo data.</p>{latest?.research && <p>{latest.research.findings.length} external evidence items · {latest.research.sources.length} retrieved sources</p>}</div>
       <div className="assistant-context__panel"><p className="eyebrow">SOURCES</p>{sources.length ? <ul className="assistant-source-list">{sources.map((source) =>
-        <li key={source.table}>{source.label} · {source.table}{source.sourceKind === 'synthetic' ? ' · Demo data' : ''}</li>)}</ul> : <p>Sources appear with retrieved results.</p>}</div>
+        <li key={source.table}>{source.label} · {source.table}{source.sourceKind === 'synthetic' ? ' · Demo data' : ''}</li>)}</ul> : <p>{latest?.research ? 'External citations and exact evidence appear with the research results.' : 'Sources appear with retrieved results.'}</p>}</div>
       {latest?.nextSteps.length ? <div className="assistant-context__panel"><p className="eyebrow">NEXT ACTIONS</p><ul className="assistant-source-list">{latest.nextSteps.map((step) => <li key={step}>{step}</li>)}</ul></div> : null}
     </aside>
   </div>;
 }
 
 function agentsLabel(agent: AgentResponse['agent']) {
-  return ({ discovery: 'Discovery agent', treatment_planning: 'Treatment planning agent', hospital_matching: 'Hospital matching agent', comparison: 'Comparison agent' })[agent];
+  return ({ discovery: 'Discovery agent', treatment_planning: 'Treatment planning agent', hospital_matching: 'Hospital matching agent', comparison: 'Comparison agent', research: 'Research agent' })[agent];
 }
 
 function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disabled }: { response: AgentResponse; approvalStatus?: string;
@@ -258,6 +259,7 @@ function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disable
       {response.hospitalMatches && <HospitalMatchResults matches={response.hospitalMatches} />}
       {response.comparison ? <ComparisonResults comparison={response.comparison} /> : response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : <FindingCards findings={response.findings} />}</div>
     {response.comparison && response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : null}
+    {response.research && <ResearchResults result={response.research} comparison={response.researchComparison} />}
     <ClarificationQuestion question={response.question} />
     {response.approvalProposal && <div className="assistant-response__approval"><small>PROPOSED ACTION</small><p>{response.approvalProposal.detail}</p>
       {response.approvalProposal.action === 'request_external_action' ? <p>External sharing and bookings are not connected. This request remains pending human review.</p>

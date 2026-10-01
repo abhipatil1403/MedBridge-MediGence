@@ -13,6 +13,7 @@ export const ReferenceResolver = {
       referenceResolutionSchema.parse({ status, reason: reason.slice(0, 600), candidates: unique(candidates).slice(0, 30), reference, query });
     if (!context) return result('unresolved', "Which result do you mean? I don't have a recent list to reference.");
     let groups = context.groups.filter((group) => !group.shared || query.entityType === group.entityType);
+    if (query.sourceKind) groups = groups.map(g => ({ ...g, references: g.references.filter(r => (r.sourceKind ?? 'medbridge_catalog') === query.sourceKind) }));
     if (query.entityType) groups = groups.filter((group) => group.entityType === query.entityType);
     if (query.attribute || query.operation === 'price') groups = groups.filter((group) => group.entityType === 'package');
     if (query.location) groups = groups.map((group) => ({ ...group, references: group.references.filter((reference) =>

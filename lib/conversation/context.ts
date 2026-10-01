@@ -44,6 +44,14 @@ export function buildReferenceContext(response: AgentResponse, createdAt = new D
     if (!groups.length) for (const task of response.tasks) if (task.tool.startsWith('search_'))
       add(task.tool.slice(7), [], undefined, undefined, task.status !== 'completed');
   }
+  if (response.research) {
+    const id = `${response.runId}:external`;
+    const entities = [...new Map(response.research.findings.map(f => [f.entity.id, f.entity])).values()];
+    groups.push({ id, entityType: 'hospital', label: 'External research hospitals', incomplete: response.research.status !== 'completed',
+      references: entities.map((entity, index) => ({ referenceId: `${id}:${index + 1}`, entityType: 'hospital', entityId: entity.id,
+        sourceKind: 'external_source', slug: entity.id, displayName: entity.name, city: entity.location, location: entity.location,
+        resultGroup: 'external_research', groupId: id, position: index + 1, sourceRunId: response.runId, createdAt, matchType: 'related' })) });
+  }
   const draft = response.patientCase ?? response.plan?.context.patientCase;
   if (draft) {
     const id = `${response.runId}:case`;
@@ -89,12 +97,13 @@ export function planReferenceContext(plan: CarePlan, requestedType?: ReferenceEn
 export function validatedConversationContext(conversationId: string, messages: ConversationMessage[], plan?: CarePlan) {
   const responses = persistedResponses(messages, conversationId);
   const latest = responses.at(-1);
-  const source = [...responses].reverse().find(r => r.findings.length || r.resultGroups?.length || r.comparison);
+  const source = [...responses].reverse().find(r => r.findings.length || r.resultGroups?.length || r.comparison || r.research);
   return {
     conversationId,
     history: messages.slice(-20).map(m => ({ role: m.role, content: m.content })),
     activePlan: plan ? { id: plan.id, goal: plan.goal, title: plan.title, status: plan.status,
       treatmentSlug: plan.context.treatmentSlug, city: plan.context.city, country: plan.context.country } : undefined,
+    research: source?.research, researchComparison: source?.researchComparison,
     findings: source?.findings ?? plan?.findings ?? [], resultGroups: source?.resultGroups,
     references: latest?.pendingClarification?.context ?? (source ? buildReferenceContext(source, source.referenceContext?.createdAt) : plan?.context.referenceContext),
     resolution: latest?.referenceResolution,
