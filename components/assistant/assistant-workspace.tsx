@@ -1,6 +1,7 @@
 'use client';
 
 import { ResearchResults } from './research-results';
+import { FindingsSummary, RequestUnderstanding } from './response-presentation';
 import { HospitalMatchResults } from './hospital-match-results';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -191,7 +192,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
     <aside className="assistant-rail" aria-label="Conversations"><div className="assistant-rail__head"><h2>Workspace</h2>
       <button type="button" disabled={busy} onClick={() => { setActivity(undefined); setConversationId(undefined); setCaseId(''); setMessages([]); setLatest(null); setCarePlan(undefined); setNotice(''); }}>New conversation</button></div>
       <div className="assistant-rail__list">{conversations.map((item) => <button key={item.id} type="button" className={item.id === conversationId ? 'active' : ''}
-        disabled={busy} onClick={() => { setActivity(undefined); setConversationId(item.id); setCaseId(item.case_id ?? ''); setLatest(null); setCarePlan(undefined); }}>{item.title}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}</div>
+        aria-pressed={item.id === conversationId} disabled={busy} onClick={() => { setActivity(undefined); setConversationId(item.id); setCaseId(item.case_id ?? ''); setLatest(null); setCarePlan(undefined); }}>{item.title}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}</div>
       <button type="button" className="assistant-signout" onClick={() => auth?.auth.signOut()}>Sign out</button></aside>
 
     <section className="assistant-main" aria-label="Care conversation">
@@ -244,13 +245,13 @@ function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disable
   onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; onRetry?: () => void; disabled: boolean }) {
   return <div className="assistant-response">
     {response.activity && <ExecutionActivity activity={response.activity} />}
-    {response.analyses?.map((analysis, index) => <div key={index}><small>CATALOG EVIDENCE REVIEW</small><p>{analysis.summary}</p>
-      {analysis.missingInformation.length > 0 && <ul>{analysis.missingInformation.map((gap, i) => <li key={i}>{gap}</li>)}</ul>}
-      <small>Derived from {analysis.recordIds.length} sourced catalog records · {analysis.complete ? 'Evidence review completed' : 'Incomplete evidence'}</small></div>)}<div><small>WHAT I UNDERSTOOD</small><p>{response.understanding}</p></div>
+    <RequestUnderstanding response={response} />
+    <RequestProgress request={response.compoundRequest} />
     {response.workflow === 'case_intake' && response.caseSummary && <CaseSummaryContent summary={response.caseSummary} />}
     {response.caseHandoff && <p>Using the reviewed case for catalog coordination. Reported medical information is separate from search requirements and does not establish treatment suitability. No case has been submitted to a provider.</p>}
-    <RequestProgress request={response.compoundRequest} />
-    <div><small>FINDINGS</small><p>{response.summary}</p>{response.summarySource === 'model' && <small>Model-generated coordination explanation. Catalog facts are sourced below.</small>}
+    <FindingsSummary response={response} />
+    <div className="assistant-catalog-results">
+      {response.research && response.findings.length > 0 && <h3 className="assistant-section-title">MEDBRIDGE CATALOG</h3>}
       {!response.resultGroups?.length && response.discovery && <div className="assistant-match-state" role="status"><strong>{response.status === 'awaiting_user_input' ? 'One detail needed' : response.findings.some((f) => f.requirementEvaluation && f.requirementEvaluation.overallStatus !== 'fully_satisfies') ? 'Catalog results · review requirements' : response.discovery.matchType === 'exact' ? 'Exact catalog matches' : response.discovery.matchType === 'related' ? 'Related catalog information' : 'No exact catalog match'}</strong>
         <p>{response.discovery.matchReason}</p>
         {response.discovery.recovered && <p>Catalog criteria were checked directly to complete this search.</p>}</div>}
@@ -260,6 +261,9 @@ function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disable
       {response.comparison ? <ComparisonResults comparison={response.comparison} /> : response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : <FindingCards findings={response.findings} />}</div>
     {response.comparison && response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : null}
     {response.research && <ResearchResults result={response.research} comparison={response.researchComparison} />}
+    {response.analyses?.map((analysis, index) => <details className="assistant-evidence-review" key={index}><summary>CATALOG EVIDENCE REVIEW</summary><p>{analysis.summary}</p>
+      {analysis.missingInformation.length > 0 && <ul>{analysis.missingInformation.map((gap, i) => <li key={i}>{gap}</li>)}</ul>}
+      <small>Derived from {analysis.recordIds.length} sourced catalog records · {analysis.complete ? 'Evidence review completed' : 'Incomplete evidence'}</small></details>)}
     <ClarificationQuestion question={response.question} />
     {response.approvalProposal && <div className="assistant-response__approval"><small>PROPOSED ACTION</small><p>{response.approvalProposal.detail}</p>
       {response.approvalProposal.action === 'request_external_action' ? <p>External sharing and bookings are not connected. This request remains pending human review.</p>
@@ -267,6 +271,6 @@ function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disable
           <button type="button" disabled={disabled} onClick={() => onDecision(response.approvalId!, 'approved')}>Approve this change</button>
           <button type="button" disabled={disabled} onClick={() => onDecision(response.approvalId!, 'rejected')}>Reject</button></div>
           : <p>Status: {approvalStatus ?? 'pending'}</p>}</div>}
-    {response.nextSteps.length > 0 && <div><small>NEXT STEPS</small><ul>{response.nextSteps.filter(step => visibleText(step)).map((step) => <li key={step}>{step}</li>)}</ul></div>}
+    {response.nextSteps.length > 0 && <div className="assistant-next-steps"><h3 className="assistant-section-title">NEXT STEPS</h3><ul>{response.nextSteps.filter(step => visibleText(step)).map((step) => <li key={step}>{step}</li>)}</ul></div>}
   </div>;
 }

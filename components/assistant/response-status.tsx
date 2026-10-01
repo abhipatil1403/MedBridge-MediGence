@@ -1,4 +1,5 @@
 import type { CompoundRequest } from '@/lib/orchestration/CompoundRequest';
+import { StatusMark } from './response-presentation';
 
 export function visibleText(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -21,6 +22,6 @@ export function RequestProgress({ request }: { request?: CompoundRequest }) {
     return label && status ? [{ id: op.id, label, status: status.replaceAll('_', ' '), note: visibleText(op.note) }] : [];
   }) ?? [];
   if (!entries.length) return null;
-  return <details><summary>Request progress</summary><ul className="assistant-request-progress">{entries.map(entry =>
-    <li key={entry.id}><strong>{entry.label}</strong>{' · '}{entry.status}{entry.note && <p>{entry.note}</p>}</li>)}</ul></details>;
+  return <details className="assistant-progress"><summary>Request progress</summary><ol className="assistant-request-progress">{entries.map(entry =>
+    <li key={entry.id}><StatusMark status={entry.status} /><div><strong>{entry.label}</strong><span>{entry.status}</span>{entry.note && <p>{entry.note}</p>}</div></li>)}</ol></details>;
 }

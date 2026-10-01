@@ -29,7 +29,7 @@ export function ComparisonResults({ comparison }: { comparison: Comparison }) {
       return <div key={target} className="assistant-comparison__group">
         <h4>{target[0].toUpperCase() + target.slice(1)}</h4>
         <div className="assistant-comparison__scroll" role="region" tabIndex={0} aria-label={`${target} comparison table`}>
-          <table><caption>{target} catalog attributes</caption><thead><tr><th scope="col">Factor</th>
+          <table><caption>{target} catalog attributes<span className="assistant-table-scroll-mark" aria-hidden="true">↔</span></caption><thead><tr><th scope="col">Factor</th>
             <th scope="col">{first.option.label}</th><th scope="col">{second.option.label}</th></tr></thead><tbody>
             <tr><th scope="row">Catalog matches</th><td><Match group={a} /></td><td><Match group={b} /></td></tr>
             <tr><th scope="row">Records</th><td><Values findings={a.findings} field="name" /></td><td><Values findings={b.findings} field="name" /></td></tr>
