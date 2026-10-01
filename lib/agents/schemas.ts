@@ -3,6 +3,8 @@ import { normalizedDiscoveryQuerySchema } from '@/lib/discovery/query-normalizer
 import { referenceContextSchema, referenceResolutionSchema, type ReferenceContext, type ReferenceResolution } from '@/lib/conversation/schemas';
 import { requirementsSchema, requirementEvaluationSchema, resultRequirementEvaluationSchema, type Requirement, type ResultRequirementEvaluation } from '@/lib/requirements/RequirementTypes';
 import { compoundRequestSchema, type CompoundRequest } from '@/lib/orchestration/CompoundRequest';
+import { patientCaseSchema, caseSummarySchema, caseHandoffSchema } from '@/lib/case/CaseSchema';
+import type { PatientCase, CaseSummary, CaseHandoff } from '@/lib/case/CaseTypes';
 
 export const agentIdSchema = z.enum(['discovery', 'treatment_planning', 'hospital_matching', 'comparison']);
 export type AgentId = z.infer<typeof agentIdSchema>;
@@ -156,9 +158,11 @@ export const comparisonSchema = z.object({ id: z.uuid(), request: comparisonRequ
 export type Comparison = z.infer<typeof comparisonSchema>;
 
 export const planningContextSchema = z.object({
+  patientCase: patientCaseSchema.optional(),
+  caseHandoff: caseHandoffSchema.optional(),
   compoundRequest: compoundRequestSchema.optional(),
   requirements: requirementsSchema.optional(),
-  goalType: z.enum(['treatment', 'consultation']),
+  goalType: z.enum(['treatment', 'consultation', 'intake']),
   treatmentSlug: z.string().optional(), treatmentName: z.string().optional(), treatmentId: z.guid().optional(),
   specialty: z.string().optional(), city: z.string().optional(), country: z.string().optional(),
   budget: z.object({ amount: z.number().positive().max(100000000), currency: z.enum(['USD', 'INR']), source: z.literal('user') }).strict().optional(),
@@ -200,6 +204,10 @@ export interface AgentTaskView {
 }
 
 export interface AgentResponse {
+  workflow?: 'case_intake';
+  patientCase?: PatientCase;
+  caseSummary?: CaseSummary;
+  caseHandoff?: CaseHandoff;
   hospitalMatches?: HospitalMatch[];
   compoundRequest?: CompoundRequest;
   requirements?: Requirement[];
@@ -228,6 +236,8 @@ export interface AgentResponse {
 }
 
 export const assistantResponseSchema = z.object({
+  workflow: z.literal('case_intake').optional(), patientCase: patientCaseSchema.optional(),
+  caseSummary: caseSummarySchema.optional(), caseHandoff: caseHandoffSchema.optional(),
   hospitalMatches: z.array(hospitalMatchSchema).max(30).optional(),
   compoundRequest: compoundRequestSchema.optional(),
   requirements: requirementsSchema.optional(),

@@ -17,6 +17,22 @@ import { applyRequirements } from '@/lib/requirements/response';
 import { parseCompoundIntent, parseHospitalMatchingIntent } from '@/lib/orchestration/CompoundIntentParser';
 import { prepareCompoundExecution } from '@/lib/orchestration/OperationExecutor';
 import { prepareReferenceComparison } from '@/lib/conversation/comparison-execution';
+import { caseIntakeIntent, prepareCaseIntake, caseSource } from '@/lib/case/CaseIntakeAgent';
+import { extractCase } from '@/lib/case/CaseExtractor';
+import { caseFields, caseHandoffSchema } from '@/lib/case/CaseSchema';
+import { summarizeCase } from '@/lib/case/CaseSummary';
+import { caseCompleteness } from '@/lib/case/CaseCompleteness';
+import type { PatientCase } from '@/lib/case/CaseTypes';
+import type { CatalogSnapshot } from '@/types/catalog';
+
+function caseCoordinationText(content: string, snapshot: CatalogSnapshot, draft?: PatientCase): string {
+  let text = /\b(?:find|search|look for)\b[^.!?;]*\bhospitals?\b[^.!?;]*/i.exec(content)?.[0] ?? content;
+  const named = snapshot.treatments.some((t) => text.toLowerCase().includes(t.name.toLowerCase()));
+  const procedures = [...new Set([...(draft?.proceduresDiscussed.filter((p) => p.status !== 'conflicting').map((p) => p.value) ?? []),
+    ...extractCase(content, draft).filter((i) => i.field === 'proceduresDiscussed').map((i) => i.value)])];
+  if (!named && procedures.length === 1) text = text.replace(/\bhospitals?\b/i, (noun) => `${noun} for ${procedures[0]}`);
+  return text;
+}
 
 export interface OrchestratorContext extends RuntimeContext { planningStore: PlanningStore }
 
@@ -68,34 +84,84 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
         },
       } }));
     }
+    const draft = active?.context.patientCase;
+    const hospitalGoal = /\b(?:find|search|look for)\b.*\bhospitals?\b|\bfind\b.*\bhospital\b/i.test(request.content);
+    const continueCase = Boolean(draft && /^continue(?: with (?:my|this) case)?[.!]?$/i.test(request.content.trim()));
+    const wantsHandoff = Boolean(draft && (hospitalGoal || continueCase && draft.pendingCoordinationRequest));
+    const newFacts = extractCase(request.content, draft).some((i) => i.field !== 'requestedGoal');
+    if ((caseIntakeIntent(request.content, draft) || wantsHandoff) && (!wantsHandoff || newFacts
+      || draft!.reviewPresentedRevision !== draft!.revision || caseFields.some((f) => draft![f].some((i) => i.status === 'conflicting')))) {
+      if (!hasPlanningSchema) throw new AgentError('PLANNING_MIGRATION_MISSING', 'Case intake needs the existing care-plan migration before it can save information.');
+      const intakeSnapshot = hospitalGoal ? await loadDiscoverySnapshot(context.tools?.repository ?? defaultToolDependencies.repository) : undefined;
+      const execution = await prepareCaseIntake({ content: request.content, conversationId, userId: context.userId, active,
+        store: context.planningStore, lease, pendingCoordinationRequest: hospitalGoal ? request.content : undefined,
+        requirements: intakeSnapshot ? RequirementExtractor.extract(caseCoordinationText(request.content, intakeSnapshot, draft), intakeSnapshot, active?.context.requirements) : undefined,
+        documentMetadata: request.caseId ? await context.caseAccess.readDocumentMetadata(request.caseId) : undefined });
+      return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
+    }
     const snapshot = await loadDiscoverySnapshot(context.tools?.repository ?? defaultToolDependencies.repository);
+    let routingContent = wantsHandoff && continueCase ? draft!.pendingCoordinationRequest! : request.content;
+    if (wantsHandoff) {
+      // Only a single explicitly reported procedure may supply omitted search context.
+      // A symptom/diagnosis never becomes a procedure or evidence of appropriateness.
+      routingContent = caseCoordinationText(routingContent, snapshot, draft);
+    }
+    const handoffMessageSourceId = wantsHandoff ? randomUUID() : undefined;
     const lastResponse = persistedResponses(recent, conversationId).at(-1);
     const previousRequirements = active?.context.requirements ?? lastResponse?.requirements ?? [];
     const newGoal = /\b(?:new|separate) (?:plan|goal|search)\b/i.test(request.content);
-    const requirements = RequirementExtractor.extract(request.content, snapshot, newGoal ? [] : previousRequirements);
+    const requirements = RequirementExtractor.extract(routingContent, snapshot, newGoal ? [] : previousRequirements);
+    // An answer to an intake search clarification updates administrative context;
+    // it neither becomes a clinical fact nor bypasses the review/Continue step.
+    if (draft?.pendingCoordinationRequest && !wantsHandoff && draft.missingInformation.some((m) => m.category === 'required_for_requested_action')
+      && RequirementExtractor.extract(request.content, snapshot).some((r) => r.type === 'location' || r.type === 'procedure' && r.matchType === 'exact')) {
+      const execution = await prepareCaseIntake({ content: request.content, conversationId, userId: context.userId, active,
+        store: context.planningStore, lease, requirements });
+      return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
+    }
+    if (wantsHandoff && caseCompleteness(draft!, requirements, true).some((m) => m.category === 'required_for_requested_action')) {
+      active!.context.requirements = requirements;
+      const execution = await prepareCaseIntake({ content: request.content, conversationId, userId: context.userId, active,
+        store: context.planningStore, lease, pendingCoordinationRequest: routingContent });
+      return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
+    }
     const another = /\b(?:another|different) (?:one|package)\b/i.test(request.content);
     const excludedIds = another ? (lastResponse?.findings ?? []).filter((f) => f.kind === 'packages').map((f) => f.provenance.recordId) : [];
     context = { ...context, tools: { ...(context.tools ?? defaultToolDependencies), requirements, evaluationSnapshot: snapshot }, finalizeResponse: async (response) => {
       const evaluated = applyRequirements(response, requirements, snapshot, excludedIds);
+      const savedCase = evaluated.plan?.context.patientCase;
+      if (savedCase) {
+        savedCase.missingInformation = caseCompleteness(savedCase, requirements, Boolean(wantsHandoff));
+        evaluated.patientCase = savedCase;
+        if (wantsHandoff) {
+          const handoff = caseHandoffSchema.parse({ caseId: savedCase.id, revision: savedCase.revision, destination: 'hospital_matching',
+            approvedByUser: true, approvalSource: caseSource(request.content, conversationId, response.runId, handoffMessageSourceId!, new Date().toISOString()),
+            coordinationRequirements: requirements, reportedFacts: savedCase, clinicallyVerified: false, submittedToProvider: false });
+          evaluated.caseHandoff = handoff; evaluated.plan!.context.caseHandoff = handoff;
+        }
+        evaluated.caseSummary = summarizeCase(savedCase);
+      }
       if (evaluated.plan && hasPlanningSchema) evaluated.plan = await context.planningStore.save(evaluated.plan, lease);
       return evaluated;
     } };
     if (active) active.context.requirements = requirements;
-    const compound = parseCompoundIntent(request.content, requirements, newGoal ? undefined : active?.context.compoundRequest);
+    const compound = parseCompoundIntent(routingContent, requirements, newGoal ? undefined : active?.context.compoundRequest);
     if (compound) {
       if (!hasPlanningSchema) throw new AgentError('PLANNING_MIGRATION_MISSING', 'Saved operations need the care-plan migration before they can run.');
-      const execution = await prepareCompoundExecution({ content: request.content, request: compound, snapshot, active, caseContext,
+      const execution = await prepareCompoundExecution({ content: routingContent, request: compound, snapshot, active, caseContext,
         userId: context.userId, conversationId, store: context.planningStore, lease });
+      execution.messageSourceId = handoffMessageSourceId;
       return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
     }
-    const referenceExecution = await prepareReferenceComparison({ content: request.content, conversationId, recent, active, snapshot,
+    const referenceExecution = wantsHandoff ? undefined : await prepareReferenceComparison({ content: request.content, conversationId, recent, active, snapshot,
       store: context.planningStore, lease }) ?? await prepareReferenceExecution({ content: request.content, conversationId, recent, active, snapshot,
       store: context.planningStore, lease });
     if (referenceExecution) return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution: referenceExecution }));
-    const hospitalRequest = parseHospitalMatchingIntent(request.content, requirements, newGoal ? undefined : active?.context.compoundRequest);
+    const hospitalRequest = parseHospitalMatchingIntent(routingContent, requirements, newGoal ? undefined : active?.context.compoundRequest);
     if (hospitalRequest && hasPlanningSchema) {
-      const execution = await prepareCompoundExecution({ content: request.content, request: hospitalRequest, snapshot, active, caseContext,
+      const execution = await prepareCompoundExecution({ content: routingContent, request: hospitalRequest, snapshot, active, caseContext,
         userId: context.userId, conversationId, store: context.planningStore, lease });
+      execution.messageSourceId = handoffMessageSourceId;
       return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
     }
     const goalText = request.content.split(/[.!?]/)[0].replace(/,?\s+(?:under|below|within|less than|maximum|budget|with|and I want)\b.*$/i, '').replace(/\s+treatment(?=\s+(?:in|at|near)\b|$)/i, '');

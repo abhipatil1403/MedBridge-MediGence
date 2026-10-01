@@ -9,6 +9,7 @@ import type { AgentResponse, CarePlan } from '@/lib/agents/schemas';
 import { CarePlanPanel } from './care-plan-panel';
 import { FindingCards, PlanningResultGroups } from './catalog-results';
 import { ComparisonResults } from './comparison-results';
+import { CasePanel, CaseSummaryContent } from './case-panel';
 
 type Conversation = { id: string; title: string; case_id: string | null; updated_at: string };
 type Case = { id: string; title: string; status: string; agentConsent: boolean; canManageConsent: boolean };
@@ -194,13 +195,14 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
 
     <aside className="assistant-context" aria-label="Plan and case context"><div className="assistant-context__panel"><p className="eyebrow">CASE CONTEXT</p><h2>Scope this conversation</h2>
       <label htmlFor="case-select">Case<select id="case-select" value={caseId} disabled={Boolean(conversationId) || busy} onChange={(event) => setCaseId(event.target.value)}>
-        <option value="">No case — catalog only</option>{cases.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
+        <option value="">No linked case record</option>{cases.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
       {selectedCase && <><p>{selectedCase.agentConsent ? 'Assistant access granted for this case.' : 'Case owner consent is needed before the assistant reads this case.'}</p>
         {selectedCase.canManageConsent && <button type="button" disabled={busy} onClick={() => changeConsent(selectedCase)}>{selectedCase.agentConsent ? 'Revoke assistant consent' : 'Grant assistant consent'}</button>}</>}
       <small>Case information stays within the selected conversation. Document contents are not sent to the assistant.</small></div>
+      {carePlan?.context.patientCase && <CasePanel draft={carePlan.context.patientCase} busy={busy} onAction={(text) => { void submitRequest(text); }} />}
       {carePlan && <CarePlanPanel plan={carePlan} busy={busy} onTaskAction={completePlanTask} />}
       <div className="assistant-context__panel"><p className="eyebrow">CURRENT REQUEST</p><p>{busy ? content.trim() : latestRequest || 'Describe what you want to explore.'}</p></div>
-      <div className="assistant-context__panel"><p className="eyebrow">CURRENT PLAN</p><h2>{latest ? agentsLabel(latest.agent) : 'No run yet'}</h2>
+      <div className="assistant-context__panel"><p className="eyebrow">CURRENT PLAN</p><h2>{latest?.workflow === 'case_intake' ? 'Case intake agent' : latest ? agentsLabel(latest.agent) : 'No run yet'}</h2>
         {latest ? <ol className="assistant-task-list">{latest.tasks.map((task) => <li key={task.id}><strong>{task.objective}</strong><span>{task.status.replaceAll('_', ' ')}</span></li>)}</ol>
           : <p>Actual tasks appear here after a request runs.</p>}</div>
       <div className="assistant-context__panel"><p className="eyebrow">FINDINGS</p><strong>{latest?.findings.length ?? 0} sourced records</strong>
@@ -219,6 +221,8 @@ function agentsLabel(agent: AgentResponse['agent']) {
 function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disabled }: { response: AgentResponse; approvalStatus?: string;
   onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; onRetry?: () => void; disabled: boolean }) {
   return <div className="assistant-response"><div><small>WHAT I UNDERSTOOD</small><p>{response.understanding}</p></div>
+    {response.workflow === 'case_intake' && response.caseSummary && <CaseSummaryContent summary={response.caseSummary} />}
+    {response.caseHandoff && <p>Using the reviewed case for catalog coordination. Reported medical information is separate from search requirements and does not establish treatment suitability. No case has been submitted to a provider.</p>}
     {response.compoundRequest && <details><summary>Request progress</summary><ul className="assistant-source-list">
       {response.compoundRequest.operations.map((operation) => <li key={operation.id}><strong>{({ discover_hospitals: 'Hospital search', discover_doctors: 'Doctor search', discover_packages: 'Package search', discover_services: 'General services · hospital availability unconfirmed', evaluate_requirements: 'Requirement check', compare_results: 'Comparison' })[operation.type]}</strong>
         {' · '}{operation.status}{operation.note && <p>{operation.note}</p>}</li>)}

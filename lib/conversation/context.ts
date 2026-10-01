@@ -44,6 +44,15 @@ export function buildReferenceContext(response: AgentResponse, createdAt = new D
     if (!groups.length) for (const task of response.tasks) if (task.tool.startsWith('search_'))
       add(task.tool.slice(7), [], undefined, undefined, task.status !== 'completed');
   }
+  const draft = response.patientCase ?? response.plan?.context.patientCase;
+  if (draft) {
+    const id = `${response.runId}:case`;
+    // Shared scope excludes the private draft from bare catalog ordinals. The slug
+    // is an internal reference key only; cases never receive a public detail URL.
+    groups.push({ id, entityType: 'case', label: 'Your reported case', shared: true, incomplete: false,
+      references: [{ referenceId: id, entityType: 'case', entityId: draft.id, slug: draft.id, displayName: 'Your reported case',
+        resultGroup: 'case', groupId: id, position: 1, sourceRunId: response.runId, createdAt, matchType: 'exact' }] });
+  }
   return referenceContextSchema.parse({ conversationId: response.conversationId, responseId: response.runId, createdAt, groups });
 }
 
@@ -66,9 +75,10 @@ export function planReferenceContext(plan: CarePlan, requestedType?: ReferenceEn
   const comparison = comparisonTask?.comparison;
   const context = buildReferenceContext({ conversationId: plan.conversationId, runId: comparisonTask?.runId ?? plan.tasks.find((task) => task.runId)?.runId ?? plan.id, agent: 'discovery', status: 'completed',
     understanding: '', summary: '', question: null, tasks: [], nextSteps: [], comparison,
-    findings: comparison ? [] : plan.findings }, plan.updatedAt);
+    findings: comparison ? [] : plan.findings, patientCase: plan.context.patientCase }, plan.updatedAt);
   if (comparisonTask?.runId) return context;
   return { ...context, groups: context.groups.map((group) => ({ ...group, references: group.references.flatMap((reference) => {
+    if (reference.entityType === 'case') return [reference];
     const source = [...plan.tasks].reverse().find((task) => task.status === 'completed' && task.runId
       && task.findings.some((finding) => finding.provenance.recordId === reference.entityId && finding.kind === reference.resultGroup));
     return source?.runId ? [{ ...reference, sourceRunId: source.runId }] : [];

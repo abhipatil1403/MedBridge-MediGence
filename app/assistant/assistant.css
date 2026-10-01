@@ -122,3 +122,9 @@
 .assistant-requirements details p, .assistant-requirements details li { font-size: .8rem; overflow-wrap: anywhere; }
 .assistant-requirements > details { margin-top: .65rem; }
 .assistant-finding[data-requirement-status]:not([data-requirement-status="fully_satisfies"]) > span { color: #52675c; }
+.case-summary ul { margin: .4rem 0 1rem; padding-left: 1.2rem; }
+.case-summary li { overflow-wrap: anywhere; }
+.case-summary details { margin: .75rem 0; }
+.case-source-label { color: var(--muted); font-size: .82rem; }
+.case-review-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: .75rem 0; }
+.case-review-actions button { border: 1px solid #cbd9d7; background: #f5faf9; color: #183c39; border-radius: .5rem; padding: .5rem .75rem; cursor: pointer; }

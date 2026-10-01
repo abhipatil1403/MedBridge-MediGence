@@ -19,6 +19,7 @@ const lists = { hospital: 'hospitals', package: 'packages', doctor: 'doctors', t
 export async function prepareReferenceExecution(input: { content: string; conversationId: string; recent: ConversationMessage[]; active?: CarePlan;
   snapshot: CatalogSnapshot; store: PlanningStore; lease: string }): Promise<NonNullable<RuntimeContext['execution']> | undefined> {
   let query = ReferenceDetector.detect(input.content);
+  if (query?.entityType === 'case') return undefined; // handled by CaseIntakeAgent using the same resolver
   const responses = persistedResponses(input.recent, input.conversationId);
   const latest = responses.at(-1);
   if (query?.ordinal && !query.entityType && !query.attribute && query.operation === 'details'
@@ -55,7 +56,7 @@ export async function prepareReferenceExecution(input: { content: string; conver
   let resolution = ReferenceResolver.resolve({ conversationId: input.conversationId, userMessage: input.content, currentContext: current, query });
   const reference = resolution.reference;
   // Both slug and record ID must still identify the same currently published catalog entity.
-  if (reference && !input.snapshot[lists[reference.entityType]].some((item) => item.slug === reference.slug && item.recordId === reference.entityId))
+  if (reference && reference.entityType !== 'case' && !input.snapshot[lists[reference.entityType]].some((item) => item.slug === reference.slug && item.recordId === reference.entityId))
     resolution = { ...resolution, status: 'unresolved', reference: undefined, reason: 'That previously shown record is no longer available in the current catalog. Which result would you like to explore?' };
   if (resolution.reference?.entityType === 'service') resolution = { ...resolution, status: 'unresolved', reference: undefined,
     reason: 'This service has no supported detail tool. Please open its catalog page or specify another result.' };

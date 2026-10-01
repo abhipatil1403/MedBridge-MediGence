@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const referenceEntityTypeSchema = z.enum(['hospital', 'doctor', 'package', 'treatment', 'country', 'service']);
+export const referenceEntityTypeSchema = z.enum(['hospital', 'doctor', 'package', 'treatment', 'country', 'service', 'case']);
 export type ReferenceEntityType = z.infer<typeof referenceEntityTypeSchema>;
 export const entityReferenceSchema = z.object({
   referenceId: z.string().min(1).max(200), entityType: referenceEntityTypeSchema, entityId: z.guid(),

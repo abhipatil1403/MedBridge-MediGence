@@ -6,6 +6,8 @@ const ordinalWords = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 's
 export const ReferenceDetector = {
   detect(content: string): ReferenceQuery | undefined {
     const text = normalize(content);
+    if (/\b(?:my|this|the) case\b|\b(?:what (?:am i|are you|information (?:are you|do you have|is)) missing|show me (?:my |the )?(?:case )?summary|update (?:the |my )?(?:MRI|CT|scan|investigation) date|what information are you missing)\b/i.test(text))
+      return referenceQuerySchema.parse({ entityType: 'case', operation: 'details' });
     if (/\b(?:is|does)\s+(?:it|this|that|this package|that package)\b.*\b(?:under|below|within|over|above|less than|more than)\b/.test(text))
       return referenceQuerySchema.parse({ entityType: 'package', operation: 'price' });
     if (/\bcompare\b|\bcomparison\b|\bversus\b|\bvs\b|\bbudget\b/.test(text)

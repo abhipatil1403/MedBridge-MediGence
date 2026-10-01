@@ -9,7 +9,7 @@ import type { AgentStore } from './persistence';
 import { attachReferences } from '@/lib/conversation/context';
 
 export const AGENT_LIMITS = { maxToolCalls: 8, maxPlanIterations: 2, maxPlanningAttempts: 2, modelTimeoutMs: 25000, toolTimeoutMs: 12000, runTimeoutMs: 80000 } as const;
-const clinicalPattern = /\b(chest pain|chest hurts|can't breathe|cannot breathe|stroke symptoms|suicid|diagnos(e|is)|what disease|prescrib(e|tion))\b/i;
+const clinicalPattern = /\b(chest pain|chest hurts|can't breathe|cannot breathe|stroke symptoms|suicid|diagnose|what disease|prescribe|prescription)\b/i;
 const externalPatterns: Array<[RegExp, 'share_records' | 'booking' | 'payment' | 'travel_purchase' | 'visa_submission']> = [
   [/\b(send|share|forward|submit|email)\b.*\b(medical|report|record|document|scan|test result)s?\b/i, 'share_records'],
   [/\b(book|schedule)\b.*\b(appointment|consultation|hospital|doctor)\b/i, 'booking'],
@@ -28,6 +28,8 @@ export interface RuntimeContext {
   finalizeResponse?: (response: AgentResponse) => Promise<AgentResponse>;
   execution?: {
     plan: AgentPlan; route?: DiscoveryRoute; carePlanId?: string;
+    messageSourceId?: string;
+    synthesis?: { summary: string; nextSteps: string[]; question: string | null };
     taskLinks?: Record<string, string>;
     diagnostics?: Record<string, string | boolean | null>;
     continueOnToolFailure?: boolean;
@@ -37,7 +39,8 @@ export interface RuntimeContext {
 }
 
 export function requestBoundary(content: string): 'clinical' | 'external' | undefined {
-  if (clinicalPattern.test(content) || /\b(should i (?:have|undergo)|do i need (?:surgery|treatment)|best treatment|medically appropriate|what medication)\b/i.test(content)) return 'clinical';
+  if (/\b(?:is|would)\b.*\b(?:surgery|treatment|replacement)\b.*\b(?:necessary|appropriate|suitable)\b|\bdo I need (?:a |an )?(?:knee|hip) replacement\b|\bshould I\b.*\b(?:medication|medicine|dose|surgery|replacement)\b/i.test(content)) return 'clinical';
+  if (clinicalPattern.test(content) || /\b(should i (?:have|undergo)|do i need (?:surgery|treatment)|best treatment|medically appropriate|what medication|(?:what|which|give me|tell me)\b.*\bdiagnosis|interpret\b.*\b(?:MRI|scan|imaging)|should i\b.*\b(?:take|stop|change)\b)\b/i.test(content)) return 'clinical';
   return externalPatterns.some(([pattern]) => pattern.test(content)) ? 'external' : undefined;
 }
 
@@ -135,7 +138,8 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
   if (request.caseId) caseContext = await context.caseAccess.readContext(request.caseId);
   const conversationId = request.conversationId ?? await context.store.createConversation(context.userId, request.caseId);
   if (request.conversationId) await context.store.assertConversation(conversationId, context.userId, request.caseId);
-  await context.store.addMessage(conversationId, 'user', request.content);
+  await context.store.addMessage(conversationId, 'user', request.content, undefined,
+    context.execution?.messageSourceId ? { sourceId: context.execution.messageSourceId } : {});
 
   const clinical = requestBoundary(request.content) === 'clinical';
   let route: DiscoveryRoute | undefined;
@@ -291,6 +295,9 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
       const result = discoverySummary(route, findings);
       summary = result.summary; nextSteps = result.nextSteps;
       if (route.normalized.missingEntities.length) { status = 'awaiting_user_input'; question = plan.missingInformation; }
+    } else if (context.execution?.synthesis) {
+      const synthesis = synthesisSchema.parse(context.execution.synthesis);
+      summary = synthesis.summary; nextSteps = synthesis.nextSteps; question = synthesis.question;
     } else {
       const synthesis = synthesisSchema.parse(await context.provider.generateStructured({
         purpose: 'synthesis', schema: synthesisSchema, maxOutputTokens: 550, timeoutMs: AGENT_LIMITS.modelTimeoutMs,
