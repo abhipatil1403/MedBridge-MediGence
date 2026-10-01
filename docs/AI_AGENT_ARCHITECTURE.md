@@ -2,7 +2,7 @@
 
 The AI layer is an auditable assistive workflow around clinical and commercial systems. It is not a clinical decision maker. The `/assistant` workspace uses a server-side Cloudflare Workers AI adapter, the existing bounded agent runtime, controlled tools, and explicitly synthetic catalog data. Production patient use still requires a separate privacy, clinical, and operational review.
 
-The current runtime lives in `lib/agents/`. It validates a model-generated plan, checks the selected agent's allowlist and each tool's Zod schema, executes catalog tools through the existing deterministic services, optionally plans a second bounded iteration, then validates synthesis. The run is limited to eight tool calls and two planning iterations. Cloudflare calls are server-side, time-limited, and retry malformed structured output once. No model has direct SQL or Supabase credentials.
+The current runtime lives in `lib/agents/`. It validates a model-generated plan, checks the selected agent's allowlist and each tool's Zod schema, executes catalog tools through the existing deterministic services, optionally plans a second bounded iteration, then validates synthesis. The run is limited to eight tool calls and eight bounded planning iterations. Cloudflare calls are server-side, time-limited, and retry malformed structured output once. No model has direct SQL or Supabase credentials.
 
 For basic catalog discovery, `QueryNormalizer` resolves supported procedure aliases, specialties, and cities before tool selection. `discoveryRoute` creates a validated deterministic plan from those entities, including multiple searches when the user requests hospitals and packages together. The model may suggest a plan, but an invalid or irrelevant suggestion cannot replace this catalog route. Model validation codes, sanitized validation details, and recovery outcome are saved in run metadata. A model outage therefore leaves structured discovery available. One catalog snapshot is reused across the route and its tools within a run.
 
@@ -105,3 +105,26 @@ HospitalMatchingAgent coordinates evidence inside the compound executor: existin
 ## Explicit prohibitions
 
 No direct SQL, unmediated database mutation, invented hospitals/doctors/prices/accreditation/availability, diagnosis, prescription, unsupported outcome claims, or false assertion that an external service was contacted. AI-generated clinical summaries are labelled **draft — requires professional review** until signed. The product does not imply regulatory compliance without a separate assessment.
+
+
+## Agentic tool execution foundation (2026-10-01)
+
+The existing runtime, Cloudflare structured provider, four agent allowlists, catalog repository/SearchService, requirement evaluator, comparison helpers, reference resolver, compound dependencies and private Supabase storage remain the architecture. Case Intake is parked and receives no new workflow capability.
+
+`tools.ts` is the central versioned registry: stable ID, display name, category, input/output Zod schemas, execute function, permission/mode, provenance policy, timeout and recovery policy. There are 26 IDs, including the 19 existing tools. Detail/location aliases call the existing implementations. `check_requirements` and `compare_providers` use published record IDs and the existing evaluators; runtime analysis can use only IDs observed in that run. Requirements come from the deterministic user requirement context, never model-authored constraints.
+
+`executeRegisteredTool` validates ID/version/agent/input, applies limits and freshness, invokes the registered service, validates output, then persists a structured observation. An observation contains status, validated data, provenance, gaps, warnings, safe errors and whether another step is needed. Invalid calls never reach services. Unknown and denied model proposals become recorded errors available to the next decision.
+
+Model-controlled plans execute one tool at a time and ask Cloudflare for `call_tool`, `continue`, `clarify`, `finish` or `partial`. Existing deterministic workflows first satisfy their required read dependencies; compound/requirement goals can then select further requirement/comparison tools from real observations. Reference-only follow-ups remain deterministic. Model failure preserves deterministic behavior. A plan/synthesis-only provider compatibility path is bounded to one follow-up.
+
+The detailed state machine is queued → planning → executing → observing → another decision or a terminal state: waiting_for_input, awaiting_confirmation, completed, partially_completed, failed or cancelled. Terminal runs cannot resume implicitly; clarification/approval remains a separate authorized workflow. Cancellation is a represented state, not a new user-facing cancellation integration.
+
+Private `agent_runs.metadata.execution` holds request, goal, owner/conversation/run IDs, state, calls, validated inputs, timestamps, safe errors, observations and source kinds. The final-output pointer references the existing `agent_outputs` row. Each runtime call links its existing task ID. Existing task/action/output persistence continues. SQL status values remain compatible; richer states live in versioned JSON. No migration or RLS change is needed.
+
+Budgets are centralized in `execution-state.ts`: eight calls, eight loop iterations, six executions of one canonical tool, three failures, sixteen proposals, 80 seconds for the runtime, 12 seconds per read and 25 seconds per model request. Canonical validated arguments ignore object-key order; aliases share cache identity. Read results may be reused for 60 seconds within a run; failures, proposal tools and consent-protected reads are not cached. Existing catalog-signature rules still control cross-turn reuse. Timed-out read promises may finish internally, but are excluded from outputs; this milestone has no executing external/write integration.
+
+Read tools execute automatically. Existing proposal tools only produce approval records. Reserved write/external/clinical modes are blocked by the execution boundary until a separate confirmed/professional workflow exists. Models cannot bypass this with user instructions. Catalog records retain IDs and synthetic/external/first-party labels; analysis carries derived source IDs. User requests are distinguished in run provenance, and generated summaries carry a separate source label.
+
+The authenticated history endpoint projects compact activity only after conversation ownership/RLS authorization, never raw tool JSON. Browser polling restores recorded progress and results without re-executing a run. A process crash is not automatically retried; background continuation and cancellation delivery are outside this milestone. Dedicated goal preparation still occurs in the existing orchestrator before runtime state starts. The total HTTP handler remains bounded by its platform timeout.
+
+Validation and deployment evidence: [AGENTIC_TOOL_EXECUTION_VALIDATION.md](./AGENTIC_TOOL_EXECUTION_VALIDATION.md).

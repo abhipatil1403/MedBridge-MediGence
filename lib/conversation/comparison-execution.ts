@@ -11,7 +11,7 @@ import { persistedResponses, buildReferenceContext, planReferenceContext, type C
 /** A pair refers to actual displayed records, never two inferred destinations. */
 export async function prepareReferenceComparison(input: { content: string; conversationId: string; recent: ConversationMessage[]; active?: CarePlan;
   snapshot: CatalogSnapshot; store: PlanningStore; lease: string }): Promise<NonNullable<RuntimeContext['execution']> | undefined> {
-  if (!/^\s*compare\s+(?:those|these)(?:\s+two)?(?:\s+(?:packages|hospitals|doctors))?[.!?]?\s*$/i.test(input.content)) return undefined;
+  if (!/^\s*compare\s+(?:those|these|the)(?:\s+two)?(?:\s+(?:packages|hospitals|doctors))?[.!?]?\s*$/i.test(input.content)) return undefined;
   const latest = persistedResponses(input.recent, input.conversationId).at(-1);
   const requested = /packages/i.test(input.content) ? 'package' : /hospitals/i.test(input.content) ? 'hospital' : /doctors/i.test(input.content) ? 'doctor' : undefined;
   if (latest?.comparison && !requested) return undefined;

@@ -5,6 +5,8 @@ import { HospitalMatchResults } from './hospital-match-results';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { createClient, type Session } from '@supabase/supabase-js';
 import Link from 'next/link';
+import { ExecutionActivity } from './execution-activity';
+import type { RunActivity } from '@/lib/agents/execution-schemas';
 import type { AgentResponse, CarePlan } from '@/lib/agents/schemas';
 import { CarePlanPanel } from './care-plan-panel';
 import { FindingCards, PlanningResultGroups } from './catalog-results';
@@ -32,6 +34,8 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
   const [latest, setLatest] = useState<AgentResponse | null>(null);
   const [carePlan, setCarePlan] = useState<CarePlan | undefined>();
   const [busy, setBusy] = useState(false);
+  const [activity, setActivity] = useState<RunActivity | undefined>();
+  const requestStarted = useRef<Set<string> | undefined>(undefined);
   const [notice, setNotice] = useState('');
   const activeUser = useRef<string | undefined>(undefined);
 
@@ -51,8 +55,13 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
       const data = await api(`/api/assistant${selectedId ? `?conversationId=${encodeURIComponent(selectedId)}` : ''}`);
       if (activeUser.current !== userId) return;
       setConversations(data.conversations);
+      if (!selectedId && requestStarted.current) {
+        const created = (data.conversations as Conversation[]).find((c) => !requestStarted.current!.has(c.id));
+        if (created) setConversationId(created.id);
+      }
       setCases(data.cases);
       if (selectedId) {
+        setActivity(data.activity);
         setCarePlan(data.plan);
         setMessages(data.messages);
         const final = [...(data.messages as Message[])].reverse().find((message) => message.role === 'assistant' && message.metadata?.response);
@@ -69,7 +78,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
         const saved = nextUser ? localStorage.getItem(`medbridge-active-conversation:${nextUser}`) : null;
         let restored: { id?: string; caseId?: string } | undefined;
         try { restored = saved ? JSON.parse(saved) as typeof restored : undefined; } catch { /* Ignore a stale browser preference. */ }
-        setConversationId(restored?.id); setCaseId(restored?.caseId ?? ''); setMessages([]); setLatest(null); setCarePlan(undefined); setConversations([]); setCases([]);
+        setActivity(undefined); setConversationId(restored?.id); setCaseId(restored?.caseId ?? ''); setMessages([]); setLatest(null); setCarePlan(undefined); setConversations([]); setCases([]);
       }
       activeUser.current = nextUser;
       setSession(next);
@@ -90,6 +99,12 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
     return () => clearTimeout(timer);
   }, [session, configured, conversationId, refresh]);
 
+  useEffect(() => {
+    if (!session || !configured || (!busy && (!activity || ['completed', 'partially_completed', 'failed', 'cancelled', 'waiting_for_input', 'awaiting_confirmation'].includes(activity.state)))) return;
+    const timer = setInterval(() => void refresh(conversationId), 2500);
+    return () => clearInterval(timer);
+  }, [session, configured, busy, activity, refresh, conversationId]);
+
   async function signIn(event: FormEvent) {
     event.preventDefault();
     if (!auth) return;
@@ -106,16 +121,20 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
 
   async function submitRequest(text: string) {
     if (!text || busy) return;
-    setBusy(true); setNotice('');
+    const ownerAtStart = session?.user.id;
+    requestStarted.current = new Set(conversations.map((c) => c.id));
+    setActivity(undefined); setBusy(true); setNotice('');
     try {
       const result: AgentResponse = await api('/api/assistant', { method: 'POST', body: JSON.stringify({ content: text, conversationId, caseId: caseId || undefined }) });
+      if (activeUser.current !== ownerAtStart) return;
       setConversationId(result.conversationId);
+      setActivity(result.activity);
       setLatest(result);
       setCarePlan(result.plan);
       setContent(result.status === 'failed' ? text : '');
       await refresh(result.conversationId);
     } catch (error) { setNotice(error instanceof Error ? error.message : 'The assistant could not run.'); }
-    finally { setBusy(false); }
+    finally { requestStarted.current = undefined; setBusy(false); }
   }
 
   async function send(event: FormEvent) {
@@ -168,9 +187,9 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
   const sources = latest ? [...new Map(latest.findings.map((finding) => [finding.provenance.table, finding.provenance])).values()] : [];
   return <div className="assistant-shell">
     <aside className="assistant-rail" aria-label="Conversations"><div className="assistant-rail__head"><h2>Workspace</h2>
-      <button type="button" disabled={busy} onClick={() => { setConversationId(undefined); setCaseId(''); setMessages([]); setLatest(null); setCarePlan(undefined); setNotice(''); }}>New conversation</button></div>
+      <button type="button" disabled={busy} onClick={() => { setActivity(undefined); setConversationId(undefined); setCaseId(''); setMessages([]); setLatest(null); setCarePlan(undefined); setNotice(''); }}>New conversation</button></div>
       <div className="assistant-rail__list">{conversations.map((item) => <button key={item.id} type="button" className={item.id === conversationId ? 'active' : ''}
-        disabled={busy} onClick={() => { setConversationId(item.id); setCaseId(item.case_id ?? ''); setLatest(null); setCarePlan(undefined); }}>{item.title}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}</div>
+        disabled={busy} onClick={() => { setActivity(undefined); setConversationId(item.id); setCaseId(item.case_id ?? ''); setLatest(null); setCarePlan(undefined); }}>{item.title}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}</div>
       <button type="button" className="assistant-signout" onClick={() => auth?.auth.signOut()}>Sign out</button></aside>
 
     <section className="assistant-main" aria-label="Care conversation">
@@ -185,7 +204,8 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
             onDecision={decideApproval} onRetry={latest?.runId === message.metadata.response.runId && latestRequest ? () => { void submitRequest(latestRequest); } : undefined}
             disabled={busy} /> : <p>{message.content}</p>}
         </article>)}
-        {busy && <div className="assistant-working" role="status">Working on your request. Results and recorded task states will appear when the run finishes.</div>}
+        {activity && !messages.some((message) => message.metadata?.response?.runId === activity.runId) && <ExecutionActivity activity={activity} />}
+        {busy && !activity && <div className="assistant-working" role="status">Working on your request. Results and recorded task states will appear when the run finishes.</div>}
       </div>
       <form className="assistant-composer" onSubmit={send}><label htmlFor="assistant-input">Your request</label>
         <textarea id="assistant-input" value={content} onChange={(event) => setContent(event.target.value)} placeholder="Tell us what you are looking for…" rows={3} maxLength={2000} disabled={busy} required />
@@ -220,14 +240,18 @@ function agentsLabel(agent: AgentResponse['agent']) {
 
 function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disabled }: { response: AgentResponse; approvalStatus?: string;
   onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; onRetry?: () => void; disabled: boolean }) {
-  return <div className="assistant-response"><div><small>WHAT I UNDERSTOOD</small><p>{response.understanding}</p></div>
+  return <div className="assistant-response">
+    {response.activity && <ExecutionActivity activity={response.activity} />}
+    {response.analyses?.map((analysis, index) => <div key={index}><small>CATALOG EVIDENCE REVIEW</small><p>{analysis.summary}</p>
+      {analysis.missingInformation.length > 0 && <ul>{analysis.missingInformation.map((gap, i) => <li key={i}>{gap}</li>)}</ul>}
+      <small>Derived from {analysis.recordIds.length} sourced catalog records · {analysis.complete ? 'Evidence review completed' : 'Incomplete evidence'}</small></div>)}<div><small>WHAT I UNDERSTOOD</small><p>{response.understanding}</p></div>
     {response.workflow === 'case_intake' && response.caseSummary && <CaseSummaryContent summary={response.caseSummary} />}
     {response.caseHandoff && <p>Using the reviewed case for catalog coordination. Reported medical information is separate from search requirements and does not establish treatment suitability. No case has been submitted to a provider.</p>}
     {response.compoundRequest && <details><summary>Request progress</summary><ul className="assistant-source-list">
       {response.compoundRequest.operations.map((operation) => <li key={operation.id}><strong>{({ discover_hospitals: 'Hospital search', discover_doctors: 'Doctor search', discover_packages: 'Package search', discover_services: 'General services · hospital availability unconfirmed', evaluate_requirements: 'Requirement check', compare_results: 'Comparison' })[operation.type]}</strong>
         {' · '}{operation.status}{operation.note && <p>{operation.note}</p>}</li>)}
     </ul></details>}
-    <div><small>FINDINGS</small><p>{response.summary}</p>
+    <div><small>FINDINGS</small><p>{response.summary}</p>{response.summarySource === 'model' && <small>Model-generated coordination explanation. Catalog facts are sourced below.</small>}
       {!response.resultGroups?.length && response.discovery && <div className="assistant-match-state" role="status"><strong>{response.status === 'awaiting_user_input' ? 'One detail needed' : response.findings.some((f) => f.requirementEvaluation && f.requirementEvaluation.overallStatus !== 'fully_satisfies') ? 'Catalog results · review requirements' : response.discovery.matchType === 'exact' ? 'Exact catalog matches' : response.discovery.matchType === 'related' ? 'Related catalog information' : 'No exact catalog match'}</strong>
         <p>{response.discovery.matchReason}</p>
         {response.discovery.recovered && <p>Catalog criteria were checked directly to complete this search.</p>}</div>}

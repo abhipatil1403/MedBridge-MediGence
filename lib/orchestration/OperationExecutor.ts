@@ -57,7 +57,7 @@ export async function prepareCompoundExecution(input: { content: string; request
     const args = toolSchemas[tool].parse(target === 'services' ? { query: request.requirements.filter((r) => r.type === 'service').map((r) => r.label).join(' ').slice(0, 240) || 'Coordination services' }
       : { query: `Find ${target} for ${context.treatmentName ?? context.specialty ?? 'catalog records'}${place.value ? ` in ${place.label}` : ''}`.slice(0, 240),
       treatment: context.treatmentSlug, specialty: operation === 'discover_doctors' ? context.specialty
-        : operation === 'discover_hospitals' ? request.requirements.find((r) => r.type === 'specialty')?.value : undefined,
+        : operation === 'discover_hospitals' || operation === 'discover_packages' ? request.requirements.find((r) => r.type === 'specialty')?.value : undefined,
       city: place.type === 'city' ? place.value || undefined : undefined,
       country: place.type === 'country' ? place.value : place.value ? EntityMatcher.match(place.label, snapshot).country : context.country,
       hospital: hospital?.slug ?? context.preferredHospital });
@@ -75,7 +75,8 @@ export async function prepareCompoundExecution(input: { content: string; request
           && (!args.city || normalize(city ?? '') === normalize(args.city))
           && (!args.country || 'country' in r && r.country === args.country)
           && (!args.specialty || 'specialty' in r && normalize(r.specialty) === normalize(args.specialty)
-            || 'specialties' in r && r.specialties.some((value) => normalize(value) === normalize(args.specialty!)));
+            || 'specialties' in r && r.specialties.some((value) => normalize(value) === normalize(args.specialty!))
+            || 'treatmentSlug' in r && snapshot.treatments.some((t) => t.slug === r.treatmentSlug && normalize(t.specialty) === normalize(args.specialty!)));
       })));
     if (searches.some((s) => s.step.tool === tool && s.step.input === step.input)) return;
     if (!cached && scheduledCalls >= 8) { limitReached = true; return; }

@@ -4,11 +4,14 @@ import { AgentError } from './errors';
 import { discoveryRoute, routeToolDependencies, type DiscoveryRoute } from './discovery-routing';
 import { agents } from './registry';
 import { assistantResponseSchema, discoveryResultSchema, planSchema, synthesisSchema, toolResultSchema, userRequestSchema, type AgentId, type AgentPlan, type AgentResponse, type AgentTaskView, type Finding, type ToolResult } from './schemas';
-import { executeTool, type CaseAccess, type ToolDependencies, defaultToolDependencies, toolDescriptions, toolSchemas } from './tools';
+import { toolRegistry, type CaseAccess, type ToolDependencies, defaultToolDependencies, toolDescriptions, toolSchemas } from './tools';
 import type { AgentStore } from './persistence';
 import { attachReferences } from '@/lib/conversation/context';
 
-export const AGENT_LIMITS = { maxToolCalls: 8, maxPlanIterations: 2, maxPlanningAttempts: 2, modelTimeoutMs: 25000, toolTimeoutMs: 12000, runTimeoutMs: 80000 } as const;
+import { AGENT_LIMITS, ExecutionState, terminalStates, canonicalInput, safeText } from './execution-state';
+import { executeRegisteredTool } from './tool-execution';
+import { observeNext } from './observation';
+export { AGENT_LIMITS } from './execution-state';
 const clinicalPattern = /\b(chest pain|chest hurts|can't breathe|cannot breathe|stroke symptoms|suicid|diagnose|what disease|prescribe|prescription)\b/i;
 const externalPatterns: Array<[RegExp, 'share_records' | 'booking' | 'payment' | 'travel_purchase' | 'visa_submission']> = [
   [/\b(send|share|forward|submit|email)\b.*\b(medical|report|record|document|scan|test result)s?\b/i, 'share_records'],
@@ -50,18 +53,10 @@ function publicFailure(error: unknown): AgentError {
 
 function validateSynthesis(summary: string, nextSteps: readonly string[], question: string | null) {
   const text = [summary, ...nextSteps, question ?? ''].join(' ');
-  if (/\b(you have|you need surgery|best hospital|safest hospital|guaranteed outcome|confirmed booking|success rate)\b|[$₹]/i.test(text)) {
+  if (safeText(text) !== text) throw new AgentError('UNSAFE_MODEL_OUTPUT', 'The assistant could not prepare a reliable summary.');
+  if (/\b(you have|you need surgery|best hospital|safest hospital|guaranteed outcome|confirmed booking|success rate|booked|reserved|paid|emailed|submitted|scheduled|verified credentials)\b|[$₹]/i.test(text)) {
     throw new AgentError('UNSAFE_MODEL_OUTPUT', 'The assistant could not prepare a reliable summary. Please try again.');
   }
-}
-
-async function boundedTool<T>(work: Promise<T>): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([work, new Promise<T>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new AgentError('TOOL_TIMEOUT', 'A catalog search took too long. Please try again.')), AGENT_LIMITS.toolTimeoutMs);
-    })]);
-  } finally { if (timer) clearTimeout(timer); }
 }
 
 export function safetyPlan(content: string): AgentPlan | undefined {
@@ -79,7 +74,7 @@ async function planRequest(provider: LLMProvider, content: string, caseContext?:
   for (let attempt = 0; attempt < AGENT_LIMITS.maxPlanningAttempts; attempt++) {
     try {
       const raw = await provider.generateStructured({ purpose: 'plan', system,
-        input: JSON.stringify({ request: content, caseContext: caseContext ?? null,
+        input: JSON.stringify({ request: safeText(content), caseContext: caseContext ?? null,
           previousResults: followUp ? { agent: followUp.agent, usedTools: followUp.usedTools,
             findings: followUp.findings.map(({ kind, slug, title, facts }) => ({ kind, slug, title, facts })) } : undefined,
           correction: attempt ? 'Previous plan was invalid. Use only tools allowed for the selected agent and valid inputs.' : undefined }),
@@ -138,13 +133,18 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
   if (request.caseId) caseContext = await context.caseAccess.readContext(request.caseId);
   const conversationId = request.conversationId ?? await context.store.createConversation(context.userId, request.caseId);
   if (request.conversationId) await context.store.assertConversation(conversationId, context.userId, request.caseId);
-  await context.store.addMessage(conversationId, 'user', request.content, undefined,
+  await context.store.addMessage(conversationId, 'user', safeText(request.content), undefined,
     context.execution?.messageSourceId ? { sourceId: context.execution.messageSourceId } : {});
 
   const clinical = requestBoundary(request.content) === 'clinical';
   let route: DiscoveryRoute | undefined;
   const diagnostics: Record<string, string | boolean | null> = { ...context.execution?.diagnostics };
   let plan: AgentPlan;
+  const runId = await context.store.startRun(conversationId, context.userId, context.execution?.plan.agent ?? 'discovery', request.caseId, context.execution?.carePlanId);
+  const execution = new ExecutionState(runId, conversationId, context.userId, request.content, 'Understand the catalog request', context.store);
+  execution.agent = context.execution?.plan.agent ?? 'discovery';
+  await execution.persist();
+  await execution.transition('planning');
   try {
     if (context.execution && !clinical) { plan = planSchema.parse(context.execution.plan); route = context.execution.route; }
     else if (clinical) plan = { agent: 'discovery', understanding: 'This request may need clinical assessment.', steps: [], missingInformation: null };
@@ -159,6 +159,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
           if (!route.normalized.missingEntities.length) {
             try {
               const suggested = await planRequest(context.provider, request.content, caseContext, undefined, (failure) => {
+                execution.planningErrors.push({ code: failure.code, message: failure.publicMessage });
                 diagnostics.modelPlanError = failure.code;
                 diagnostics.validationError = typeof failure.cause === 'string' ? failure.cause.slice(0, 300) : null;
                 diagnostics.recoveryAttempted = true;
@@ -174,22 +175,26 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
               diagnostics.recoveryAttempted = true;
             }
           }
-        } else plan = await planRequest(context.provider, request.content, caseContext, undefined, undefined, context.supportedAgents);
+        } else plan = await planRequest(context.provider, request.content, caseContext, undefined, (failure) => execution.planningErrors.push({ code: failure.code, message: failure.publicMessage }), context.supportedAgents);
       }
     }
   } catch (error) {
     const failure = publicFailure(error);
-    const failedRunId = await context.store.startRun(conversationId, context.userId, 'discovery', request.caseId);
+    const failedRunId = runId;
+    await execution.transition('failed');
     const failedResponse: AgentResponse = { conversationId, runId: failedRunId, agent: 'discovery', status: 'failed',
       understanding: 'The request could not be planned safely.', summary: 'I couldn’t complete this search. Please try a more specific catalog request.', findings: [],
       nextSteps: ['Try again with a treatment, specialty, or location.'], question: null, tasks: [] };
+    failedResponse.activity = execution.activity();
+    await execution.persist(failedResponse);
     await context.store.saveOutput(failedRunId, assistantResponseSchema.parse(failedResponse));
     await context.store.addMessage(conversationId, 'assistant', failedResponse.summary, failedRunId, { response: failedResponse });
     await context.store.finishRun(failedRunId, 'failed', failure.code, diagnostics);
     return failedResponse;
   }
 
-  const runId = await context.store.startRun(conversationId, context.userId, plan.agent, request.caseId, context.execution?.carePlanId);
+  execution.goal = plan.understanding; execution.agent = plan.agent;
+  await execution.persist();
   const tasks: AgentTaskView[] = [];
   const findings: Finding[] = [];
   const results: Array<{ tool: string; input?: string; taskId?: string; result: ToolResult }> = [];
@@ -198,14 +203,17 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
   let approval: string | undefined;
   let approvalId: string | undefined;
   let approvalProposal: AgentResponse['approvalProposal'];
-  const started = Date.now();
+  const started = execution.started;
   try {
     if (clinical) {
-      let response: AgentResponse = { conversationId, runId, agent: plan.agent, status, understanding: plan.understanding,
+      let response: AgentResponse = { conversationId, runId, agent: plan.agent, status, understanding: safeText(plan.understanding),
         summary: 'I cannot diagnose symptoms. If symptoms may be urgent, seek emergency care now. A licensed clinician can assess them.',
         findings, nextSteps: ['Contact a qualified medical professional for an assessment.'], question: null, tasks };
       if (context.execution?.finalize) response = await context.execution.finalize(response, results);
       if (context.finalizeResponse) response = await context.finalizeResponse(response);
+      await execution.transition('completed');
+      response.activity = execution.activity();
+      await execution.persist(response);
       response = assistantResponseSchema.parse(attachReferences(response));
       await context.store.saveOutput(runId, response);
       await context.store.addMessage(conversationId, 'assistant', response.summary, runId, { response });
@@ -215,9 +223,15 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
     let activePlan = plan;
     const dependencies = route ? routeToolDependencies(route, context.tools ?? defaultToolDependencies) : context.tools ?? defaultToolDependencies;
     const used = new Set<string>();
+    let limited = false;
+    let legacyFollowUps = 0;
+    let requiredSteps = [...plan.steps];
+    const modelControlsReads = !route && !context.execution && !requestBoundary(request.content);
+    if (modelControlsReads) activePlan = { ...plan, steps: requiredSteps.splice(0, 1) };
     for (let iteration = 0; iteration < AGENT_LIMITS.maxPlanIterations; iteration++) {
       const steps = activePlan.steps.slice(0, AGENT_LIMITS.maxToolCalls - tasks.length)
-        .filter((step) => !used.has(`${step.tool}:${step.input}`) && !(findings.length && step.tool === 'request_user_information'));
+        .filter((step) => !(findings.length && step.tool === 'request_user_information'));
+      if (activePlan.steps.length > steps.length) { limited = true; execution.warnings.push('Tool call limit reached; some requested work remains incomplete.'); }
       const offset = tasks.length;
       for (const step of steps) {
         used.add(`${step.tool}:${step.input}`);
@@ -228,15 +242,18 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
       for (const [index, step] of steps.entries()) {
         const task = tasks[offset + index];
         const taskId = task.id;
-        if (Date.now() - started > AGENT_LIMITS.runTimeoutMs) throw new AgentError('RUN_TIMEOUT', 'The assistant took too long. Please try again.');
+        if (Date.now() - started >= AGENT_LIMITS.runTimeoutMs || execution.failures >= AGENT_LIMITS.maxFailures) { limited = true; execution.warnings.push('Execution safety limit reached; some work remains incomplete.'); break; }
         task.status = 'running'; task.startedAt = new Date().toISOString();
         await context.store.updateTask(taskId, 'running');
         const toolStarted = Date.now();
         try {
-          const input = JSON.parse(step.input);
-          const rawResult = await boundedTool(executeTool(step.tool, input, {
+          let input: unknown; try { input = JSON.parse(step.input); } catch { input = null; }
+          const observation = await executeRegisteredTool(execution, { tool: step.tool, input, taskId }, {
             agent: plan.agent, userId: context.userId, caseId: request.caseId, caseAccess: context.caseAccess,
-          }, dependencies));
+            observedRecordIds: findings.map((f) => f.provenance.recordId),
+          }, dependencies);
+          if (observation.error) throw new AgentError(observation.error.code, observation.error.message);
+          const rawResult = observation.data!;
           const result = toolResultSchema.parse(route?.normalized.entities.relatedProcedure && step.tool === 'get_treatment'
             ? { ...rawResult, findings: rawResult.findings.map((item) => ({ ...item, matchType: 'related' as const,
               matchReason: 'A broader catalog topic only; it does not confirm the requested procedure or any provider.' })) }
@@ -249,11 +266,12 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
           else task.status = 'completed';
           task.completedAt = new Date().toISOString();
           await context.store.updateTask(taskId, task.status, undefined, result);
-          const actionId = await context.store.recordAction(runId, taskId, step.tool, result.approvalRequired ? 'proposed' : 'completed', duration, input, result);
+          const actionId = observation.status === 'reused' ? undefined : await context.store.recordAction(runId, taskId, step.tool, result.approvalRequired ? 'proposed' : 'completed', duration, input, result);
           if (result.approvalRequired) {
+            const args = input as Record<string, string>;
             approvalId = actionId;
             approvalProposal = { action: step.tool, detail: step.tool === 'create_case' || step.tool === 'update_case'
-              ? `Case title: ${String(input.title)}` : step.tool === 'create_agent_task' ? `Task: ${String(input.objective)}` : result.approvalRequired };
+              ? `Case title: ${String(args.title)}` : step.tool === 'create_agent_task' ? `Task: ${String(args.objective)}` : result.approvalRequired };
           }
           if (result.approvalRequired || result.requestedInformation) break;
         } catch (error) {
@@ -261,8 +279,9 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
           task.status = 'failed'; task.errorCode = failure.code; task.completedAt = new Date().toISOString();
           await context.store.updateTask(taskId, 'failed', failure.code);
           await context.store.recordAction(runId, taskId, step.tool, 'failed', Date.now() - toolStarted, step.input, undefined, failure.code);
-          if (context.execution?.continueOnToolFailure) { status = 'failed'; continue; }
-          throw failure;
+          diagnostics.toolFailure = failure.code;
+          status = 'failed';
+          continue;
         }
       }
       if (context.execution?.nextSteps && status !== 'awaiting_approval' && status !== 'awaiting_user_input'
@@ -271,18 +290,53 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
         activePlan = planSchema.parse({ ...plan, steps: next });
         if (next.length && tasks.length < AGENT_LIMITS.maxToolCalls) continue;
       }
-      if (status !== 'completed') break;
+      if (['awaiting_approval', 'awaiting_user_input'].includes(status) || limited) break;
       if (activePlan.missingInformation && findings.length === 0) { status = 'awaiting_user_input'; question = activePlan.missingInformation; break; }
-      if (route || iteration + 1 >= AGENT_LIMITS.maxPlanIterations || tasks.length >= AGENT_LIMITS.maxToolCalls || findings.length === 0) break;
-      activePlan = await planRequest(context.provider, request.content, caseContext, {
-        agent: plan.agent, findings, usedTools: results.map((item) => item.tool),
-      }, undefined, context.supportedAgents);
-      if (!activePlan.steps.some((step) => !used.has(`${step.tool}:${step.input}`))) {
-        if (activePlan.missingInformation && findings.length === 0) { status = 'awaiting_user_input'; question = activePlan.missingInformation; }
-        break;
+      const mayExtend = execution.calls.length > 0 && !requestBoundary(request.content) && !context.execution?.messageSourceId && !(typeof context.execution?.diagnostics?.workflow === 'string' && context.execution.diagnostics.workflow.startsWith('reference'))
+        && (!route && !context.execution || /\b(compare|check|missing|included|accommodation)\b/i.test(request.content));
+      if (!mayExtend) break;
+      if (iteration + 1 >= AGENT_LIMITS.maxPlanIterations || tasks.length >= AGENT_LIMITS.maxToolCalls || execution.failures >= AGENT_LIMITS.maxFailures) {
+        limited = true; execution.warnings.push('Planning safety limit reached; further work could not be completed.'); break;
+      }
+      try {
+        const constrained = Boolean(route || context.execution);
+        const decision = await observeNext(context.provider, execution, plan.agent, constrained);
+        if (decision.action === 'finish') {
+          if (requiredSteps.length && modelControlsReads) { activePlan = { ...plan, steps: requiredSteps.splice(0, 1) }; continue; }
+          break;
+        }
+        if (decision.action === 'partial') { limited = true; execution.warnings.push('The model reported remaining catalog work.'); break; }
+        if (decision.action === 'clarify') {
+          if (!findings.length) { status = 'awaiting_user_input'; question = decision.question; }
+          break;
+        }
+        if (decision.action !== 'call_tool') {
+          if (requiredSteps.length && modelControlsReads) { activePlan = { ...plan, steps: requiredSteps.splice(0, 1) }; continue; }
+          break;
+        }
+        const name = decision.tool!;
+        let args: unknown; try { args = JSON.parse(decision.input!); } catch { args = null; }
+        const definition = Object.hasOwn(toolRegistry, name) ? toolRegistry[name as keyof typeof toolRegistry] : undefined;
+        if (!definition || definition.mode !== 'read' || definition.authorization === 'case_consent'
+          || constrained && !['check_requirements', 'compare_providers'].includes(name) || decision.version && decision.version !== '1') {
+          await executeRegisteredTool(execution, { tool: name, version: decision.version ?? '1', input: args },
+            { agent: plan.agent, userId: '', caseAccess: context.caseAccess }, dependencies);
+          activePlan = { ...plan, steps: [] };
+          // The next iteration observes this rejection and can select a safe correction.
+          continue;
+        }
+        requiredSteps = requiredSteps.filter((s) => s.tool !== name || s.input !== decision.input);
+        activePlan = { ...plan, steps: [{ objective: definition.displayName, tool: definition.name, input: decision.input! }], missingInformation: null };
+      } catch {
+        diagnostics.observationFallback = true;
+        // Compatibility with existing providers that only support plan/synthesis.
+        if (requiredSteps.length && modelControlsReads) { activePlan = { ...plan, steps: requiredSteps.splice(0, 1) }; continue; }
+        if (route || context.execution || legacyFollowUps++ >= 1 || !findings.length) break;
+        activePlan = await planRequest(context.provider, request.content, caseContext, { agent: plan.agent, findings, usedTools: results.map((r) => r.tool) }, undefined, context.supportedAgents);
+        if (!activePlan.steps.some((step) => !used.has(`${step.tool}:${step.input}`))) break;
       }
     }
-    if (status !== 'completed') {
+    {
       for (const pending of tasks.filter((task) => task.status === 'pending')) {
         pending.status = 'blocked'; pending.completedAt = new Date().toISOString();
         await context.store.updateTask(pending.id, 'blocked');
@@ -300,9 +354,9 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
       summary = synthesis.summary; nextSteps = synthesis.nextSteps; question = synthesis.question;
     } else {
       const synthesis = synthesisSchema.parse(await context.provider.generateStructured({
-        purpose: 'synthesis', schema: synthesisSchema, maxOutputTokens: 550, timeoutMs: AGENT_LIMITS.modelTimeoutMs,
+        purpose: 'synthesis', schema: synthesisSchema, maxOutputTokens: 550, timeoutMs: Math.min(AGENT_LIMITS.modelTimeoutMs, Math.max(1, AGENT_LIMITS.runTimeoutMs - (Date.now() - started))),
         system: `You are ${agents[plan.agent].name}. ${agents[plan.agent].safety} Write a concise coordination summary. All provider and cost facts appear in separate trusted cards; do not repeat names, numbers, prices, credentials, or medical claims in your summary. Use only the tool results. If no results, say what information is missing. Do not say any action was completed unless a tool completed it.`,
-        input: JSON.stringify({ understanding: plan.understanding, toolResults: results.map(({ tool, result }) => ({ tool,
+        input: JSON.stringify({ understanding: safeText(plan.understanding), toolResults: results.map(({ tool, result }) => ({ tool,
           recordNames: result.findings.map((item) => item.title), note: result.note, comparison: result.comparison,
           caseContext: result.caseContext, requestedInformation: result.requestedInformation })), missingInformation: question }),
       }));
@@ -324,11 +378,25 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
     }) : undefined;
     const discovery = discoveryResult ? { normalizedQuery: discoveryResult.normalizedQuery, matchType: discoveryResult.matchType,
       matchReason: discoveryResult.matchReason, recovered: discoveryResult.recovered } : undefined;
-    let response: AgentResponse = { conversationId, runId, agent: plan.agent, status, understanding: plan.understanding,
-      summary, findings: unique, nextSteps, question, tasks, approvalId, approvalProposal, discovery };
+    let response: AgentResponse = { conversationId, runId, agent: plan.agent, status, understanding: safeText(plan.understanding),
+      summary, findings: unique.slice(0, 30), analyses: results.flatMap((r) => r.result.analysis ? [r.result.analysis] : []), summarySource: route || context.execution?.synthesis ? 'application' : 'model', nextSteps, question, tasks, approvalId, approvalProposal, discovery };
     if (context.execution?.finalize) response = await context.execution.finalize(response, results);
     if (context.finalizeResponse) response = await context.finalizeResponse(response);
+    const failedCalls = execution.calls.filter((c) => c.status === 'failed' && !execution.calls.some((next) => next.step > c.step && next.tool === c.tool && ['completed', 'reused'].includes(next.status) && (c.error?.code === 'TOOL_INPUT_INVALID' || canonicalInput(next.input) === canonicalInput(c.input))));
+    if (status === 'failed' && !failedCalls.length && results.length) response.status = 'completed';
+    if (failedCalls.length || limited) {
+      response.summary = `${response.summary} ${failedCalls.length ? `${[...new Set(failedCalls.map((c) => c.tool.replaceAll('_', ' ')))].join(', ')} could not be completed. Successful sourced results are preserved.` : 'Some requested work remains incomplete because an execution limit was reached.'}`.slice(0, 1600);
+      if (response.status === 'completed' && !results.length && failedCalls.length) response.status = 'failed';
+    }
+    const catalogIncomplete = response.compoundRequest?.operations.some((o) => o.status === 'incomplete' || o.status === 'skipped')
+      || response.analyses?.some((a) => !a.complete);
+    if (response.compoundRequest || response.comparison) response.summarySource = 'derived';
+    const finalState = response.status === 'awaiting_user_input' ? 'waiting_for_input' : response.status === 'awaiting_approval' ? 'awaiting_confirmation'
+      : response.status === 'failed' && !response.findings.length ? 'failed' : failedCalls.length || limited || catalogIncomplete ? 'partially_completed' : 'completed';
+    await execution.transition(finalState);
+    response.activity = execution.activity();
     response = assistantResponseSchema.parse(attachReferences(response));
+    await execution.persist(response);
     if (diagnostics.recoveryAttempted) diagnostics.recoveryResult = response.status;
     await context.store.saveOutput(runId, response);
     await context.store.addMessage(conversationId, 'assistant', response.summary, runId, { response });
@@ -338,10 +406,13 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
     const failure = publicFailure(error);
     console.error(JSON.stringify({ event: 'agent_run_failed', runId, code: failure.code }));
     let failedResponse: AgentResponse = { conversationId, runId, agent: plan.agent, status: 'failed',
-      understanding: plan.understanding, summary: failure.publicMessage, findings, nextSteps: ['Try again or narrow the request.'], question: null, tasks };
+      understanding: safeText(plan.understanding), summary: failure.publicMessage, findings, nextSteps: ['Try again or narrow the request.'], question: null, tasks };
     if (context.execution?.finalize) failedResponse = await context.execution.finalize(failedResponse, results);
     if (context.finalizeResponse) failedResponse = await context.finalizeResponse(failedResponse);
+    if (!terminalStates.has(execution.state)) await execution.transition(findings.length ? 'partially_completed' : 'failed');
+    failedResponse.activity = execution.activity();
     failedResponse = assistantResponseSchema.parse(attachReferences(failedResponse));
+    await execution.persist(failedResponse);
     await context.store.saveOutput(runId, failedResponse);
     await context.store.addMessage(conversationId, 'assistant', failedResponse.summary, runId, { response: failedResponse });
     await context.store.finishRun(runId, 'failed', failure.code, { ...diagnostics, ...(diagnostics.recoveryAttempted ? { recoveryResult: 'failed' } : {}) });

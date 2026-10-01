@@ -5,6 +5,9 @@ import type { Database, Json } from '@/types/database';
 import { AgentError } from './errors';
 import type { AgentId, AgentResponse, AgentTaskView, ToolName, ToolResult } from './schemas';
 import type { CaseAccess } from './tools';
+import { agentIdSchema } from './schemas';
+import { activitySchema } from './execution-schemas';
+import { safeValue } from './execution-state';
 
 type Db = SupabaseClient<Database>;
 function checked<T>(data: T | null, error: { message: string } | null): T {
@@ -70,6 +73,7 @@ export class SupabaseCaseAccess implements CaseAccess {
 }
 
 export interface AgentStore {
+  saveExecutionState?(runId: string, state: Record<string, unknown>): Promise<void>;
   createConversation(userId: string, caseId?: string): Promise<string>;
   assertConversation(conversationId: string, userId: string, caseId?: string): Promise<void>;
   addMessage(conversationId: string, role: 'user' | 'assistant', content: string, runId?: string, metadata?: Record<string, unknown>): Promise<void>;
@@ -144,14 +148,48 @@ export class SupabaseAgentStore implements AgentStore {
     return status === 'proposed' ? id : undefined;
   }
   async saveOutput(runId: string, response: AgentResponse) {
-    const { error } = await this.admin.from('agent_outputs').insert({ run_id: runId, output_type: 'assistant_response',
-      content: JSON.parse(JSON.stringify(response)),
+    const existing = await this.admin.from('agent_outputs').select('id').eq('run_id', runId).eq('output_type', 'assistant_response').limit(1).maybeSingle();
+    if (existing.error) throw new AgentError('DATABASE_FAILURE', 'The assistant result could not be saved.');
+    const output = { run_id: runId, output_type: 'assistant_response', content: JSON.parse(JSON.stringify(response)),
       source_record_ids: [...new Set(response.findings.map((item) => item.provenance.sourceRecordId).filter((id): id is string => Boolean(id)))],
-    });
+    };
+    // The existing conversation lease and unique runtime ID serialize this writer.
+    // Retrying finalization updates its row instead of duplicating an already saved result.
+    const { error } = existing.data ? await this.admin.from('agent_outputs').update(output).eq('id', existing.data.id).eq('run_id', runId)
+      : await this.admin.from('agent_outputs').insert(output);
     if (error) throw new AgentError('DATABASE_FAILURE', 'The assistant result could not be saved.');
   }
+  async saveExecutionState(runId: string, state: Record<string, unknown>) {
+    const existing = await this.admin.from('agent_runs').select('metadata').eq('id', runId).single();
+    const data = checked(existing.data, existing.error);
+    const metadata = data.metadata && typeof data.metadata === 'object' && !Array.isArray(data.metadata) ? data.metadata : {};
+    const result = await this.admin.from('agent_runs').update({ ...(agentIdSchema.safeParse(state.agent).success ? { agent_name: String(state.agent) } : {}), metadata: { ...metadata, execution: JSON.parse(JSON.stringify(safeValue(state))) as Json } }).eq('id', runId);
+    if (result.error) throw new AgentError('DATABASE_FAILURE', 'Run progress could not be saved.');
+  }
+  async readActivity(conversationId: string, userId: string, caseId?: string) {
+    await this.assertConversation(conversationId, userId, caseId);
+    const result = await this.admin.from('agent_runs').select('id,metadata').eq('conversation_id', conversationId).eq('initiated_by', userId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (result.error) throw new AgentError('DATABASE_FAILURE', 'Run progress is temporarily unavailable.');
+    const metadata = result.data?.metadata;
+    const execution = metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata.execution : undefined;
+    if (!execution || typeof execution !== 'object' || Array.isArray(execution)) return undefined;
+    // Return a small allowlisted projection. Raw inputs/results and private errors never reach this endpoint.
+    const calls = Array.isArray(execution.calls) ? execution.calls : [];
+    const parsed = activitySchema.safeParse({ runId: result.data!.id, state: execution.state, updatedAt: execution.updatedAt,
+      steps: calls.map((raw) => {
+        const c = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+        const output = c.output && typeof c.output === 'object' && !Array.isArray(c.output) ? c.output : {};
+        return { id: c.id, number: c.step, label: typeof c.tool === 'string' ? c.tool.replaceAll('_', ' ') : 'Catalog operation',
+          status: c.status, recordCount: Array.isArray(output.findings) ? output.findings.length : 0,
+          ...(c.status === 'failed' ? { error: 'This catalog operation could not be completed.' } : {}) };
+      }), warnings: execution.warnings });
+    return parsed.success ? parsed.data : undefined;
+  }
   async finishRun(runId: string, status: AgentResponse['status'], errorCode?: string, diagnostics?: Record<string, string | boolean | null>) {
-    const { error } = await this.admin.from('agent_runs').update({ status, finished_at: new Date().toISOString(), metadata: { ...diagnostics, ...(errorCode ? { errorCode } : {}) } }).eq('id', runId);
+    const existing = await this.admin.from('agent_runs').select('metadata').eq('id', runId).single();
+    const saved = checked(existing.data, existing.error);
+    const metadata = saved.metadata && typeof saved.metadata === 'object' && !Array.isArray(saved.metadata) ? saved.metadata : {};
+    const { error } = await this.admin.from('agent_runs').update({ status, finished_at: new Date().toISOString(), metadata: { ...metadata, ...diagnostics, ...(errorCode ? { errorCode } : {}) } }).eq('id', runId);
     if (error) throw new AgentError('DATABASE_FAILURE', 'The agent run could not be finalized.');
     console.info(JSON.stringify({ event: 'agent_run_finished', runId, status, errorCode }));
   }

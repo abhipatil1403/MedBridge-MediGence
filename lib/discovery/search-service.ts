@@ -77,11 +77,13 @@ export function searchPackages(catalog: CatalogSnapshot, parsed: ParsedQuery, fi
   const results = catalog.packages.filter((item) =>
     (!country || item.country === country) && (!(filters.treatment || parsed.entities.procedure) || item.treatmentSlug === (filters.treatment || parsed.entities.procedure)) &&
     (!filters.hospital || item.hospitalSlug === filters.hospital) &&
+    (!(filters.specialty || (!parsed.entities.procedure && parsed.entities.specialty)) || catalog.treatments.some((t) => t.slug === item.treatmentSlug && t.specialty === (filters.specialty || parsed.entities.specialty))) &&
     (!city || catalog.hospitals.some((hospital) => hospital.slug === item.hospitalSlug && normalize(hospital.city) === normalize(city))) &&
     (!filters.budget || !Number.isFinite(item.samplePriceUsd) || item.samplePriceUsd <= 0 || item.samplePriceUsd <= filters.budget),
   );
   return SearchRankingService.sort(matched("packages", results, parsed, (item) => ({
     country: item.country, city: catalog.hospitals.find((hospital) => hospital.slug === item.hospitalSlug)?.city, treatmentSlugs: [item.treatmentSlug],
+    specialty: catalog.treatments.find((treatment) => treatment.slug === item.treatmentSlug)?.specialty,
     searchText: catalog.treatments.find((treatment) => treatment.slug === item.treatmentSlug)?.name,
   })), filters.sort, (item, key) => key === "price" ? item.samplePriceUsd : undefined);
 }

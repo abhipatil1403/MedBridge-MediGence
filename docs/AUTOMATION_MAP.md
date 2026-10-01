@@ -34,3 +34,12 @@ Implemented assistant planning is request-driven: a planning goal creates/reuses
 | Content review date reached | Unpublish or flag clinically material content | Editor/clinician republishes | Content version and approver |
 
 **Implementation order:** outbox and audit first; then enquiry/case tasks; document processing; provider/cost freshness; booking/payment reconciliation; travel; recovery; AI-generated proposals. Use bounded retries and suppress duplicate notifications. Health and travel escalations have explicit on-call owners.
+
+
+## Agentic execution milestone (2026-10-01)
+
+The existing request-driven runtime now has a typed registry, validated service execution, structured result observations, bounded Cloudflare next decisions, canonical read-result reuse, safe recovery and persisted run activity. Goal/reference/requirement policies and compound dependencies remain the existing infrastructure. This is request-driven execution; it adds no scheduler, external integrations or patient-data workflow. Case Intake is parked.
+
+Run states are queued, planning, executing, observing, waiting_for_input, awaiting_confirmation, completed, partially_completed, failed and cancelled, persisted in existing private run JSON. Owned history restores compact progress; refreshing never replays tools. Read tools execute automatically; existing writes remain approval proposals. Future executing writes/external/clinical tools are blocked until an independently authorized workflow exists.
+
+See [AI_AGENT_ARCHITECTURE.md](./AI_AGENT_ARCHITECTURE.md) for the loop, budgets, permissions and provenance and [AGENTIC_TOOL_EXECUTION_VALIDATION.md](./AGENTIC_TOOL_EXECUTION_VALIDATION.md) for measured gates, security, manual scenarios and deployment limits. No new environment variables or database migration is required.

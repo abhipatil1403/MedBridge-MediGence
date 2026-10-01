@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { activitySchema, type RunActivity } from './execution-schemas';
 import { normalizedDiscoveryQuerySchema } from '@/lib/discovery/query-normalizer';
 import { referenceContextSchema, referenceResolutionSchema, type ReferenceContext, type ReferenceResolution } from '@/lib/conversation/schemas';
 import { requirementsSchema, requirementEvaluationSchema, resultRequirementEvaluationSchema, type Requirement, type ResultRequirementEvaluation } from '@/lib/requirements/RequirementTypes';
@@ -11,6 +12,7 @@ export type AgentId = z.infer<typeof agentIdSchema>;
 export const toolNameSchema = z.enum([
   'search_treatments', 'search_hospitals', 'search_doctors', 'search_packages', 'search_countries', 'search_services',
   'get_treatment', 'get_hospital', 'get_doctor', 'get_package', 'get_country', 'compare_treatment_options',
+  'get_hospital_details', 'get_doctor_details', 'get_treatment_details', 'get_package_details', 'search_locations', 'check_requirements', 'compare_providers',
   'get_case_context', 'get_case_documents_metadata', 'create_case', 'update_case', 'create_agent_task', 'request_user_information', 'request_external_action',
 ]);
 export type ToolName = z.infer<typeof toolNameSchema>;
@@ -64,6 +66,7 @@ export interface Finding {
 }
 
 export interface ToolResult {
+  analysis?: { kind: 'derived'; recordIds: string[]; summary: string; complete: boolean; missingInformation: string[] };
   findings: Finding[];
   note?: string;
   comparison?: Record<string, unknown>;
@@ -78,9 +81,9 @@ export const findingSchema = z.object({ kind: z.string(), slug: z.string().optio
   requirementEvaluation: resultRequirementEvaluationSchema.optional(),
   href: z.string().optional(), facts: z.record(z.string(), z.union([z.string(), z.number(), z.null()])),
   matchType: z.enum(['exact', 'related']), matchReason: z.string().min(1), provenance: provenanceSchema });
-export const toolResultSchema = z.object({ findings: z.array(findingSchema).max(30), note: z.string().optional(),
+export const toolResultSchema = z.object({ analysis: z.object({ kind: z.literal('derived'), recordIds: z.array(z.guid()).max(30), summary: z.string().max(1600), complete: z.boolean(), missingInformation: z.array(z.string().max(300)).max(30) }).strict().optional(), findings: z.array(findingSchema).max(30), note: z.string().optional(),
   comparison: z.record(z.string(), z.unknown()).optional(), caseContext: z.record(z.string(), z.unknown()).optional(),
-  requestedInformation: z.string().optional(), approvalRequired: z.string().optional() });
+  requestedInformation: z.string().optional(), approvalRequired: z.string().optional() }).strict();
 
 export const hospitalMatchClassificationSchema = z.enum(['strong_match', 'partial_match', 'insufficient_evidence', 'does_not_match']);
 export const hospitalMatchSchema = z.object({
@@ -204,6 +207,9 @@ export interface AgentTaskView {
 }
 
 export interface AgentResponse {
+  analyses?: NonNullable<ToolResult['analysis']>[];
+  summarySource?: 'model' | 'derived' | 'application';
+  activity?: RunActivity;
   workflow?: 'case_intake';
   patientCase?: PatientCase;
   caseSummary?: CaseSummary;
@@ -236,6 +242,9 @@ export interface AgentResponse {
 }
 
 export const assistantResponseSchema = z.object({
+  activity: activitySchema.optional(),
+  analyses: z.array(toolResultSchema.shape.analysis.unwrap()).max(8).optional(),
+  summarySource: z.enum(['model', 'derived', 'application']).optional(),
   workflow: z.literal('case_intake').optional(), patientCase: patientCaseSchema.optional(),
   caseSummary: caseSummarySchema.optional(), caseHandoff: caseHandoffSchema.optional(),
   hospitalMatches: z.array(hospitalMatchSchema).max(30).optional(),

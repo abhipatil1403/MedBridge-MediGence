@@ -46,7 +46,8 @@ export const RequirementExtractor = {
     if (preferredHospital) put('hospital', preferredHospital.name, { value: preferredHospital.slug });
     if (/\bclinical suitability|medically suitable\b/i.test(content)) put('clinical_suitability', 'Clinical suitability');
     if (entities.specialty && (/\bdoctor|specialist|cardiologist|oncologist|neurologist\b/i.test(content)
-      || /\bhospitals?\b/i.test(content) && normalize(content).includes(normalize(entities.specialty))))
+      || /\bhospitals?\b/i.test(content) && normalize(content).includes(normalize(entities.specialty))
+      || /\bpackages?\b/i.test(content) && !entities.procedure))
       put('specialty', entities.specialty, { value: entities.specialty });
     if (/\bservices?|support|help with\b/i.test(content)) for (const service of snapshot.services)
       if ([service.name, ...service.aliases].some((name) => normalize(content).includes(normalize(name))))

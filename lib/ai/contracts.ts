@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 
 export interface ModelRequest<T extends z.ZodType> {
-  purpose: 'plan' | 'synthesis';
+  purpose: 'plan' | 'observe' | 'synthesis';
   system: string;
   input: string;
   schema: T;

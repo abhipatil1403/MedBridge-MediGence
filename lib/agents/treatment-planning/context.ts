@@ -41,7 +41,8 @@ export function resolvePlanningContext(content: string, snapshot: CatalogSnapsho
 }
 
 export function planningQuestion(context: PlanningContext): string | null {
-  if (!context.treatmentSlug && !(context.goalType === 'consultation' && context.specialty))
+  const specialtyScope = context.specialty && (context.goalType === 'consultation' || context.requestedTargets.length === 1 && context.requestedTargets[0] === 'packages');
+  if (!context.treatmentSlug && !specialtyScope)
     return context.goalType === 'consultation' ? 'Which specialty are you looking for a consultation with?' : 'What treatment or procedure are you planning for?';
   if (!context.city && !context.country) return 'Which city or country would you prefer?';
   return null;

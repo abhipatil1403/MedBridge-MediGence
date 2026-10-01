@@ -61,8 +61,10 @@ export async function GET(request: NextRequest) {
         }
       }
     }
+    const selectedConversation = conversationQuery.data?.find((c) => c.id === conversationId);
+    const activity = conversationId && selectedConversation ? await new SupabaseAgentStore(createAdminClient(), db).readActivity(conversationId, user.id, selectedConversation.case_id ?? undefined) : undefined;
     const plan = conversationId ? await new SupabasePlanningStore(createAdminClient(), db).load(conversationId, user.id) : undefined;
-    return NextResponse.json({ conversations: conversationQuery.data ?? [], cases: (caseQuery.data ?? []).map((item) => ({ ...item, canManageConsent: item.owner_id === user.id, agentConsent: consent.get(item.id) === 'granted' })), messages, plan },
+    return NextResponse.json({ conversations: conversationQuery.data ?? [], cases: (caseQuery.data ?? []).map((item) => ({ ...item, canManageConsent: item.owner_id === user.id, agentConsent: consent.get(item.id) === 'granted' })), messages, plan, activity },
       { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) { return errorResponse(error); }
 }
@@ -83,6 +85,6 @@ export async function POST(request: NextRequest) {
       planningStore: new SupabasePlanningStore(admin, userDb),
       provider: configuredProvider(),
     });
-    return NextResponse.json(response);
+    return NextResponse.json(response, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) { return errorResponse(error); }
 }

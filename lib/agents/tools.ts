@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { loadDiscoverySnapshot } from './discovery-routing';
+import { compareCandidates } from './comparison/candidates';
+import { AGENT_LIMITS, safeText } from './execution-state';
 import type { CatalogRecord, CatalogRepository } from '@/types/catalog';
 import type { DiscoveryFilters, DiscoveryResults, ResultType } from '@/types/discovery';
 import { catalogRepository } from '@/lib/catalog/repository';
@@ -29,7 +32,11 @@ const taskInput = z.object({ objective: z.string().min(3).max(160) }).strict();
 const questionInput = z.object({ question: z.string().min(3).max(300) }).strict();
 const externalActionInput = z.object({ action: z.enum(['share_records', 'booking', 'payment', 'travel_purchase', 'visa_submission']), recipient: z.string().max(120).optional() }).strict();
 
+const analysisInput = z.object({ recordIds: z.array(z.guid()).min(1).max(10) }).strict();
+export const toolAliases = { get_hospital_details: 'get_hospital', get_doctor_details: 'get_doctor', get_treatment_details: 'get_treatment', get_package_details: 'get_package', search_locations: 'search_countries' } as const;
 export const toolSchemas = {
+  get_hospital_details: slugInput, get_doctor_details: slugInput, get_treatment_details: slugInput, get_package_details: slugInput,
+  search_locations: searchInput, check_requirements: analysisInput, compare_providers: analysisInput,
   search_treatments: searchInput, search_hospitals: searchInput, search_doctors: searchInput,
   search_packages: searchInput, search_countries: searchInput, search_services: searchInput,
   get_treatment: slugInput, get_hospital: slugInput, get_doctor: slugInput,
@@ -40,8 +47,13 @@ export const toolSchemas = {
 } satisfies Record<ToolName, z.ZodType>;
 
 export const toolDescriptions: Record<ToolName, string> = {
-  search_treatments: 'Search real catalog treatments.', search_hospitals: 'Search real catalog hospitals by treatment, location and specialty.',
-  search_doctors: 'Search real catalog doctors by specialty and location.', search_packages: 'Search catalog packages.',
+  get_hospital_details: 'Read a published hospital by slug.', get_doctor_details: 'Read a published doctor by slug.',
+  get_treatment_details: 'Read a published treatment by slug.', get_package_details: 'Read a published package by slug.',
+  search_locations: 'Search published catalog countries and travel notes; city-level records are not a separate location search.',
+  check_requirements: 'Evaluate actual catalog record IDs against documented requirements. Use IDs returned by tools.',
+  compare_providers: 'Compare actual catalog hospital, doctor or package IDs in supplied order; no clinical ranking.',
+  search_treatments: 'Search published catalog treatments.', search_hospitals: 'Search published catalog hospitals by treatment, location and specialty.',
+  search_doctors: 'Search published catalog doctors by specialty and location.', search_packages: 'Search catalog packages.',
   search_countries: 'Search countries and travel notes.', search_services: 'Search coordination services.',
   get_treatment: 'Get a treatment by slug.', get_hospital: 'Get a hospital by slug.', get_doctor: 'Get a doctor by slug.',
   get_package: 'Get a package by slug.', get_country: 'Get a country by slug.',
@@ -56,6 +68,11 @@ export const toolDescriptions: Record<ToolName, string> = {
 };
 
 export interface ToolDefinition {
+  id: ToolName; displayName: string; category: 'catalog' | 'analysis' | 'case' | 'coordination';
+  permission: 'read' | 'confirmation' | 'case_consent' | 'professional'; mode: 'read' | 'proposal' | 'ask' | 'write' | 'external' | 'clinical';
+  provenance: readonly ('catalog' | 'synthetic' | 'external' | 'user' | 'derived')[];
+  timeoutMs: number; failureHandling: 'observe_and_recover';
+  execute: (input: unknown, context: ToolContext, dependencies?: ToolDependencies) => Promise<ToolResult>;
   name: ToolName;
   version: '1';
   description: string;
@@ -68,6 +85,12 @@ export interface ToolDefinition {
 const protectedTools = new Set<ToolName>(['get_case_context', 'get_case_documents_metadata', 'update_case']);
 const proposedTools = new Set<ToolName>(['create_case', 'update_case', 'create_agent_task', 'request_external_action']);
 export const toolRegistry = Object.fromEntries((Object.keys(toolSchemas) as ToolName[]).map((name) => [name, {
+  id: name, displayName: name.replaceAll('_', ' '),
+  category: ['check_requirements', 'compare_providers'].includes(name) ? 'analysis' : name.includes('case') ? 'case' : name.startsWith('search_') || name.startsWith('get_') || name === 'compare_treatment_options' ? 'catalog' : 'coordination',
+  permission: proposedTools.has(name) ? 'confirmation' : protectedTools.has(name) ? 'case_consent' : 'read',
+  mode: proposedTools.has(name) ? 'proposal' : name === 'request_user_information' ? 'ask' : 'read',
+  provenance: ['catalog', 'synthetic', 'external', 'user', 'derived'], timeoutMs: AGENT_LIMITS.toolTimeoutMs, failureHandling: 'observe_and_recover',
+  execute: async (input: unknown, context: ToolContext, dependencies?: ToolDependencies) => toolResultSchema.parse(await executeTool(name, input, context, dependencies)),
   name, version: '1', description: toolDescriptions[name], inputSchema: toolSchemas[name], outputSchema: toolResultSchema,
   authorization: protectedTools.has(name) ? 'case_consent' : 'authenticated',
   sideEffect: name === 'request_user_information' ? 'ask' : proposedTools.has(name) ? 'propose' : 'read',
@@ -83,6 +106,7 @@ export interface ToolContext {
   userId: string;
   caseId?: string;
   caseAccess: CaseAccess;
+  observedRecordIds?: readonly string[];
 }
 export interface ToolDependencies {
   requirements?: import('@/lib/requirements/RequirementTypes').Requirement[];
@@ -143,11 +167,32 @@ function assertCaseScope(inputCaseId: string, context: ToolContext) {
 
 /** Validate both agent permission and exact schema before reaching any service. */
 export async function executeTool(name: ToolName, rawInput: unknown, context: ToolContext, dependencies: ToolDependencies = defaultToolDependencies): Promise<ToolResult> {
-  const definition = toolRegistry[name];
+  const definition = Object.hasOwn(toolRegistry, name) ? toolRegistry[name] : undefined;
   if (!definition?.allowedAgents.includes(context.agent)) throw new AgentError('TOOL_DENIED', 'This agent cannot perform that action.');
   const validated = definition.inputSchema.safeParse(rawInput);
   if (!validated.success) throw new AgentError('TOOL_INPUT_INVALID', 'The assistant requested invalid search information.');
   const input = validated.data as Record<string, string> & { budget?: number };
+  if (!context.userId) throw new AgentError('AUTH_REQUIRED', 'Sign in to use catalog tools.');
+  if (safeText(JSON.stringify(rawInput)) !== JSON.stringify(rawInput)) throw new AgentError('TOOL_INPUT_INVALID', 'Credentials cannot be used as tool arguments.');
+  if (name in toolAliases) return executeTool(toolAliases[name as keyof typeof toolAliases], rawInput, context, dependencies);
+  if (name === 'check_requirements' || name === 'compare_providers') {
+    const args = analysisInput.parse(rawInput);
+    if (context.observedRecordIds && args.recordIds.some((id) => !context.observedRecordIds!.includes(id))) throw new AgentError('TOOL_SCOPE_DENIED', 'Select records already returned in this run.');
+    const snapshot = dependencies.evaluationSnapshot ?? await loadDiscoverySnapshot(dependencies.repository);
+    const kinds = ['hospitals', 'doctors', 'packages', 'treatments', 'countries', 'services'] as const;
+    const records = args.recordIds.flatMap((id) => kinds.flatMap((kind) => snapshot[kind].filter((r) => r.recordId === id).map((r) => toFinding(kind, r))));
+    if (records.length !== args.recordIds.length || new Set(args.recordIds).size !== args.recordIds.length) throw new AgentError('TOOL_RECORD_UNAVAILABLE', 'Some selected catalog records are unavailable.');
+    const requirements = dependencies.requirements ?? [];
+    if (name === 'check_requirements') {
+      const findings = evaluateFindings(records, requirements, snapshot);
+      const missing = [...new Set(findings.flatMap((f) => f.requirementEvaluation?.evaluations.filter((e) => ['unknown', 'incomplete', 'related'].includes(e.status)).map((e) => e.explanation) ?? []))];
+      return { findings, analysis: { kind: 'derived', recordIds: args.recordIds, complete: requirements.length > 0 && missing.length === 0, missingInformation: missing, summary: requirements.length ? 'Checked documented catalog evidence against the requested requirements.' : 'No requirements were supplied; no constraint satisfaction is claimed.' } };
+    }
+    const targets = [...new Set(records.map((r) => r.kind))].filter((k): k is 'hospitals' | 'packages' | 'doctors' => ['hospitals', 'packages', 'doctors'].includes(k));
+    if (!targets.length) throw new AgentError('TOOL_INPUT_INVALID', 'Compare hospitals, doctors, or packages.');
+    const result = compareCandidates({ intent: 'comparison', options: [], targets, focus: 'catalog' }, [targets.map((target) => ({ taskId: context.userId, target, status: 'completed' as const, findings: records.filter((r) => r.kind === target), matchType: 'exact' as const, matchReason: 'Selected sourced records.' }))]);
+    return { findings: records, analysis: { kind: 'derived', recordIds: args.recordIds, summary: result.summary, complete: result.complete, missingInformation: result.complete ? [] : ['At least two sourced peers are needed for comparison.'] } };
+  }
   if (name in searchKinds) {
     const kind = searchKinds[name as keyof typeof searchKinds];
     const result = await dependencies.search(input.query, kind, { country: input.country, city: input.city, treatment: input.treatment, specialty: input.specialty,

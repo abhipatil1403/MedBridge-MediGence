@@ -19,7 +19,7 @@ export async function prepareTreatmentPlanning(input: { content: string; userId:
   const { content, snapshot, active, userId, conversationId, store, lease } = input;
   const context = resolvePlanningContext(content, snapshot, active, input.caseContext);
   const question = planningQuestion(context);
-  const subject = context.treatmentName ?? (context.specialty ? `${context.specialty} consultation` : 'Care');
+  const subject = context.treatmentName ?? (context.specialty ? `${context.specialty}${context.goalType === 'consultation' ? ' consultation' : context.requestedTargets.length === 1 && context.requestedTargets[0] === 'packages' ? ' packages' : ''}` : 'Care');
   const location = context.city ?? context.country;
   const canonical = `Find ${context.requestedTargets.filter((item) => item !== 'services').join(' and ')} for ${context.treatmentName ?? context.specialty ?? 'treatment'}${location ? ` in ${location}` : ''}`;
   const tempRoute: DiscoveryRoute = { snapshot, normalized: QueryNormalizer.normalize(canonical, snapshot),

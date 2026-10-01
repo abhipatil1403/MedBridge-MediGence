@@ -75,8 +75,8 @@ describe('compound intent orchestration', () => {
     expect(search).toHaveBeenCalledTimes(1); expect(response.compoundRequest?.operations[0].status).toBe('incomplete');
     expect(response.compoundRequest?.operations[1].status).toBe('skipped');
   });
-  it('resolves hospital and its package, then evaluates its new budget with no model', async () => {
-    const model = vi.fn(async () => { throw new Error('No model calls needed'); });
+  it('keeps reference and budget follow-ups deterministic after the compound observation', async () => {
+    const model = vi.fn(async (request: { purpose: string }) => { throw new Error(`No model calls needed for ${request.purpose}`); });
     const h = harness({ generateStructured: model }); const first = await h.send(compoundRegression);
     const detail = await h.send('Tell me more about the first hospital.', first.conversationId);
     expect(detail.referenceResolution?.reference?.entityId).toBe(hospital.recordId);
@@ -85,7 +85,8 @@ describe('compound intent orchestration', () => {
     const budget = await h.send('Is it under $5,000?', first.conversationId);
     expect(budget.findings[0].slug).toBe(pkg.slug); expect(budget.tasks.map((t) => t.tool)).toEqual(['get_package']);
     expect(budget.findings[0].requirementEvaluation?.evaluations.find((e) => e.type === 'budget')?.status).toBe('not_met');
-    expect(model).not.toHaveBeenCalled();
+    expect(model).toHaveBeenCalledTimes(1);
+    expect(model.mock.calls[0][0]).toMatchObject({ purpose: 'observe' });
   });
   it('reloads persisted context, retaining requirements and entity references', async () => {
     const h = harness(); const response = await h.send(compoundRegression);
@@ -173,7 +174,7 @@ describe('compound intent orchestration', () => {
     const h = harness(unavailable, dependencies); const response = await h.send(compoundRegression);
     expect(response.findings.filter((f) => f.kind === 'packages')).toHaveLength(2);
     expect((await h.send('Tell me more about the second package.', response.conversationId)).findings[0].slug).toBe(second.slug);
-    const compared = await h.send('Compare those two.', response.conversationId);
+    const compared = await h.send('Compare the two packages.', response.conversationId);
     expect(compared.question).toBeNull(); expect(compared.findings.map((f) => f.slug)).toEqual([pkg.slug, second.slug]);
     expect(compared.tasks.map((t) => t.tool)).toEqual(['get_package', 'get_package']);
   });

@@ -22,6 +22,8 @@ export function classifyWorkflow(content: string, normalized: NormalizedDiscover
       return workflowDecisionSchema.parse({ workflow: 'treatment_planning', reason: 'plan_continuation' });
   }
   if (wantsPlan && careGoal && !simpleDoctor) return workflowDecisionSchema.parse({ workflow: 'treatment_planning', reason: 'planning_goal' });
+  if (normalized.targets.length === 1 && normalized.targets[0] === 'packages' && normalized.entities.specialty && !normalized.entities.procedure)
+    return workflowDecisionSchema.parse({ workflow: 'treatment_planning', reason: 'planning_goal' });
   if (!active && normalized.targets.includes('packages') && !normalized.entities.procedure)
     return workflowDecisionSchema.parse({ workflow: 'discovery', reason: 'missing_context' });
   return workflowDecisionSchema.parse({ workflow: 'discovery', reason: 'catalog_request' });

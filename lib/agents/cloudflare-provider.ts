@@ -56,6 +56,7 @@ export class CloudflareProvider implements LLMProvider {
 
   async generateStructured<T extends z.ZodType>(request: ModelRequest<T>): Promise<z.infer<T>> {
     const instructions = `${request.system}\nReturn exactly one JSON object matching this schema. Do not include markdown or explanatory text.\nSchema: ${JSON.stringify(z.toJSONSchema(request.schema))}`;
+    const deadline = AbortSignal.timeout(request.timeoutMs);
     let lastError: AgentError | undefined;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
@@ -66,7 +67,7 @@ export class CloudflareProvider implements LLMProvider {
             { role: 'system', content: instructions },
             { role: 'user', content: request.input + (attempt ? '\nYour previous answer was invalid. Return a complete JSON object only.' : '') },
           ], max_completion_tokens: Math.max(request.maxOutputTokens, 600), chat_template_kwargs: { enable_thinking: false }, stream: false }),
-          signal: AbortSignal.timeout(request.timeoutMs),
+          signal: deadline,
           cache: 'no-store',
         });
         if (response.status === 401 || response.status === 403) throw new AgentError('MODEL_AUTH_FAILURE', 'AI authentication failed. Please contact the site administrator.');
