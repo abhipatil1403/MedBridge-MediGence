@@ -1,6 +1,7 @@
 'use client';
 
 import { ResearchResults } from './research-results';
+import { DocumentPanel } from './document-panel';
 import { FindingsSummary, RequestUnderstanding } from './response-presentation';
 import { HospitalMatchResults } from './hospital-match-results';
 
@@ -210,6 +211,8 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
         {activity && !messages.some((message) => message.metadata?.response?.runId === activity.runId) && <ExecutionActivity activity={activity} />}
         {busy && !activity && <div className="assistant-working" role="status">Working on your request. Results and recorded task states will appear when the run finishes.</div>}
       </div>
+      <DocumentPanel key={`${session.user.id}:${conversationId??'new'}`} token={session.access_token} conversationId={conversationId} disabled={busy}
+        onResponse={async response=>{setConversationId(response.conversationId);setLatest(response);setActivity(response.activity);await refresh(response.conversationId);}} />
       <form className="assistant-composer" onSubmit={send}><label htmlFor="assistant-input">Your request</label>
         <textarea id="assistant-input" value={content} onChange={(event) => setContent(event.target.value)} placeholder="Tell us what you are looking for…" rows={3} maxLength={2000} disabled={busy} required />
         <div><small>For discovery and coordination. A clinician must assess symptoms and treatment decisions.</small><button className="button" type="submit" disabled={busy || !content.trim()}>{busy ? 'Working…' : 'Plan my next step'}</button></div>
@@ -228,9 +231,9 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
       <div className="assistant-context__panel"><p className="eyebrow">CURRENT PLAN</p><h2>{latest?.workflow === 'case_intake' ? 'Case intake agent' : latest ? agentsLabel(latest.agent) : 'No run yet'}</h2>
         {latest ? <ol className="assistant-task-list">{latest.tasks.map((task) => <li key={task.id}><strong>{task.objective}</strong><span>{task.status.replaceAll('_', ' ')}</span></li>)}</ol>
           : <p>Actual tasks appear here after a request runs.</p>}</div>
-      <div className="assistant-context__panel"><p className="eyebrow">FINDINGS</p><strong>{latest?.findings.length ?? 0} catalog records</strong>
-        <p>Source labels reflect each catalog record. Synthetic records are demo data.</p>{latest?.research && <p>{latest.research.findings.length} external evidence items · {latest.research.sources.length} retrieved sources</p>}</div>
-      <div className="assistant-context__panel"><p className="eyebrow">SOURCES</p>{sources.length ? <ul className="assistant-source-list">{sources.map((source) =>
+      <div className="assistant-context__panel"><p className="eyebrow">FINDINGS</p>{latest?.documents ? <><strong>{latest.documents.requirements.length} requested documents</strong><p>{latest.documents.documents.filter(d=>d.uploadStatus==='uploaded').length} private uploaded files. Review the checklist and confirmation state below the conversation.</p></> : <><strong>{latest?.findings.length ?? 0} catalog records</strong>
+        <p>Source labels reflect each catalog record. Synthetic records are demo data.</p>{latest?.research && <p>{latest.research.findings.length} external evidence items · {latest.research.sources.length} retrieved sources</p>}</>}</div>
+      <div className="assistant-context__panel"><p className="eyebrow">SOURCES</p>{latest?.documents ? <ul className="assistant-source-list">{[...new Set(latest.documents.requirements.map(r=>r.source.label))].map(label=><li key={label}>{label}</li>)}</ul> : sources.length ? <ul className="assistant-source-list">{sources.map((source) =>
         <li key={source.table}>{source.label} · {source.table}{source.sourceKind === 'synthetic' ? ' · Demo data' : ''}</li>)}</ul> : <p>{latest?.research ? 'External citations and exact evidence appear with the research results.' : 'Sources appear with retrieved results.'}</p>}</div>
       {latest?.nextSteps.length ? <div className="assistant-context__panel"><p className="eyebrow">NEXT ACTIONS</p><ul className="assistant-source-list">{latest.nextSteps.map((step) => <li key={step}>{step}</li>)}</ul></div> : null}
     </aside>
@@ -238,7 +241,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
 }
 
 function agentsLabel(agent: AgentResponse['agent']) {
-  return ({ discovery: 'Discovery agent', treatment_planning: 'Treatment planning agent', hospital_matching: 'Hospital matching agent', comparison: 'Comparison agent', research: 'Research agent' })[agent];
+  return ({ discovery: 'Discovery agent', treatment_planning: 'Treatment planning agent', hospital_matching: 'Hospital matching agent', comparison: 'Comparison agent', research: 'Research agent', document_coordination: 'Document coordination agent' })[agent];
 }
 
 function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disabled }: { response: AgentResponse; approvalStatus?: string;
@@ -249,7 +252,7 @@ function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disable
     <RequestProgress request={response.compoundRequest} />
     {response.workflow === 'case_intake' && response.caseSummary && <CaseSummaryContent summary={response.caseSummary} />}
     {response.caseHandoff && <p>Using the reviewed case for catalog coordination. Reported medical information is separate from search requirements and does not establish treatment suitability. No case has been submitted to a provider.</p>}
-    <FindingsSummary response={response} />
+    {response.agent === 'document_coordination' ? <p>{response.summary}</p> : <FindingsSummary response={response} />}
     <div className="assistant-catalog-results">
       {response.research && response.findings.length > 0 && <h3 className="assistant-section-title">MEDBRIDGE CATALOG</h3>}
       {!response.resultGroups?.length && response.discovery && <div className="assistant-match-state" role="status"><strong>{response.status === 'awaiting_user_input' ? 'One detail needed' : response.findings.some((f) => f.requirementEvaluation && f.requirementEvaluation.overallStatus !== 'fully_satisfies') ? 'Catalog results · review requirements' : response.discovery.matchType === 'exact' ? 'Exact catalog matches' : response.discovery.matchType === 'related' ? 'Related catalog information' : 'No exact catalog match'}</strong>

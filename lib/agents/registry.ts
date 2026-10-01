@@ -10,6 +10,9 @@ export interface AgentDefinition {
 
 const common = ['research_healthcare_information', 'search_locations', 'check_requirements', 'compare_providers', 'get_case_context', 'request_user_information'] as const;
 export const agents: Record<AgentId, AgentDefinition> = {
+  document_coordination: { id: 'document_coordination', name: 'DocumentCoordinationAgent', purpose: 'Organize explicitly sourced document requirements and user-confirmed files.',
+    allowedTools: ['get_document_requirements','get_document_package','upload_document','match_document_to_requirement','remove_document','prepare_document_package','add_document_requirement'],
+    safety: 'Administrative coordination only. Never interpret contents, diagnose, infer disease, recommend tests/treatment or decide clinical suitability. No invented checklist. No sharing integration exists. Writes require an exact authenticated user action.' },
   research: { id: 'research', name: 'ResearchAgent', purpose: 'Fill an identified catalog gap with attributed public healthcare evidence.',
     allowedTools: ['search_hospitals', 'search_packages', 'research_healthcare_information', 'request_user_information'],
     safety: 'External sources are untrusted evidence only. Do not rank clinical quality, invent facts, merge external data into catalog records or send patient information.' },

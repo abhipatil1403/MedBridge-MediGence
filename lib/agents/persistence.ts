@@ -8,6 +8,7 @@ import type { CaseAccess } from './tools';
 import { agentIdSchema } from './schemas';
 import { activitySchema } from './execution-schemas';
 import { safeValue } from './execution-state';
+import { documentWorkspaceSchema } from '@/lib/documents/schemas';
 
 type Db = SupabaseClient<Database>;
 function checked<T>(data: T | null, error: { message: string } | null): T {
@@ -179,9 +180,12 @@ export class SupabaseAgentStore implements AgentStore {
       steps: calls.map((raw) => {
         const c = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
         const output = c.output && typeof c.output === 'object' && !Array.isArray(c.output) ? c.output : {};
+        const documents = documentWorkspaceSchema.safeParse(output.documents);
+        const ownedDocuments = documents.success && documents.data.ownerId===userId && documents.data.conversationId===conversationId ? documents.data : undefined;
         return { id: c.id, number: c.step, label: typeof c.tool === 'string' ? c.tool.replaceAll('_', ' ') : 'Catalog operation',
-          status: c.status, recordCount: Array.isArray(output.findings) ? output.findings.length : 0,
-          ...(c.status === 'failed' ? { error: 'This catalog operation could not be completed.' } : {}) };
+          status: c.status, recordCount: ownedDocuments ? c.tool==='get_document_requirements' ? ownedDocuments.requirements.length : ownedDocuments.documents.filter(d=>d.uploadStatus==='uploaded').length
+            : Array.isArray(output.findings) ? output.findings.length : 0,
+          ...(c.status === 'failed' ? { error: execution.agent==='document_coordination' ? 'This document operation could not be completed.' : 'This catalog operation could not be completed.' } : {}) };
       }), warnings: execution.warnings });
     return parsed.success ? parsed.data : undefined;
   }

@@ -1,4 +1,5 @@
 import { ZodError } from 'zod';
+import { authorizeDocumentTool } from '@/lib/documents/service';
 import { AgentError } from './errors';
 import { toolRegistry, toolAliases, type ToolContext, type ToolDependencies } from './tools';
 import { toolNameSchema, type ToolResult } from './schemas';
@@ -19,7 +20,9 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
     const definition = toolRegistry[name];
     if (call.version !== definition.version) throw new AgentError('TOOL_VERSION_UNSUPPORTED', 'This tool version is unavailable.');
     if (!context.userId || !definition.allowedAgents.includes(context.agent)) throw new AgentError('TOOL_DENIED', 'This agent cannot perform that action.');
-    if (['write', 'external', 'clinical'].includes(definition.mode)) throw new AgentError('TOOL_CONFIRMATION_REQUIRED', 'This action needs a separate authorized confirmation or professional review.');
+    if (['write', 'external', 'clinical'].includes(definition.mode)
+      && !(definition.mode === 'write' && authorizeDocumentTool(name,proposal.input,context.userId,context.documentAuthorization)))
+      throw new AgentError('TOOL_CONFIRMATION_REQUIRED', 'This action needs a separate authorized confirmation or professional review.');
     const parsed = definition.inputSchema.safeParse(proposal.input);
     if (!parsed.success || safeText(JSON.stringify(proposal.input)) !== JSON.stringify(proposal.input)) throw new AgentError('TOOL_INPUT_INVALID', 'The requested tool arguments are invalid.');
     call.validatedInput = safeValue(parsed.data);
@@ -45,7 +48,7 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
       try {
         const remaining = AGENT_LIMITS.runTimeoutMs - (Date.now() - state.started);
         const raw = await Promise.race([definition.execute(parsed.data, context, dependencies), new Promise<never>((_resolve, reject) => {
-          timer = setTimeout(() => reject(new AgentError('TOOL_TIMEOUT', 'This catalog operation took too long.')), Math.min(definition.timeoutMs, remaining));
+          timer = setTimeout(() => reject(new AgentError('TOOL_TIMEOUT', context.agent==='document_coordination' ? 'This document operation took too long.' : 'This catalog operation took too long.')), Math.min(definition.timeoutMs, remaining));
         })]);
         const valid = definition.outputSchema.safeParse(raw);
         if (!valid.success || safeText(JSON.stringify(raw)) !== JSON.stringify(raw)) throw new AgentError('TOOL_OUTPUT_INVALID', 'This tool returned an invalid result.');
@@ -57,6 +60,8 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
     // Case context stays in existing consent-controlled storage, not the new model observations.
     call.output = { ...output, caseContext: undefined };
     call.provenance = [
+      ...(output.documents ? [{ kind: 'user', recordIds: output.documents.documents.map(d=>d.id) },
+        ...output.documents.requirements.map(r=>({kind:r.source.kind,recordIds:[r.id]}))] : []),
       ...(output.research ? [{ kind: 'external_source', recordIds: output.research.sources.map(s => s.id) }] : []),
       ...['synthetic', 'external', 'first_party'].flatMap((kind) => {
         const ids = output!.findings.filter((f) => f.provenance.sourceKind === kind).map((f) => f.provenance.recordId);
@@ -67,11 +72,12 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
     state.failures++;
     call.status = 'failed';
     call.error = { code: error instanceof ZodError ? 'TOOL_OUTPUT_INVALID' : error instanceof AgentError ? error.code : 'TOOL_FAILURE',
-      message: error instanceof AgentError && error.code.startsWith('TOOL_') ? safeText(error.publicMessage).slice(0, 120) : 'This catalog operation could not be completed.' };
+      message: error instanceof AgentError && (error.code.startsWith('TOOL_') || context.agent==='document_coordination'&&error.code.startsWith('DOCUMENT_'))
+        ? safeText(error.publicMessage).slice(0, 120) : context.agent==='document_coordination' ? 'This document operation could not be completed.' : 'This catalog operation could not be completed.' };
   }
   call.endedAt = new Date().toISOString();
   const observation: ToolObservation = { id: call.id, tool: call.tool,
-    status: call.status === 'failed' ? 'failed' : call.status === 'reused' ? 'reused' : !output?.findings.length && !output?.research?.findings.length && !output?.requestedInformation && !output?.approvalRequired ? 'empty' : 'completed',
+    status: call.status === 'failed' ? 'failed' : call.status === 'reused' ? 'reused' : !output?.findings.length && !output?.research?.findings.length && !output?.documents && !output?.requestedInformation && !output?.approvalRequired ? 'empty' : 'completed',
     ...(output ? { data: { ...output, caseContext: undefined } } : {}), provenance: call.provenance,
     missingInformation: output?.analysis?.missingInformation ?? (output?.requestedInformation ? [output.requestedInformation] : []),
     warnings: output?.note ? [output.note] : [], error: call.error,

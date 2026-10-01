@@ -830,6 +830,114 @@ export type Database = {
         };
         Relationships: [];
       };
+      document_checklists: {
+        Row: {
+          id: string;
+          hospital_id: string;
+          service_id: string | null;
+          service_label: string | null;
+          source_kind: string;
+          source_label: string;
+          source_reference: string | null;
+          requirements: Json;
+          published: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          hospital_id: string;
+          service_id?: string | null;
+          service_label?: string | null;
+          source_kind: string;
+          source_label: string;
+          source_reference?: string | null;
+          requirements: Json;
+          published?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          hospital_id?: string;
+          service_id?: string | null;
+          service_label?: string | null;
+          source_kind?: string;
+          source_label?: string;
+          source_reference?: string | null;
+          requirements?: Json;
+          published?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      document_coordination_audit: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          owner_id: string;
+          revision: number;
+          action: string;
+          snapshot: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          owner_id: string;
+          revision: number;
+          action: string;
+          snapshot: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          owner_id?: string;
+          revision?: number;
+          action?: string;
+          snapshot?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      document_workspaces: {
+        Row: {
+          id: string;
+          owner_id: string;
+          conversation_id: string;
+          hospital_id: string;
+          service_id: string | null;
+          service_label: string;
+          revision: number;
+          data: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          owner_id: string;
+          conversation_id: string;
+          hospital_id: string;
+          service_id?: string | null;
+          service_label: string;
+          revision: number;
+          data: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          conversation_id?: string;
+          hospital_id?: string;
+          service_id?: string | null;
+          service_label?: string;
+          revision?: number;
+          data?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       healthcare_services: {
         Row: {
           id: string;
@@ -1503,6 +1611,7 @@ export type Database = {
       acquire_assistant_turn: { Args: { p_conversation_id: string; p_user_id: string; p_token: string }; Returns: boolean };
       release_assistant_turn: { Args: { p_conversation_id: string; p_token: string }; Returns: undefined };
       save_care_plan: { Args: { p_plan: Json; p_token: string }; Returns: undefined };
+      save_document_workspace: { Args: { p_workspace: Json; p_expected_revision: number; p_action: string }; Returns: undefined };
     };
     Enums: {
       case_lifecycle_status: "draft" | "intake" | "planning" | "awaiting_patient" | "awaiting_provider" | "in_progress" | "completed" | "cancelled";

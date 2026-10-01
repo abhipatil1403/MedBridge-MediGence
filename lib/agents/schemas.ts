@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { documentWorkspaceSchema, type DocumentWorkspace } from '@/lib/documents/schemas';
 import { researchResultSchema, type ResearchResult } from '@/lib/research/schemas';
 import { researchComparisonSchema } from './comparison/research';
 import { activitySchema, type RunActivity } from './execution-schemas';
@@ -9,9 +10,10 @@ import { compoundRequestSchema, type CompoundRequest } from '@/lib/orchestration
 import { patientCaseSchema, caseSummarySchema, caseHandoffSchema } from '@/lib/case/CaseSchema';
 import type { PatientCase, CaseSummary, CaseHandoff } from '@/lib/case/CaseTypes';
 
-export const agentIdSchema = z.enum(['discovery', 'treatment_planning', 'hospital_matching', 'comparison', 'research']);
+export const agentIdSchema = z.enum(['discovery', 'treatment_planning', 'hospital_matching', 'comparison', 'research', 'document_coordination']);
 export type AgentId = z.infer<typeof agentIdSchema>;
 export const toolNameSchema = z.enum([
+  'get_document_requirements', 'get_document_package', 'upload_document', 'match_document_to_requirement', 'remove_document', 'prepare_document_package', 'add_document_requirement',
   'research_healthcare_information', 'search_treatments', 'search_hospitals', 'search_doctors', 'search_packages', 'search_countries', 'search_services',
   'get_treatment', 'get_hospital', 'get_doctor', 'get_package', 'get_country', 'compare_treatment_options',
   'get_hospital_details', 'get_doctor_details', 'get_treatment_details', 'get_package_details', 'search_locations', 'check_requirements', 'compare_providers',
@@ -69,6 +71,7 @@ export interface Finding {
 }
 
 export interface ToolResult {
+  documents?: DocumentWorkspace;
   research?: ResearchResult;
   analysis?: { kind: 'derived'; recordIds: string[]; summary: string; complete: boolean; missingInformation: string[] };
   findings: Finding[];
@@ -85,7 +88,7 @@ export const findingSchema = z.object({ sourceKind: z.literal('medbridge_catalog
   requirementEvaluation: resultRequirementEvaluationSchema.optional(),
   href: z.string().optional(), facts: z.record(z.string(), z.union([z.string(), z.number(), z.null()])),
   matchType: z.enum(['exact', 'related']), matchReason: z.string().min(1), provenance: provenanceSchema });
-export const toolResultSchema = z.object({ research: researchResultSchema.optional(), analysis: z.object({ kind: z.literal('derived'), recordIds: z.array(z.guid()).max(30), summary: z.string().max(1600), complete: z.boolean(), missingInformation: z.array(z.string().max(300)).max(30) }).strict().optional(), findings: z.array(findingSchema).max(30), note: z.string().optional(),
+export const toolResultSchema = z.object({ documents: documentWorkspaceSchema.optional(), research: researchResultSchema.optional(), analysis: z.object({ kind: z.literal('derived'), recordIds: z.array(z.guid()).max(30), summary: z.string().max(1600), complete: z.boolean(), missingInformation: z.array(z.string().max(300)).max(30) }).strict().optional(), findings: z.array(findingSchema).max(30), note: z.string().optional(),
   comparison: z.record(z.string(), z.unknown()).optional(), caseContext: z.record(z.string(), z.unknown()).optional(),
   requestedInformation: z.string().optional(), approvalRequired: z.string().optional() }).strict();
 
@@ -213,6 +216,7 @@ export interface AgentTaskView {
 }
 
 export interface AgentResponse {
+  documents?: DocumentWorkspace;
   research?: ResearchResult;
   researchComparison?: z.infer<typeof researchComparisonSchema>;
   pendingClarification?: ReferenceClarification;
@@ -251,6 +255,7 @@ export interface AgentResponse {
 }
 
 export const assistantResponseSchema = z.object({
+  documents: documentWorkspaceSchema.optional(),
   research: researchResultSchema.optional(), researchComparison: researchComparisonSchema.optional(),
   pendingClarification: referenceClarificationSchema.optional(),
   activity: activitySchema.optional(),

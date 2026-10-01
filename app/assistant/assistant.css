@@ -143,6 +143,34 @@
 .assistant-research a { text-decoration: underline; }
 
 /* Presentation refinement: existing MedBridge palette, shell and interactions. */
+/* Document coordination uses the same assistant surfaces and native disclosures. */
+.assistant-documents { margin: 0 24px 24px; padding: 16px; border: 1px solid var(--line); background: #fbfcfa; border-radius: 4px; font-size: 14px; }
+.assistant-documents > summary { font-size: 15px; }
+.assistant-documents h3 { font-size: 16px; margin: 24px 0 12px; }
+.assistant-documents p { margin: 12px 0; overflow-wrap: anywhere; }
+.assistant-documents small { color: var(--muted); font-size: 12px; display: block; line-height: 1.6; }
+.assistant-documents form, .assistant-document-target { display: grid; gap: 12px; margin-top: 16px; }
+.assistant-documents label { display: grid; gap: 6px; font-size: 13px; }
+.assistant-documents select, .assistant-documents input:not([type=checkbox]) { width: 100%; min-width: 0; min-height: 44px; padding: 10px; border: 1px solid var(--line); background: white; color: var(--ink); font: inherit; }
+.assistant-documents button { min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); background: #edf2ea; color: var(--deep); font: inherit; cursor: pointer; line-height: 1.5; }
+.assistant-documents button:hover { background: #cfddcf; }
+.assistant-documents button:disabled { opacity: .6; cursor: default; }
+.assistant-document-checklist, .assistant-uploaded-documents { list-style: none; padding: 0; margin: 12px 0; }
+.assistant-document-checklist > li, .assistant-uploaded-documents > li { padding: 16px 0; border-bottom: 1px solid var(--line); display: grid; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.assistant-document-checklist > li > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.assistant-document-checklist span, .assistant-uploaded-documents > li > span { color: var(--teal); font-size: 12px; }
+.assistant-document-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.assistant-document-drop { padding: 16px; border: 1px dashed var(--teal); margin-block: 16px; }
+.assistant-document-drop p { margin-top: 0; }
+.assistant-document-drop input { padding: 8px 0 !important; border: 0 !important; background: transparent !important; }
+.assistant-document-checkbox { display: flex !important; align-items: flex-start; gap: 8px !important; margin-block: 12px; }
+.assistant-document-checkbox input { width: 18px; height: 18px; flex-shrink: 0; }
+.assistant-document-package { border-top: 2px solid var(--teal); padding-top: 8px; margin-top: 24px; }
+.assistant-document-notice { border-left: 2px solid var(--teal); padding: 12px; background: #f4f7f1; }
+.assistant-document-retention { font-size: 12px; color: var(--muted); }
+.assistant-documents progress { width: 100%; accent-color: var(--teal); }
+@media(max-width:700px) { .assistant-documents { margin-inline: 16px; padding: 12px; } .assistant-document-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); } .assistant-documents input[type=file] { font-size: 12px; } }
+@media(max-width:374px) { .assistant-document-actions { grid-template-columns: minmax(0,1fr); } }
 .assistant-page { padding-block: 32px 64px; }
 .assistant-page__head { margin-bottom: 24px; max-width: 780px; }
 .assistant-page__head .eyebrow { margin-bottom: 12px; }

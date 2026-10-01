@@ -58,7 +58,8 @@ export class ExecutionState {
     readonly request: string, public goal: string, private readonly store: AgentStore) {}
   activity(): RunActivity { return activitySchema.parse({ runId: this.runId, state: this.state, updatedAt: new Date().toISOString(),
     steps: this.calls.map((c) => ({ id: c.id, number: c.step, label: label(c.tool), status: c.status,
-      recordCount: (c.output?.findings.length ?? 0) + (c.output?.research?.findings.length ?? 0), ...(c.error ? { error: c.error.message } : {}) })), warnings: this.warnings.slice(0, 8) }); }
+      recordCount: c.output?.documents ? (c.tool === 'get_document_requirements' ? c.output.documents.requirements.length : c.output.documents.documents.filter(d => d.uploadStatus === 'uploaded').length)
+        : (c.output?.findings.length ?? 0) + (c.output?.research?.findings.length ?? 0), ...(c.error ? { error: c.error.message } : {}) })), warnings: this.warnings.slice(0, 8) }); }
   async persist(finalOutput?: unknown) {
     await this.store.saveExecutionState?.(this.runId, { version: '1', runId: this.runId, conversationId: this.conversationId,
       ownerId: this.ownerId, agent: this.agent, originalRequest: safeText(this.request), goal: safeText(this.goal), state: this.state,

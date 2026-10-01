@@ -87,6 +87,15 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
         },
       } }));
     }
+    if (/\b(?:document coordination|document checklist|organize (?:my |the )?documents|upload (?:my |the )?(?:documents|files)|prepare (?:a |the )?document package)\b/i.test(request.content)) {
+      return validateResponse(await runAgent({...request,conversationId},{...context,execution:{
+        plan:{agent:'document_coordination',understanding:'You requested administrative document coordination.',steps:[],missingInformation:null},
+        diagnostics:{workflow:'document_coordination'},
+        synthesis:{summary:'Choose the hospital and requested service in Documents below. Requirements must come from a documented source or be explicitly supplied by you. Uploaded content is not interpreted.',
+          question:'Which hospital and service are you organizing documents for?',nextSteps:['Select your hospital and requested service in Documents.']},
+        finalize:async response=>({...response,status:'awaiting_user_input'}),
+      }}));
+    }
     const draft = active?.context.patientCase;
     const hospitalGoal = /\b(?:find|search|look for)\b.*\bhospitals?\b|\bfind\b.*\bhospital\b/i.test(request.content);
     const continueCase = Boolean(draft && /^continue(?: with (?:my|this) case)?[.!]?$/i.test(request.content.trim()));

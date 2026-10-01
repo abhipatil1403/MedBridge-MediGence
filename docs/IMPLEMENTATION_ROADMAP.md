@@ -39,3 +39,12 @@ See [AI_AGENT_ARCHITECTURE.md](./AI_AGENT_ARCHITECTURE.md) for the loop, budgets
 ## External research milestone (2026-10-01)
 
 One controlled research tool extends the existing runtime. Explicit public/current information requests check internal catalog evidence first; successfully empty matching workflows can append targeted research. The initial reviewed official-page collection covers Mumbai knee/hip replacement and orthopedics. External evidence never creates a catalog provider or medical recommendation. Before widening coverage, review each source identity, retrieval behavior, privacy and evidence extraction. Pricing, conflict, injection, persistence and RLS gates are documented in [EXTERNAL_RESEARCH_AGENT_VALIDATION.md](EXTERNAL_RESEARCH_AGENT_VALIDATION.md). Case Intake and patient-data collection remain parked.
+
+
+## Administrative document coordination
+
+Implemented a vertical workflow inside the assistant: explicit hospital/service selection, sourced checklist, private PDF/JPEG/PNG uploads, filename-only suggestions, user-confirmed mappings, missing/optional states, duplicate warnings, replacements and owner-scoped revisioned package preparation. This extends the existing tool runtime and Supabase auth/storage rather than adding a separate file manager or medical interpretation system. Migration: `20261001090000_document_coordination.sql`.
+
+The first release stops at Ready to share. Future hospital delivery requires an actual provider integration, recipient/package ownership checks and a separate explicit confirmation. No generic medical checklist, clinical interpretation, diagnosis, treatment recommendation, DICOM processing or automatic hospital submission is included. Provider checklists must be explicitly configured or directly sourced; the bounded research collection may have no requirement coverage.
+
+Operational follow-ups: define retention/purge policy, malware scanning, provider checklist administration/review, expanded reviewed requirement-source coverage and an authenticated hospital delivery integration. Validate each independently before enabling real patient sharing. Current measured gates and limitations are in [DOCUMENT_COORDINATION_VALIDATION.md](DOCUMENT_COORDINATION_VALIDATION.md).

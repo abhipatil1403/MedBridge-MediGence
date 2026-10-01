@@ -47,3 +47,18 @@ See [AI_AGENT_ARCHITECTURE.md](./AI_AGENT_ARCHITECTURE.md) for the loop, budgets
 ## Request-driven external research
 
 An identified internal catalog evidence gap can authorize one bounded official-source research call in the existing execution loop. This is an authenticated user-request capability, not a recurring monitor. Source retrieval and deterministic evidence extraction cannot invoke tools or create providers. Existing output/action/run JSON records the external source IDs and timestamps. A failed or missing source leaves catalog results visible; conflicts remain unresolved. Refresh restores owned evidence without replaying retrieval. No notifications, sharing, bookings or patient collection are triggered. See [EXTERNAL_RESEARCH_AGENT_VALIDATION.md](EXTERNAL_RESEARCH_AGENT_VALIDATION.md).
+
+
+## Request-driven document coordination
+
+| User action | Registered operation | Boundary | Recorded evidence |
+|---|---|---|---|
+| Select hospital/service | `get_document_requirements` | Published configured checklist or explicitly attributed research; no invented checklist | Hospital/service IDs, requirement sources, conversation ownership |
+| Select/drop file | `upload_document` | Authenticated transport; validated format/size; private owner storage | SHA256, original filename/type/size, uploader/time, duplicate/version links |
+| Confirm category/change mapping | `match_document_to_requirement` | Exact user-confirmed file/requirement IDs; suggestions are not matches | Mapping and confirmation timestamp, revision audit |
+| Remove file/version | `remove_document` | Owner and exact user selection; prepared package invalidated | Removed metadata retained; stored bytes deleted, retry if storage fails |
+| Supply explicit requirement | `add_document_requirement` | User-supplied provenance; no model generation | Requested label/status/source/target and revision |
+| Review and prepare | `prepare_document_package` | Required documents confirmed, reviewed current revision | Ordered sourced manifest, actor/time, atomic audit |
+| Review sharing status | `get_document_package` | No connected hospital channel; no submission | Ready-to-share boundary, `submittedToProvider: false` |
+
+No reminder, background processing, clinical extraction, automatic sharing or retention schedule is introduced. Existing agent and external research automation rules retain their behavior.
