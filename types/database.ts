@@ -1307,6 +1307,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      provider_verification_runs: {
+        Row: {
+          id: string;
+          owner_id: string;
+          conversation_id: string;
+          provider_id: string;
+          provider_type: string;
+          completed_at: string;
+          report: Json;
+        };
+        Insert: {
+          id: string;
+          owner_id: string;
+          conversation_id: string;
+          provider_id: string;
+          provider_type: string;
+          completed_at: string;
+          report: Json;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          conversation_id?: string;
+          provider_id?: string;
+          provider_type?: string;
+          completed_at?: string;
+          report?: Json;
+        };
+        Relationships: [];
+      };
       source_records: {
         Row: {
           id: string;

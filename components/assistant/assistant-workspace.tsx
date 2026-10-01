@@ -1,6 +1,7 @@
 'use client';
 
 import { ResearchResults } from './research-results';
+import { VerificationResults } from './verification-results';
 import { DocumentPanel } from './document-panel';
 import { FindingsSummary, RequestUnderstanding } from './response-presentation';
 import { HospitalMatchResults } from './hospital-match-results';
@@ -206,7 +207,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
           <span>{message.role === 'user' ? 'You' : 'MedBridge'}</span>
           {message.role === 'assistant' && message.metadata?.response ? <ResponseBlocks response={message.metadata.response} approvalStatus={message.metadata.approvalStatus}
             onDecision={decideApproval} onRetry={latest?.runId === message.metadata.response.runId && latestRequest ? () => { void submitRequest(latestRequest); } : undefined}
-            disabled={busy} /> : <p>{message.content}</p>}
+            disabled={busy} onRequest={text=>{void submitRequest(text);}} /> : <p>{message.content}</p>}
         </article>)}
         {activity && !messages.some((message) => message.metadata?.response?.runId === activity.runId) && <ExecutionActivity activity={activity} />}
         {busy && !activity && <div className="assistant-working" role="status">Working on your request. Results and recorded task states will appear when the run finishes.</div>}
@@ -241,11 +242,11 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
 }
 
 function agentsLabel(agent: AgentResponse['agent']) {
-  return ({ discovery: 'Discovery agent', treatment_planning: 'Treatment planning agent', hospital_matching: 'Hospital matching agent', comparison: 'Comparison agent', research: 'Research agent', document_coordination: 'Document coordination agent' })[agent];
+  return ({ discovery: 'Discovery agent', treatment_planning: 'Treatment planning agent', hospital_matching: 'Hospital matching agent', comparison: 'Comparison agent', research: 'Research agent', document_coordination: 'Document coordination agent',provider_verification:'Provider verification agent' })[agent];
 }
 
-function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disabled }: { response: AgentResponse; approvalStatus?: string;
-  onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; onRetry?: () => void; disabled: boolean }) {
+function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, onRequest, disabled }: { response: AgentResponse; approvalStatus?: string;
+  onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; onRetry?: () => void; onRequest?:(content:string)=>void; disabled: boolean }) {
   return <div className="assistant-response">
     {response.activity && <ExecutionActivity activity={response.activity} />}
     <RequestUnderstanding response={response} />
@@ -264,6 +265,7 @@ function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, disable
       {response.comparison ? <ComparisonResults comparison={response.comparison} /> : response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : <FindingCards findings={response.findings} />}</div>
     {response.comparison && response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : null}
     {response.research && <ResearchResults result={response.research} comparison={response.researchComparison} />}
+    {response.verification && <VerificationResults result={response.verification} onRequest={onRequest} disabled={disabled} />}
     {response.analyses?.map((analysis, index) => <details className="assistant-evidence-review" key={index}><summary>CATALOG EVIDENCE REVIEW</summary><p>{analysis.summary}</p>
       {analysis.missingInformation.length > 0 && <ul>{analysis.missingInformation.map((gap, i) => <li key={i}>{gap}</li>)}</ul>}
       <small>Derived from {analysis.recordIds.length} sourced catalog records · {analysis.complete ? 'Evidence review completed' : 'Incomplete evidence'}</small></details>)}

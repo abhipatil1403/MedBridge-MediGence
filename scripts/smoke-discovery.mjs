@@ -14,14 +14,16 @@ for (const [kind, minimum] of Object.entries({ treatments: 20, hospitals: 15, do
 }
 
 const examples = [
+  // Procedure queries require an explicit treatment link. Generic country and
+  // recovery-service cards do not establish that relationship.
   ["I need knee replacement", "treatment", "knee-replacement", "treatments"],
   ["I want a cardiologist", "doctor", undefined, "doctors"],
   ["I need a second opinion", "second-opinion", undefined, "services"],
   ["Find hospitals in India", "hospital", undefined, "hospitals"],
-  ["Compare kidney transplant in India and Turkey", "comparison", "kidney-transplant", "countries"],
+  ["Compare kidney transplant in India and Turkey", "comparison", "kidney-transplant", "treatments"],
   ["I need cancer treatment", "treatment", "cancer-treatment", "treatments"],
   ["Find a hospital for spine surgery", "hospital", "brain-and-spine-surgery", "hospitals"],
-  ["I need physiotherapy after surgery", "recovery", "physiotherapy-after-surgery", "services"],
+  ["I need physiotherapy after surgery", "recovery", "physiotherapy-after-surgery", "treatments"],
 ];
 
 for (const [query, intent, procedure, kind] of examples) {
@@ -29,6 +31,7 @@ for (const [query, intent, procedure, kind] of examples) {
   assert.equal(status, 200, query);
   assert.equal(body.understanding.intent, intent, query);
   if (procedure) assert.equal(body.understanding.entities.procedure, procedure, query);
+  if (intent === 'comparison') assert.deepEqual(body.understanding.entities.countries, ['india', 'turkey']);
   assert.ok(body.sections[kind].length > 0, `${query} has no ${kind} results`);
 }
 

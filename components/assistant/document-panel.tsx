@@ -78,6 +78,7 @@ export function DocumentPanel({token,conversationId,disabled,onResponse}:{token:
       <button type="submit" disabled={locked||!hospital||!service.trim()}>Get requested documents</button>
     </form>:<>
       <div className="assistant-document-target-summary"><h3>{w.hospitalName}</h3><p>{w.serviceLabel}</p><small>Start a new conversation to select a different hospital/service.</small></div>
+      {Boolean(w.providerEvidence?.length)&&<details><summary>Saved provider/service evidence</summary><p>This supports the stated service only. Document requirements and the manifest remain governed by the checklist below.</p>{w.providerEvidence!.map((e,i)=><p key={i}><a href={e.source.url} target="_blank" rel="noopener noreferrer">{e.source.title}</a> · {e.snippet} · Retrieved {new Date(e.source.retrievedAt).toLocaleDateString()}</p>)}</details>}
       <h3>Documents requested</h3>
       {!w.requirements.length&&<p className="assistant-document-notice">Document requirements are not available for this hospital/service. No reliable document requirements were found. No checklist has been generated.</p>}
       <ul className="assistant-document-checklist">{w.requirements.map(r=>{

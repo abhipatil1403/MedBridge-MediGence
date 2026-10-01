@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { researchSourceSchema } from '@/lib/research/schemas';
 
 export const DOCUMENT_BUCKET = 'care-documents';
 // Keep uploads below Vercel's request-body limit, including multipart overhead.
@@ -26,12 +27,14 @@ export const documentPackageSchema = z.object({
   manifest: z.array(z.object({ requirement: documentRequirementSchema, document: uploadedDocumentSchema }).strict()).min(1).max(100),
 }).strict();
 export const documentWorkspaceSchema = z.object({
+  providerEvidence:z.array(z.object({field:z.enum(['services','treatments']),value:z.string().max(240),snippet:z.string().max(240),source:researchSourceSchema}).strict()).max(12).optional(),
   id: z.uuid(), ownerId: z.uuid(), conversationId: z.uuid(), hospitalId: z.uuid(), hospitalName: text,
   serviceId: z.uuid().nullable(), serviceLabel: text, revision: z.number().int().nonnegative(),
   requirements: z.array(documentRequirementSchema).max(30), documents: z.array(uploadedDocumentSchema).max(100),
   package: documentPackageSchema.optional(), requirementLookup: z.enum(['documented', 'unavailable']),
   researchNote: z.string().max(400).optional(), createdAt: z.iso.datetime(), updatedAt: z.iso.datetime(),
 }).strict().superRefine((w, ctx) => {
+  if(w.providerEvidence?.some(e=>e.source.entityId!==w.hospitalId||!e.snippet.includes(e.value)))ctx.addIssue({code:'custom',message:'Provider evidence must support this hospital and exact service statement'});
   if (new Set(w.requirements.map(r => r.id)).size !== w.requirements.length || new Set(w.documents.map(d => d.id)).size !== w.documents.length)
     ctx.addIssue({ code: 'custom', message: 'Document identities must be unique' });
   for (const r of w.requirements) if (r.hospitalId !== w.hospitalId || r.serviceLabel !== w.serviceLabel)

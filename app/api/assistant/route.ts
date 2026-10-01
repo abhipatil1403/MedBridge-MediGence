@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { SupabaseVerificationStore } from '@/lib/verification/store';
+import { defaultToolDependencies } from '@/lib/agents/tools';
 import { z } from 'zod';
 import { configuredProvider } from '@/lib/agents/cloudflare-provider';
 import { AgentError } from '@/lib/agents/errors';
@@ -84,6 +86,7 @@ export async function POST(request: NextRequest) {
       store: new SupabaseAgentStore(admin, userDb),
       planningStore: new SupabasePlanningStore(admin, userDb),
       provider: configuredProvider(),
+      tools:{...defaultToolDependencies,verificationStore:new SupabaseVerificationStore(admin,userDb)},
     });
     return NextResponse.json(response, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) { return errorResponse(error); }

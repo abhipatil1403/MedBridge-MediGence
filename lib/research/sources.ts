@@ -1,21 +1,15 @@
 import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
-import type { ResearchInput, ResearchSource } from './schemas';
+import type { ResearchInput } from './schemas';
+import { approvedSources, type ApprovedSource } from './collection';
+export { approvedSources, type ApprovedSource } from './collection';
 
 export const RESEARCH_LIMITS = { maxSources: 4, maxBytes: 650000, maxText: 24000, timeoutMs: 9000, redirects: 2 } as const;
 export function evidenceId(key: string) {
   const hex = createHash('sha256').update(key).digest('hex');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
-export interface ApprovedSource { url: string; provider: string; aliases: string[]; location: string; treatments: string[]; type: ResearchSource['sourceType'] }
-// Reviewed official pages, not search-engine snippets. Retrieval is still required for every fact.
-export const approvedSources: ApprovedSource[] = [
-  { url: 'https://www.kokilabenhospital.com/departments/centresofexcellence/centrefor_bonejoint.html', provider: 'Kokilaben Dhirubhai Ambani Hospital', aliases: ['Kokilaben', 'Kokilaben Hospital'], location: 'Mumbai', treatments: ['knee replacement', 'hip replacement', 'orthopedics'], type: 'official_provider' },
-  { url: 'https://www.nanavatimaxhospital.org/our-specialities/orthopaedics-joint-replacement', provider: 'Nanavati Max Super Speciality Hospital', aliases: ['Nanavati', 'Nanavati Max'], location: 'Mumbai', treatments: ['knee replacement', 'hip replacement', 'orthopedics'], type: 'official_provider' },
-  { url: 'https://www.apollohospitals.com/region/mumbai/procedures/total-knee-replacement-surgery/', provider: 'Apollo Hospitals Mumbai', aliases: ['Apollo', 'Apollo Hospitals'], location: 'Mumbai', treatments: ['knee replacement'], type: 'official_provider' },
-  { url: 'https://www.nanavatimaxhospital.org/our-specialities/knee-replacement-unit', provider: 'Nanavati Max Super Speciality Hospital', aliases: ['Nanavati', 'Nanavati Max'], location: 'Mumbai', treatments: ['knee replacement'], type: 'official_provider' },
-];
 export function selectSources(input: ResearchInput): ApprovedSource[] {
   const normalized = (v: string) => v.toLowerCase().replaceAll('-', ' ').trim();
   const treatment = normalized(input.treatment ?? input.specialty ?? '');
@@ -55,6 +49,7 @@ export function textFromHtml(html: string) {
 }
 export interface RetrievedPage { url: string; html: string; retrievedAt: string }
 export type ResearchRetriever = (source: ApprovedSource) => Promise<RetrievedPage>;
+export class SourceRetrievalError extends Error {constructor(readonly code:'rate_limit'|'source_unavailable'|'unsupported_source',message:string){super(message);}}
 export const retrieveOfficialPage: ResearchRetriever = async source => {
   let url = validateSourceUrl(source.url);
   const signal = AbortSignal.timeout(RESEARCH_LIMITS.timeoutMs);
@@ -67,7 +62,7 @@ export const retrieveOfficialPage: ResearchRetriever = async source => {
       url = validateSourceUrl(new URL(response.headers.get('location') ?? '', url).href); continue;
     }
     if (!response.ok || !response.headers.get('content-type')?.includes('text/html') || Number(response.headers.get('content-length')) > RESEARCH_LIMITS.maxBytes) {
-      await response.body?.cancel(); throw new Error('Source is unavailable or unsupported');
+      await response.body?.cancel(); throw new SourceRetrievalError(response.status===429?'rate_limit':!response.ok?'source_unavailable':'unsupported_source','Source is unavailable or unsupported');
     }
     const reader = response.body?.getReader(); if (!reader) throw new Error('Empty source');
     const decoder = new TextDecoder(); let html = '', count = 0;

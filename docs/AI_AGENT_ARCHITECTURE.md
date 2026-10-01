@@ -1,5 +1,9 @@
 # Agentic AI architecture
 
+## Provider factual verification (2 October 2026)
+
+ProviderVerificationAgent extends the existing registry and bounded execution loop with five scope-aware tools. Deterministic resolution uses the existing displayed-order reference resolver; exact server authorization prevents model-invented writes. The research collection/transport/source models provide exact attributed statements, strict entity identity, authority tiers and injection protections. Private immutable reports preserve internal values, external evidence, conflicts, dates and real history without updating catalog providers. ComparisonAgent consumes saved factual reports; Document Coordination can expose verified service sources while retaining its sourced checklist/manifest authority. See [PROVIDER_VERIFICATION.md](PROVIDER_VERIFICATION.md) for schemas, budgets, policy, security, coverage and measured validation.
+
 The AI layer is an auditable assistive workflow around clinical and commercial systems. It is not a clinical decision maker. The `/assistant` workspace uses a server-side Cloudflare Workers AI adapter, the existing bounded agent runtime, controlled tools, and explicitly synthetic catalog data. Production patient use still requires a separate privacy, clinical, and operational review.
 
 The current runtime lives in `lib/agents/`. It validates a model-generated plan, checks the selected agent's allowlist and each tool's Zod schema, executes catalog tools through the existing deterministic services, optionally plans a second bounded iteration, then validates synthesis. The run is limited to eight tool calls and eight bounded planning iterations. Cloudflare calls are server-side, time-limited, and retry malformed structured output once. No model has direct SQL or Supabase credentials.

@@ -1,5 +1,9 @@
 # Incremental implementation roadmap
 
+## Provider verification milestone (2 October 2026)
+
+Implemented ProviderVerificationAgent using the existing runtime, source collection, reference resolver and owner-scoped Supabase persistence. Migration `20261002090000_provider_verification.sql` stores immutable private evidence snapshots/history. The existing assistant exposes real evidence/refresh/history and factual comparison; document manifests retain their current truth boundary. No paid API or mandatory configuration was added. Future source expansion requires actual reviewed doctor/clinic/government/registry URLs and parser/security validation; broad crawling, clinical ranking, automatic catalog governance and inferred checklists remain outside this milestone. Optional freshness policy and operational retention choices are documented in [PROVIDER_VERIFICATION.md](PROVIDER_VERIFICATION.md).
+
 Each milestone has an acceptance gate. The foundation in this task provides only the global shell and architecture; later milestones should build vertically through UI, service, data, permissions and states. Priorities and dependencies are in [FEATURE_MATRIX.md](FEATURE_MATRIX.md).
 
 | Milestone | Deliverable | Exit criterion |

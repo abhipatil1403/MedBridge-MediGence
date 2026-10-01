@@ -1,4 +1,5 @@
 import { withResearchRecovery } from '@/lib/research/recovery';
+import { prepareVerification } from '@/lib/verification/agent';
 import { prepareResearchExecution, wantsExternalResearch } from '@/lib/research/agent';
 import { randomUUID } from 'node:crypto';
 import { QueryNormalizer } from '@/lib/discovery/query-normalizer';
@@ -112,6 +113,8 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
       return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
     }
     const snapshot = await loadDiscoverySnapshot(context.tools?.repository ?? defaultToolDependencies.repository);
+    const verificationExecution=prepareVerification({content:request.content,conversationId,userId:context.userId,recent,snapshot});
+    if(verificationExecution)return validateResponse(await runAgent({...request,conversationId},{...context,tools:{...(context.tools??defaultToolDependencies),evaluationSnapshot:snapshot},execution:verificationExecution}));
     let routingContent = wantsHandoff && continueCase ? draft!.pendingCoordinationRequest! : request.content;
     if (wantsHandoff) {
       // Only a single explicitly reported procedure may supply omitted search context.

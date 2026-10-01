@@ -7,6 +7,10 @@ import type { Database, Json } from '@/types/database';
 import { DOCUMENT_BUCKET, documentRequirementSchema, documentWorkspaceSchema, startDocumentsSchema, type DocumentRequirement, type DocumentWorkspace, type UploadedDocument } from './schemas';
 import { documentPath } from './coordination';
 import { researchDocumentRequirements } from './research';
+import { SupabaseVerificationStore } from '@/lib/verification/store';
+import { verifiedServiceSources } from '@/lib/verification/integration';
+import { ageVerificationReport } from '@/lib/verification/service';
+import { configuredFreshnessPolicy } from '@/lib/verification/policy';
 
 export interface DocumentStore {
   load(id: string, ownerId: string): Promise<DocumentWorkspace>;
@@ -53,9 +57,11 @@ export class SupabaseDocumentStore implements DocumentStore {
         source:{kind:row.source_kind,id:row.id,label:row.source_label,reference:row.source_reference ?? undefined} }));
     }
     if (!requirements.length) requirements.push(...await researchDocumentRequirements(hospital.id,hospital.name,input.serviceLabel));
+    let providerEvidence:ReturnType<typeof verifiedServiceSources>=[];
+    try{const report=(await new SupabaseVerificationStore(this.admin,this.user).history(ownerId,conversationId,hospital.id))[0];if(report)providerEvidence=verifiedServiceSources(ageVerificationReport(report,configuredFreshnessPolicy()),ownerId,conversationId,hospital.id,input.serviceLabel);}catch{/* Missing verification history does not change sourced document requirements. */}
     const now = new Date().toISOString();
     const w = documentWorkspaceSchema.parse({id:randomUUID(),ownerId,conversationId,hospitalId:hospital.id,hospitalName:hospital.name,
-      serviceId:input.serviceId ?? null,serviceLabel:input.serviceLabel,revision:0,requirements,documents:[],requirementLookup:requirements.length?'documented':'unavailable',createdAt:now,updatedAt:now});
+      serviceId:input.serviceId ?? null,serviceLabel:input.serviceLabel,revision:0,requirements,documents:[],providerEvidence,requirementLookup:requirements.length?'documented':'unavailable',createdAt:now,updatedAt:now});
     await this.save(w,-1,'selected_hospital_service'); return w;
   }
   async save(w: DocumentWorkspace, expectedRevision: number, action: string) {

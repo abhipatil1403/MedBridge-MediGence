@@ -10,6 +10,7 @@ export interface AgentDefinition {
 
 const common = ['research_healthcare_information', 'search_locations', 'check_requirements', 'compare_providers', 'get_case_context', 'request_user_information'] as const;
 export const agents: Record<AgentId, AgentDefinition> = {
+  provider_verification: {id:'provider_verification',name:'ProviderVerificationAgent',purpose:'Verify factual information using reviewed authoritative sources and preserve conflicts.',allowedTools:['verify_provider_information','refresh_provider_verification','get_provider_verification_status','get_provider_verification_history','compare_provider_evidence'],safety:'No diagnosis, suitability, clinical ranking or catalog mutation. Each supported field requires exact evidence. Server-bound provider and scope only.'},
   document_coordination: { id: 'document_coordination', name: 'DocumentCoordinationAgent', purpose: 'Organize explicitly sourced document requirements and user-confirmed files.',
     allowedTools: ['get_document_requirements','get_document_package','upload_document','match_document_to_requirement','remove_document','prepare_document_package','add_document_requirement'],
     safety: 'Administrative coordination only. Never interpret contents, diagnose, infer disease, recommend tests/treatment or decide clinical suitability. No invented checklist. No sharing integration exists. Writes require an exact authenticated user action.' },
@@ -33,7 +34,7 @@ export const agents: Record<AgentId, AgentDefinition> = {
   },
   comparison: {
     id: 'comparison', name: 'ComparisonAgent', purpose: 'Compare catalog options and available estimates.',
-    allowedTools: ['compare_treatment_options', 'search_treatments', 'search_countries', 'search_hospitals', 'search_packages', 'search_doctors', 'search_services', 'get_treatment', 'get_country', 'get_hospital', 'get_doctor', 'get_package', 'get_treatment_details', 'get_hospital_details', 'get_doctor_details', 'get_package_details', ...common],
+    allowedTools: ['compare_provider_evidence','compare_treatment_options', 'search_treatments', 'search_countries', 'search_hospitals', 'search_packages', 'search_doctors', 'search_services', 'get_treatment', 'get_country', 'get_hospital', 'get_doctor', 'get_package', 'get_treatment_details', 'get_hospital_details', 'get_doctor_details', 'get_package_details', ...common],
     safety: 'Separate catalog facts, estimates, missing data, and user-specific questions. Never fabricate costs.',
   },
 };

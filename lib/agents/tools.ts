@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { verificationToolSchemas, type VerificationTool } from '@/lib/verification/schemas';
+import { verifyProviderTool, type VerificationAuthorization } from '@/lib/verification/service';
+import type { VerificationStore } from '@/lib/verification/store';
 import { documentToolSchemas, type DocumentTool } from '@/lib/documents/schemas';
 import { coordinateDocument, documentWrites, type DocumentAuthorization } from '@/lib/documents/service';
 import type { DocumentStore } from '@/lib/documents/store';
@@ -43,6 +46,7 @@ const externalActionInput = z.object({ action: z.enum(['share_records', 'booking
 const analysisInput = z.object({ recordIds: z.array(z.guid()).min(1).max(10) }).strict();
 export const toolAliases = { get_hospital_details: 'get_hospital', get_doctor_details: 'get_doctor', get_treatment_details: 'get_treatment', get_package_details: 'get_package', search_locations: 'search_countries' } as const;
 export const toolSchemas = {
+  ...verificationToolSchemas,
   ...documentToolSchemas,
   research_healthcare_information: researchInputSchema,
   get_hospital_details: slugInput, get_doctor_details: slugInput, get_treatment_details: slugInput, get_package_details: slugInput,
@@ -57,6 +61,11 @@ export const toolSchemas = {
 } satisfies Record<ToolName, z.ZodType>;
 
 export const toolDescriptions: Record<ToolName, string> = {
+  verify_provider_information:'Verify resolved provider factual fields against approved authoritative evidence. Save a private immutable report. No catalog mutation.',
+  refresh_provider_verification:'Recheck resolved provider fields with new retrieval, bypassing the saved report cache.',
+  get_provider_verification_status:'Read the latest owner-scoped saved verification and exact field evidence.',
+  get_provider_verification_history:'Read real saved verification runs for this conversation and provider.',
+  compare_provider_evidence:'Compare saved factual field values and conflicts without clinical ranking.',
   get_document_requirements: 'Read the selected hospital/service checklist with explicit source attribution. No inferred requirements.',
   get_document_package: 'Read the owner-scoped document workspace and current package.',
   upload_document: 'Upload a server-validated file from an explicit user file selection; no content processing.',
@@ -102,16 +111,17 @@ export interface ToolDefinition {
 }
 const protectedTools = new Set<ToolName>(['get_case_context', 'get_case_documents_metadata', 'update_case']);
 const proposedTools = new Set<ToolName>(['create_case', 'update_case', 'create_agent_task', 'request_external_action']);
+const verificationWrites = new Set<ToolName>(['verify_provider_information','refresh_provider_verification']);
 export const toolRegistry = Object.fromEntries((Object.keys(toolSchemas) as ToolName[]).map((name) => [name, {
   id: name, displayName: name.replaceAll('_', ' '),
   category: Object.hasOwn(documentToolSchemas,name) ? 'coordination' : name === 'research_healthcare_information' ? 'research' : ['check_requirements', 'compare_providers'].includes(name) ? 'analysis' : name.includes('case') ? 'case' : name.startsWith('search_') || name.startsWith('get_') || name === 'compare_treatment_options' ? 'catalog' : 'coordination',
-  permission: documentWrites.has(name as DocumentTool) ? 'confirmation' : proposedTools.has(name) ? 'confirmation' : protectedTools.has(name) ? 'case_consent' : 'read',
-  mode: documentWrites.has(name as DocumentTool) ? 'write' : proposedTools.has(name) ? 'proposal' : name === 'request_user_information' ? 'ask' : 'read',
+  permission: documentWrites.has(name as DocumentTool) || verificationWrites.has(name) ? 'confirmation' : proposedTools.has(name) ? 'confirmation' : protectedTools.has(name) ? 'case_consent' : 'read',
+  mode: documentWrites.has(name as DocumentTool) || verificationWrites.has(name) ? 'write' : proposedTools.has(name) ? 'proposal' : name === 'request_user_information' ? 'ask' : 'read',
   provenance: Object.hasOwn(documentToolSchemas,name) ? ['hospital','provider_configured','external','user'] : ['catalog', 'synthetic', 'external', 'user', 'derived'], timeoutMs: AGENT_LIMITS.toolTimeoutMs, failureHandling: 'observe_and_recover',
   execute: async (input: unknown, context: ToolContext, dependencies?: ToolDependencies) => toolResultSchema.parse(await executeTool(name, input, context, dependencies)),
   name, version: '1', description: toolDescriptions[name], inputSchema: toolSchemas[name], outputSchema: toolResultSchema,
   authorization: protectedTools.has(name) ? 'case_consent' : 'authenticated',
-  sideEffect: documentWrites.has(name as DocumentTool) ? 'write' : name === 'request_user_information' ? 'ask' : proposedTools.has(name) ? 'propose' : 'read',
+  sideEffect: documentWrites.has(name as DocumentTool) || verificationWrites.has(name) ? 'write' : name === 'request_user_information' ? 'ask' : proposedTools.has(name) ? 'propose' : 'read',
   allowedAgents: (Object.keys(agents) as AgentId[]).filter((agent) => agents[agent].allowedTools.includes(name)),
 }])) as unknown as Record<ToolName, ToolDefinition>;
 
@@ -120,6 +130,7 @@ export interface CaseAccess {
   readDocumentMetadata(caseId: string): Promise<Record<string, unknown>[]>;
 }
 export interface ToolContext {
+  verificationAuthorization?: VerificationAuthorization;
   documentAuthorization?: DocumentAuthorization;
   researchAuthorization?: ResearchAuthorization;
   referenceBoundary?: import('./runtime').ToolContextReferenceBoundary;
@@ -130,6 +141,7 @@ export interface ToolContext {
   observedRecordIds?: readonly string[];
 }
 export interface ToolDependencies {
+  verificationStore?: VerificationStore;
   documentStore?: DocumentStore;
   researchRetrieve?: ResearchRetriever;
   requirements?: import('@/lib/requirements/RequirementTypes').Requirement[];
@@ -196,6 +208,7 @@ export async function executeTool(name: ToolName, rawInput: unknown, context: To
   if (!validated.success) throw new AgentError('TOOL_INPUT_INVALID', 'The assistant requested invalid search information.');
   const input = validated.data as Record<string, string> & { budget?: number };
   if (!context.userId) throw new AgentError('AUTH_REQUIRED', 'Sign in to use catalog tools.');
+  if(Object.hasOwn(verificationToolSchemas,name))return {findings:[],verification:await verifyProviderTool(name as VerificationTool,rawInput,context.userId,context.verificationAuthorization,dependencies.verificationStore,dependencies.evaluationSnapshot??await loadDiscoverySnapshot(dependencies.repository),dependencies.researchRetrieve)};
   if (safeText(JSON.stringify(rawInput)) !== JSON.stringify(rawInput)) throw new AgentError('TOOL_INPUT_INVALID', 'Credentials cannot be used as tool arguments.');
   if (Object.hasOwn(documentToolSchemas,name)) return { findings: [], documents: await coordinateDocument(name as DocumentTool,rawInput,context.userId,context.documentAuthorization,dependencies.documentStore) };
   if (name === 'research_healthcare_information') {

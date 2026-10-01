@@ -1,4 +1,6 @@
 import { ZodError } from 'zod';
+import { authorizeVerification } from '@/lib/verification/service';
+import { verificationToolSchemas } from '@/lib/verification/schemas';
 import { authorizeDocumentTool } from '@/lib/documents/service';
 import { AgentError } from './errors';
 import { toolRegistry, toolAliases, type ToolContext, type ToolDependencies } from './tools';
@@ -21,11 +23,12 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
     if (call.version !== definition.version) throw new AgentError('TOOL_VERSION_UNSUPPORTED', 'This tool version is unavailable.');
     if (!context.userId || !definition.allowedAgents.includes(context.agent)) throw new AgentError('TOOL_DENIED', 'This agent cannot perform that action.');
     if (['write', 'external', 'clinical'].includes(definition.mode)
-      && !(definition.mode === 'write' && authorizeDocumentTool(name,proposal.input,context.userId,context.documentAuthorization)))
+      && !(definition.mode === 'write' && (authorizeDocumentTool(name,proposal.input,context.userId,context.documentAuthorization)||authorizeVerification(name,proposal.input,context.userId,context.verificationAuthorization))))
       throw new AgentError('TOOL_CONFIRMATION_REQUIRED', 'This action needs a separate authorized confirmation or professional review.');
     const parsed = definition.inputSchema.safeParse(proposal.input);
     if (!parsed.success || safeText(JSON.stringify(proposal.input)) !== JSON.stringify(proposal.input)) throw new AgentError('TOOL_INPUT_INVALID', 'The requested tool arguments are invalid.');
     call.validatedInput = safeValue(parsed.data);
+    if(Object.hasOwn(verificationToolSchemas,name)&&!authorizeVerification(name,parsed.data,context.userId,context.verificationAuthorization))throw new AgentError('VERIFICATION_ACTION_DENIED','Provider verification requires a resolved authenticated request.');
     const reference = context.referenceBoundary;
     if (reference && (reference.status !== 'resolved' || !reference.allowedCalls.some(c => c.tool === name && canonicalInput(c.input) === canonicalInput(parsed.data))))
       throw new AgentError('REFERENCE_TOOL_BLOCKED', 'Identify the referenced result before continuing.');
@@ -60,6 +63,7 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
     // Case context stays in existing consent-controlled storage, not the new model observations.
     call.output = { ...output, caseContext: undefined };
     call.provenance = [
+      ...(output.verification?.report?[{kind:'external_source',recordIds:output.verification.report.sources.map(s=>s.id)}]:[]),
       ...(output.documents ? [{ kind: 'user', recordIds: output.documents.documents.map(d=>d.id) },
         ...output.documents.requirements.map(r=>({kind:r.source.kind,recordIds:[r.id]}))] : []),
       ...(output.research ? [{ kind: 'external_source', recordIds: output.research.sources.map(s => s.id) }] : []),
@@ -77,7 +81,7 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
   }
   call.endedAt = new Date().toISOString();
   const observation: ToolObservation = { id: call.id, tool: call.tool,
-    status: call.status === 'failed' ? 'failed' : call.status === 'reused' ? 'reused' : !output?.findings.length && !output?.research?.findings.length && !output?.documents && !output?.requestedInformation && !output?.approvalRequired ? 'empty' : 'completed',
+    status: call.status === 'failed' ? 'failed' : call.status === 'reused' ? 'reused' : !output?.findings.length && !output?.research?.findings.length && !output?.documents && !output?.verification && !output?.requestedInformation && !output?.approvalRequired ? 'empty' : 'completed',
     ...(output ? { data: { ...output, caseContext: undefined } } : {}), provenance: call.provenance,
     missingInformation: output?.analysis?.missingInformation ?? (output?.requestedInformation ? [output.requestedInformation] : []),
     warnings: output?.note ? [output.note] : [], error: call.error,

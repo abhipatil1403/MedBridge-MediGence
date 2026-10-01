@@ -1,5 +1,9 @@
 # Automation map
 
+## Provider Verification Agent
+
+Explicit verify/field/recheck requests resolve a provider through existing structured conversation references, then execute `verify_provider_information` or `refresh_provider_verification` in the shared authenticated runtime. Exact user action authorizes only a private evidence snapshot; no catalog mutation or provider selection occurs. Status/history are read-only registered tools. `compare_provider_evidence` runs under ComparisonAgent, reads real owned reports and supplies no clinical ranking. Source calls are bounded, deduplicated and selectively retried; refresh bypasses the evidence cache. Freshness is projected on reads under an optional central policy. There are no scheduled verifications, background source monitors, automatic catalog writes or clinical decisions. See [PROVIDER_VERIFICATION.md](PROVIDER_VERIFICATION.md).
+
 Implemented ComparisonAgent is request-driven. Comparison intent selects two independent catalog search contexts; task completion records actual tool outcomes, and a separate review remains for the user. Identical completed inputs reuse saved results, and failed inputs can be retried on the next request while preserving the successful side. Budget updates refresh affected package inputs. No provider contact, booking, outbound notification, currency conversion or clinical decision is triggered by a comparison.
 
 Automations are event-driven service workflows with an owner, idempotency key, audit event and retry/dead-letter behavior. An AI draft is not an action. Rules and notifications must reflect persisted state; deadlines are configured by service and jurisdiction, not borrowed from marketing claims.
