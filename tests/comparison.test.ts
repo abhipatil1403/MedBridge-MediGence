@@ -10,6 +10,21 @@ import { assistantResponseSchema, comparisonSchema } from '@/lib/agents/schemas'
 import type { ToolDependencies } from '@/lib/agents/tools';
 
 describe('ComparisonAgent normalization, orchestration and sourced output', () => {
+  it('saves a contextual comparison using cached search results without unsolicited model analysis', async () => {
+    const generateStructured = vi.fn(async (request: { purpose: string }) => {
+      if (request.purpose === 'observe') return { action: 'call_tool', tool: 'compare_providers', version: '1', input: JSON.stringify({ recordIds: [randomUUID()] }), question: null };
+      throw new Error('Model unavailable in this regression');
+    });
+    const h = harness({ generateStructured: async request=>request.schema.parse(await generateStructured(request)) });
+    const first = await h.send('I need knee replacement in Mumbai.');
+    const comparison = await h.send('Compare it with Pune.', first.conversationId);
+    expect(comparison.status).toBe('completed');
+    expect(comparison.comparison?.sides.map(side=>side.option.value)).toEqual(['Mumbai', 'Pune']);
+    const saved = await h.planningStore.load(first.conversationId, userId);
+    expect(saved?.tasks.some(task=>task.comparison?.id === comparison.comparison?.id && task.status === 'completed')).toBe(true);
+    expect(comparison.tasks.some(task=>task.tool === 'compare_providers')).toBe(false);
+    expect(generateStructured.mock.calls.some(([request])=>request.purpose === 'observe')).toBe(false);
+  });
   it.each([
     ['Compare knee replacement in Pune and Mumbai.', ['Pune', 'Mumbai'], ['hospitals', 'packages']],
     ['Compare knee replacement in Mumbai and Pune.', ['Mumbai', 'Pune'], ['hospitals', 'packages']],

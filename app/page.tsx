@@ -1,64 +1,27 @@
-import { ArrowRight, ArrowUpRight } from "lucide-react";
-import Link from "next/link";
-import { CompareForm } from "@/components/compare-form";
-import { DemoNotice } from "@/components/demo-notice";
-import { ReportPicker } from "@/components/discovery/report-picker";
-import { SearchBox } from "@/components/discovery/search-box";
-import { getHomepageCatalog } from "@/lib/catalog/homepage-service";
+import { ArrowRight, ArrowUpRight } from 'lucide-react';
+import Link from 'next/link';
+import { DemoNotice } from '@/components/demo-notice';
+import { SearchPrompt } from '@/components/search-prompt';
+import { getHomepageCatalog } from '@/lib/catalog/homepage-service';
 
-export const dynamic = "force-dynamic";
-
-const examples = [
-  "I need a second opinion for spine surgery",
-  "Find hospitals for knee replacement in India",
-  "Compare cancer treatment in India and Turkey",
-  "Find a cardiologist for my father",
-  "How much does kidney transplant treatment cost?",
-];
-
-const quickServices = [
-  ["Treatments", "/treatments", "Explore care categories"],
-  ["Hospitals", "/hospitals", "Compare sample providers"],
-  ["Doctors", "/doctors", "Find specialist profiles"],
-  ["Compare", "/compare", "Review destinations"],
-  ["Second Opinion", "/second-opinion", "Prepare for review"],
-  ["Video Consultation", "/consultation", "Explore appointments"],
-  ["Packages", "/packages", "See itemized examples"],
-  ["Medical Travel", "/medical-travel", "Plan the journey"],
-  ["Recovery", "/recovery", "Continue care"],
-] as const;
-
-const journey = [
-  { step: "01", name: "Plan", description: "Find the care question, review options, and prepare a decision with a professional.", links: [["Discover treatment", "/treatments"], ["Compare destinations", "/compare"], ["Find hospitals", "/hospitals"], ["Find doctors", "/doctors"], ["Get second opinion", "/second-opinion"]] },
-  { step: "02", name: "Treat", description: "Connect provider choice, consultation, package terms, and travel logistics.", links: [["Select provider", "/hospitals"], ["Consultation", "/consultation"], ["Treatment package", "/packages"], ["Medical travel", "/medical-travel"], ["Hospital coordination", "/treatment-plan"]] },
-  { step: "03", name: "Recover", description: "Keep rehabilitation, follow-up, and handover visible after treatment.", links: [["Recovery plan", "/recovery"], ["Rehabilitation", "/discover?q=rehabilitation"], ["Follow-up", "/consultation"], ["Local doctor handover", "/recovery"], ["Ongoing support", "/recovery"]] },
-] as const;
+export const dynamic = 'force-dynamic';
+const explore = [['Treatments','/treatments'],['Hospitals','/hospitals'],['Doctors','/doctors'],['Packages','/packages'],['Compare destinations','/compare'],['Second opinion','/second-opinion'],['Medical travel','/medical-travel'],['Recovery','/recovery']] as const;
+const help = [['Understand','Turn a complex request into a clear starting point.'],['Explore','Find relevant treatments, providers and services.'],['Verify','See what the available sources actually support.'],['Move forward','Organize requirements and prepare your next step.']] as const;
+const prompts = [['Find hospitals','Find hospitals for knee replacement in Mumbai.'],['Compare destinations','Compare knee replacement in India and Turkey.'],['Check provider information','Verify contact information for Kokilaben Dhirubhai Ambani Hospital in Mumbai.'],['Prepare documents','Organize documents for a hospital.']] as const;
 
 export default async function Home() {
-  const { treatments, hospitals, doctors, countries } = await getHomepageCatalog();
+  const { treatments, hospitals } = await getHomepageCatalog();
   return <main id="main-content" tabIndex={-1} className="home-page">
-    <section className="home-hero" aria-labelledby="home-title"><div className="container home-hero__grid">
-      <div><p className="eyebrow">YOUR CARE, MORE CLEARLY CONNECTED</p><h1 id="home-title">Tell us what you need. We&apos;ll help plan the care.</h1><p className="home-hero__lead">Explore treatments, doctors, hospitals, costs and care options in one place.</p></div>
-      <div className="home-hero__visual" aria-hidden="true"><span>01 / DISCOVER</span><div className="home-hero__line"><i /><i /><i /></div><p>A question becomes a clearer next step.</p></div>
-      <div className="home-hero__search"><SearchBox label="What care are you looking for?" prominent /><div className="home-hero__tools"><ReportPicker /><span>Voice search is not available yet.</span></div>
-        <div className="home-examples"><strong>Try a search</strong><div>{examples.map((example) => <Link key={example} href={`/discover?q=${encodeURIComponent(example)}`}>{example} <ArrowUpRight size={14} aria-hidden="true" /></Link>)}</div></div>
-      </div>
-    </div></section>
-
-    <section className="home-services section-block" aria-labelledby="services-title"><div className="container"><div className="home-section-heading"><div><p className="eyebrow">FIND YOUR STARTING POINT</p><h2 id="services-title">Explore care services</h2></div><p>Move from a question to the next relevant part of your care journey.</p></div><div className="service-grid">{quickServices.map(([name, href, description], index) => <Link href={href} className="service-grid__item" key={href}><span>{String(index + 1).padStart(2, "0")}</span><strong>{name}</strong><small>{description}</small><ArrowUpRight size={19} aria-hidden="true" /></Link>)}</div></div></section>
-
-    <section className="home-journey section-block" aria-labelledby="journey-title"><div className="container"><div className="home-section-heading"><div><p className="eyebrow">ONE CONNECTED PATH</p><h2 id="journey-title">Plan → Treat → Recover</h2></div><p>Explore each stage without losing sight of what comes after it.</p></div><div className="journey-track">{journey.map((stage) => <article key={stage.step} className="journey-stage"><div className="journey-stage__head"><span>{stage.step}</span><h3>{stage.name}</h3></div><p>{stage.description}</p><ul>{stage.links.map(([label, href]) => <li key={label}><Link href={href}>{label}<ArrowRight size={15} aria-hidden="true" /></Link></li>)}</ul></article>)}</div></div></section>
-
-    <section className="home-treatments section-block" aria-labelledby="popular-title"><div className="container"><div className="home-section-heading"><div><p className="eyebrow">TREATMENT DISCOVERY</p><h2 id="popular-title">Popular treatment topics</h2></div><Link className="text-link" href="/treatments">Browse all treatments <ArrowRight size={16} /></Link></div><DemoNotice compact /><div className="treatment-grid">{treatments.map((item, index) => <Link key={item.slug} href={`/treatments/${item.slug}`}><span>{String(index + 1).padStart(2, "0")} / {item.specialty}</span><strong>{item.name}</strong><ArrowUpRight size={18} aria-hidden="true" /></Link>)}</div></div></section>
-
-    <section className="home-providers section-block" aria-labelledby="hospitals-title"><div className="container"><div className="home-section-heading"><div><p className="eyebrow">PROVIDER DISCOVERY</p><h2 id="hospitals-title">Explore sample hospitals</h2></div><Link className="text-link" href="/hospitals">Browse hospitals <ArrowRight size={16} /></Link></div><div className="provider-list">{hospitals.map((item) => <article className="provider-row" key={item.slug}><div><span className="result-kicker">DEMO HOSPITAL · {item.city}, {item.country}</span><h3><Link href={`/hospitals/${item.slug}`}>{item.name}</Link></h3><p>{item.specialties.slice(0, 4).join(" · ")}</p><small>{item.treatmentSlugs.length} sample procedures · {item.sampleBedCount} sample beds · {item.sampleAccreditation} · {item.verification}</small></div><div><Link className="result-action" href={`/hospitals/${item.slug}`}>View hospital <ArrowRight size={16} /></Link><Link href={`/treatment-plan?hospital=${item.slug}`}>Prepare planning brief</Link></div></article>)}</div></div></section>
-
-    <section className="home-doctors section-block" aria-labelledby="doctors-title"><div className="container"><div className="home-section-heading"><div><p className="eyebrow">CLINICIAN DISCOVERY</p><h2 id="doctors-title">Find a sample specialist</h2></div><Link className="text-link" href="/doctors">Browse doctors <ArrowRight size={16} /></Link></div><div className="doctor-grid">{doctors.map((item) => <article key={item.slug}><span className="result-kicker">DEMO CLINICIAN · {item.verification}</span><h3>{item.name}</h3><p>{item.specialty}</p><dl><div><dt>Hospital</dt><dd>{item.hospitalName}</dd></div><div><dt>Location</dt><dd>{item.city}, {item.country}</dd></div><div><dt>Experience</dt><dd>{item.sampleExperienceYears} sample years</dd></div><div><dt>Languages</dt><dd>{item.languages.join(", ")}</dd></div><div><dt>Consultation</dt><dd>{item.consultationMode}</dd></div></dl><Link className="result-action" href={`/doctors/${item.slug}`}>View profile <ArrowRight size={16} /></Link></article>)}</div></div></section>
-
-    <section className="home-compare section-block" aria-labelledby="compare-title"><div className="container home-compare__grid"><div><p className="eyebrow">COUNTRY COMPARISON</p><h2 id="compare-title">Place the options side by side.</h2><p>Choose a treatment and two countries to compare sample costs, provider options, stay and travel considerations.</p><DemoNotice compact /></div><CompareForm treatments={treatments} countries={countries} /></div></section>
-
-    <section className="home-opinion section-block" aria-labelledby="opinion-title"><div className="container home-opinion__grid"><div><p className="eyebrow">INDEPENDENT REVIEW</p><h2 id="opinion-title">A second opinion starts with a complete picture.</h2><p>Share the diagnosis or concern, organize medical records, select a specialty, and request professional review. Any final opinion must come from a qualified clinician.</p><Link className="button button--primary button--default" href="/second-opinion">Get a Second Opinion <ArrowUpRight size={17} /></Link></div><ol><li><span>01</span>Upload medical records</li><li><span>02</span>Share diagnosis or question</li><li><span>03</span>Select specialty</li><li><span>04</span>Request professional review</li><li><span>05</span>Receive a structured opinion</li></ol></div></section>
-
-    <section className="home-final section-block" aria-labelledby="final-title"><div className="container home-final__grid"><div><p className="eyebrow">START WITH YOUR QUESTION</p><h2 id="final-title">Not sure where to start?</h2><p>Describe what you need in your own words. MedBridge will look for matching treatment topics, sample providers, services and destinations.</p></div><SearchBox label="Describe your need" buttonLabel="Find My Options" prominent /></div></section>
+    <section className="invitation container" aria-labelledby="home-title">
+      <div className="invitation__copy"><p className="eyebrow">YOUR HEALTHCARE JOURNEY</p><h1 id="home-title">Tell us what you’re<br className="desktop-break" /> trying to <em>figure out.</em></h1><p className="invitation__lead">Describe your treatment, location, budget or question. MedBridge helps organize the information and next steps.</p><SearchPrompt id="home-request" /><div className="suggested-prompts" aria-label="Suggested requests">{prompts.map(([label,question]) => <Link key={label} href={`/assistant?q=${encodeURIComponent(question)}`}>{label}<ArrowUpRight size={14} aria-hidden="true" /></Link>)}</div><p className="invitation__scope">Discovery uses synthetic examples; public source checks are separate. Medical decisions stay with a qualified professional.</p></div>
+      <aside className="request-path" aria-label="How MedBridge helps with a request"><p className="eyebrow">FROM QUESTION TO CLARITY</p><p className="request-path__question">“Where do I<br />start?”</p><ol>{['Understand the request','Research available options','Verify the evidence','Organize the next step'].map((item,index)=><li key={item}><span>0{index+1}</span>{item}</li>)}</ol><span className="request-path__note">A way to work through your question.<br />Each request uses only relevant steps.</span></aside>
+    </section>
+    <section className="help-section container" aria-labelledby="help-title"><div className="editorial-heading"><p className="eyebrow">A CLEARER WAY THROUGH</p><h2 id="help-title">Complex questions.<br />More manageable steps.</h2></div><div className="help-concepts">{help.map(([title,description],index)=><article key={title}><span>0{index+1}</span><h3>{title}</h3><p>{description}</p></article>)}</div></section>
+    <section className="explore-room" aria-labelledby="explore-title"><div className="container explore-room__grid"><div><p className="eyebrow">EXPLORE</p><h2 id="explore-title">Find your<br />starting point.</h2><p>Browse a topic, meet the information behind a provider, or place destinations side by side.</p><Link className="text-link" href="/discover">Explore all care options <ArrowRight size={17} aria-hidden="true" /></Link></div><nav className="explore-index" aria-label="Explore care">{explore.map(([label,href])=><Link href={href} key={href}>{label}<ArrowUpRight size={21} aria-hidden="true" /></Link>)}</nav></div></section>
+    <section className="journey-editorial container" aria-labelledby="journey-title"><p className="eyebrow">KEEP THE WHOLE JOURNEY IN VIEW</p><h2 id="journey-title">One step informs the next.</h2><div>{[['Plan','Understand what you need.','Care Workspace','/assistant'],['Treat','Explore and compare care options.','Explore providers','/hospitals'],['Recover','Prepare for continuity after care.','Recovery pathway','/recovery']].map(([name,copy,label,href],index)=><article key={name}><span className="journey-editorial__number">0{index+1}</span><h3>{name}</h3><p>{copy}</p><Link href={href}>{label}<ArrowRight size={16} aria-hidden="true" /></Link></article>)}</div></section>
+    <section className="curated-topics container" aria-labelledby="topics-title"><div className="editorial-heading"><div><p className="eyebrow">TREATMENT AREAS</p><h2 id="topics-title">Begin with a topic.</h2></div><Link className="text-link" href="/treatments">Explore all treatments <ArrowRight size={17} aria-hidden="true" /></Link></div><div className="topic-index">{treatments.slice(0,8).map(item=><Link key={item.slug} href={`/treatments/${item.slug}`}><span>{item.specialty}</span><strong>{item.name}</strong><ArrowUpRight size={19} aria-hidden="true" /></Link>)}</div><p className="editorial-note">Treatment content is for exploration and has not been clinically reviewed.</p></section>
+    <section className="curated-providers container" aria-labelledby="providers-title"><div className="editorial-heading"><div><p className="eyebrow">PROVIDERS TO EXPLORE</p><h2 id="providers-title">Look beyond a name.</h2></div><Link className="text-link" href="/hospitals">Explore all hospitals <ArrowRight size={17} aria-hidden="true" /></Link></div><DemoNotice compact /><div className="provider-selection">{hospitals.slice(0,3).map(item=><article key={item.slug}><span className="result-kicker">{item.city}, {item.country}</span><h3><Link href={`/hospitals/${item.slug}`}>{item.name}</Link></h3><p>{item.specialties.slice(0,3).join(' · ')}</p><span className="editorial-note">Synthetic provider · not verified</span><Link className="result-action" href={`/hospitals/${item.slug}`}>View hospital <ArrowUpRight size={16} aria-hidden="true" /></Link></article>)}</div></section>
+    <section className="evidence-story" aria-labelledby="trust-title"><div className="container evidence-story__grid"><div><p className="eyebrow">CLARITY INCLUDES UNCERTAINTY</p><h2 id="trust-title">Know what’s supported.<br /><em>See what’s still missing.</em></h2></div><div><p>Provider information is only as useful as the evidence behind it. The workspace keeps source statements, check dates and unresolved details close to the answer.</p><p>Our discovery catalog uses labelled synthetic examples. Public source checks are separate, and factual verification does not establish clinical quality.</p><Link className="text-link" href={`/assistant?q=${encodeURIComponent(prompts[2][1])}`}>Check provider information <ArrowRight size={17} aria-hidden="true" /></Link></div></div></section>
+    <section className="final-invitation container" aria-labelledby="final-title"><p className="eyebrow">START WHERE YOU ARE</p><h2 id="final-title">You don’t need all the answers<br />to ask your first question.</h2><SearchPrompt id="final-request" compact /></section>
   </main>;
 }

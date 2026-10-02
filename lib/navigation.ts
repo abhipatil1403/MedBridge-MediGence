@@ -14,3 +14,8 @@ export const navigation: NavigationItem[] = [
 export function isActiveNavigation(pathname: string, href: string) {
   return pathname === href || href !== "/" && pathname.startsWith(`${href}/`);
 }
+
+export const navigationGroups = [
+  { label: 'Explore', items: [navigation[1], navigation[3], navigation[4], navigation[5], navigation[6]] },
+  { label: 'Plan', items: [navigation[2], { label: 'Packages', href: '/packages' }, navigation[7], { label: 'Medical travel', href: '/medical-travel' }, { label: 'Recovery', href: '/recovery' }, { label: 'Consultation pathway', href: '/consultation' }] },
+] as const;

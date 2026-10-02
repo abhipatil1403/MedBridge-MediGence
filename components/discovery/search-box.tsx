@@ -49,7 +49,7 @@ export function SearchBox({ initialQuery = "", label = "Describe your need", but
         <Search size={21} aria-hidden="true" />
         <input id={listId} value={query} onChange={(event) => setQuery(event.target.value)}
           onFocus={() => setFocused(true)} onKeyDown={(event) => { if (event.key === "Escape") setFocused(false); }}
-          placeholder="Describe your condition, treatment, or what you need help with..." autoComplete="off" maxLength={240} />
+          placeholder="Treatment, specialty, place or question…" autoComplete="off" maxLength={240} />
         <button className="button button--primary button--default" type="submit">{buttonLabel}</button>
       </div>
     </form>

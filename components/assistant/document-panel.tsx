@@ -69,11 +69,11 @@ export function DocumentPanel({token,conversationId,disabled,onResponse,contextu
   const available=(id:string)=>active.filter(d=>d.matchStatus==='matched'&&d.requirementId===id);
   const missing=w?.requirements.filter(r=>r.required&&!available(r.id).length).length??0;
   const locked=busy||disabled;
-  return <details className="assistant-documents" open={Boolean(w) && contextual}><summary>Documents{w ? ` · ${active.length} private files` : ' · optional checklist and uploads'}</summary>
+  return <details className="assistant-documents" open={Boolean(w) && contextual}><summary>Documents for this request{w ? ` · ${active.length} private files` : ' · checklist and uploads'}</summary>
     <p>Organize explicitly requested documents. Files remain private. MedBridge does not interpret their content or determine treatment needs.</p>
     {!w?<form className="assistant-document-target" onSubmit={event=>{event.preventDefault();void action('start',{hospitalId:hospital,serviceLabel:service,serviceId:serviceId||undefined});}}>
       <label>Selected hospital<select required value={hospital} disabled={locked} onChange={event=>setHospital(event.target.value)}><option value="">Choose a hospital</option>{options.hospitals.map(h=><option key={h.id} value={h.id}>{h.name}{h.source_kind==='synthetic'?' · demo':''}</option>)}</select></label>
-      <label>Catalog service (optional)<select value={serviceId} disabled={locked} onChange={event=>{setServiceId(event.target.value);setService(options.services.find(s=>s.id===event.target.value)?.name??'');}}><option value="">Enter the service you selected</option>{options.services.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+      <label>Care service (optional)<select value={serviceId} disabled={locked} onChange={event=>{setServiceId(event.target.value);setService(options.services.find(s=>s.id===event.target.value)?.name??'');}}><option value="">Enter the service you selected</option>{options.services.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
       <label>Requested service<input required maxLength={180} value={service} disabled={locked||Boolean(serviceId)} onChange={event=>setService(event.target.value)} /></label>
       <button type="submit" disabled={locked||!hospital||!service.trim()}>Get requested documents</button>
     </form>:<>

@@ -2,7 +2,7 @@
 import { PageHeader } from "@/components/page-header";
 
 import { useEffect, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { getBrowserSupabaseClient } from '@/lib/supabase/browser';
 import { safeReturnPath } from '@/lib/auth/return-path';
 
 export function AuthCallback() {
@@ -37,7 +37,7 @@ export function AuthCallback() {
       }
 
       try {
-        const client = createClient(url, key, { auth: { detectSessionInUrl: false, persistSession: true } });
+        const client = getBrowserSupabaseClient()!;
         const result = accessToken && refreshToken
           ? await client.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
           : await client.auth.exchangeCodeForSession(code!);

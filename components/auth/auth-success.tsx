@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/page-header";
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { createClient } from '@supabase/supabase-js';
+import { getBrowserSupabaseClient } from '@/lib/supabase/browser';
 
 export function AuthSuccess({ next }: { next: string }) {
   const [verified, setVerified] = useState(false);
@@ -16,7 +16,7 @@ export function AuthSuccess({ next }: { next: string }) {
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !key) { window.location.replace(failure); return; }
 
-    const client = createClient(url, key, { auth: { detectSessionInUrl: false, persistSession: true } });
+    const client = getBrowserSupabaseClient()!;
     void client.auth.getUser().then(({ data, error }) => {
       if (!active) return;
       if (error || !data.user) { window.location.replace(failure); return; }

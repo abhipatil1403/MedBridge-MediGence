@@ -7,7 +7,8 @@ import { FindingsSummary, RequestUnderstanding } from './response-presentation';
 import { HospitalMatchResults } from './hospital-match-results';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { createClient, type Session } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
+import { getBrowserSupabaseClient } from '@/lib/supabase/browser';
 import Link from 'next/link';
 import { ClarificationQuestion, RequestProgress, visibleText } from './response-status';
 import { ExecutionActivity } from './execution-activity';
@@ -22,15 +23,12 @@ type Conversation = { id: string; title: string; case_id: string | null; updated
 type Case = { id: string; title: string; status: string; agentConsent: boolean; canManageConsent: boolean };
 type Message = { id: string; role: string; content: string; metadata: { response?: AgentResponse; approvalStatus?: string }; created_at: string };
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-export function AssistantWorkspace({ configured }: { configured: boolean }) {
-  const auth = useMemo(() => url && key ? createClient(url, key) : null, []);
+export function AssistantWorkspace({ configured, initialRequest = '' }: { configured: boolean; initialRequest?: string }) {
+  const auth = useMemo(() => getBrowserSupabaseClient(), []);
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState('');
   const [linkSent, setLinkSent] = useState(false);
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState(initialRequest);
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [caseId, setCaseId] = useState<string>('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -80,7 +78,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
     function applySession(next: Session | null) {
       const nextUser = next?.user.id;
       if (activeUser.current !== nextUser) {
-        const saved = nextUser ? localStorage.getItem(`medbridge-active-conversation:${nextUser}`) : null;
+        const saved = nextUser && !initialRequest ? localStorage.getItem(`medbridge-active-conversation:${nextUser}`) : null;
         let restored: { id?: string; caseId?: string } | undefined;
         try { restored = saved ? JSON.parse(saved) as typeof restored : undefined; } catch { /* Ignore a stale browser preference. */ }
         setActivity(undefined); setConversationId(restored?.id); setCaseId(restored?.caseId ?? ''); setMessages([]); setLatest(null); setCarePlan(undefined); setConversations([]); setCases([]);
@@ -91,7 +89,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
     auth.auth.getSession().then(({ data }) => applySession(data.session));
     const { data: subscription } = auth.auth.onAuthStateChange((_event, next) => applySession(next));
     return () => subscription.subscription.unsubscribe();
-  }, [auth]);
+  }, [auth, initialRequest]);
   useEffect(() => {
     if (!session) return;
     const key = `medbridge-active-conversation:${session.user.id}`;
@@ -182,7 +180,7 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
     <Link href="/discover">Explore care options →</Link></section>;
 
   if (!session) return <section className="assistant-state assistant-signin"><div><p className="eyebrow">PRIVATE WORKSPACE</p><h2>Sign in to begin</h2>
-    <p>Your conversations are saved to your account. Case information is used only when you select a case and grant assistant consent.</p></div>
+    <p>Keep your research, sources and next steps in one private conversation.</p>{initialRequest && <div className="signin-request"><span className="eyebrow">YOUR REQUEST IS READY</span><p>{initialRequest}</p><small>Sign in, then review and send it.</small></div>}<small>Case information is used only with your consent. Documents are not sent to the assistant.</small></div>
     <form onSubmit={signIn}><label>Email address<input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setLinkSent(false); }} autoComplete="email" required /></label>
       <button type="submit" className="button button--primary" disabled={busy}>{linkSent ? 'Send another sign-in link' : 'Send sign-in link'}</button>
       {notice && <p role="status">{notice}</p>}</form></section>;
@@ -190,25 +188,18 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
   const selectedCase = cases.find((item) => item.id === caseId);
   const latestRequest = [...messages].reverse().find((message) => message.role === 'user')?.content;
   return <div className="assistant-shell">
-    <aside className="assistant-rail" aria-label="Conversations"><div className="assistant-rail__head"><h2>Workspace</h2>
+    <aside className="assistant-rail" aria-label="Conversations"><div className="assistant-rail__head"><p className="eyebrow">YOUR WORKSPACE</p><h2>Conversations</h2>
       <button type="button" disabled={busy} onClick={() => { setActivity(undefined); setConversationId(undefined); setCaseId(''); setMessages([]); setLatest(null); setCarePlan(undefined); setNotice(''); }}>New conversation</button></div>
-      <details className="assistant-conversations"><summary>Saved conversations · {conversations.length}</summary><div className="assistant-rail__list">{conversations.map((item) => <button key={item.id} type="button" className={item.id === conversationId ? 'active' : ''}
+      <details className="assistant-conversations" open><summary>Recent · {conversations.length}</summary><div className="assistant-rail__list">{conversations.length === 0 && <p className="editorial-note">Your saved requests will appear here.</p>}{conversations.map((item) => <button key={item.id} type="button" className={item.id === conversationId ? 'active' : ''}
         aria-pressed={item.id === conversationId} disabled={busy} onClick={() => { setActivity(undefined); setConversationId(item.id); setCaseId(item.case_id ?? ''); setLatest(null); setCarePlan(undefined); }}>{item.title}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}</div></details>
       <button type="button" className="assistant-signout" onClick={() => auth?.auth.signOut()}>Sign out</button></aside>
 
     <section className="assistant-main" aria-label="Care conversation">
-      <div className="assistant-main__intro"><span className="eyebrow">CARE COORDINATION</span><h2>{conversationId ? 'Your conversation' : 'What can we help you explore?'}</h2>
-        <p>Start with a treatment, location or question. Sample providers are clearly labelled.</p></div>
-            <details className="assistant-case-context" open={Boolean(selectedCase)}><summary>{selectedCase ? `Linked case · ${selectedCase.title}` : "Case context · optional"}</summary>
-      <label htmlFor="case-select">Case<select id="case-select" value={caseId} disabled={Boolean(conversationId) || busy} onChange={(event) => setCaseId(event.target.value)}>
-        <option value="">No linked case record</option>{cases.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
-      {selectedCase && <><p>{selectedCase.agentConsent ? 'Assistant access granted for this case.' : 'Case owner consent is needed before the assistant reads this case.'}</p>
-        {selectedCase.canManageConsent && <button type="button" disabled={busy} onClick={() => changeConsent(selectedCase)}>{selectedCase.agentConsent ? 'Revoke assistant consent' : 'Grant assistant consent'}</button>}</>}
-      <small>Case information stays within the selected conversation. Document contents are not sent to the assistant.</small></details>
+      <div className="assistant-main__intro"><span className="eyebrow">{conversationId ? 'YOUR HEALTHCARE REQUEST' : 'START WITH YOUR QUESTION'}</span><h2>{conversationId ? 'Your conversation' : 'Your journey starts here.'}</h2>
+        <p>{conversationId ? 'Findings, evidence and next steps, together.' : 'Tell MedBridge what you’re trying to figure out.'}</p></div>
 
-      <div className="assistant-messages" aria-live="polite">{messages.length === 0 && <div className="assistant-empty"><p>Try a specific care planning request:</p>
-        {['I need a cardiologist in India.', 'Find hospitals for knee replacement in Mumbai.', 'Compare knee replacement in India and Turkey.'].map((example) =>
-          <button key={example} type="button" onClick={() => setContent(example)}>{example}</button>)}</div>}
+
+      <div className="assistant-messages" aria-live="polite">
         {messages.map((message) => <article key={message.id} className={`assistant-message assistant-message--${message.role}`}>
           <span>{message.role === 'user' ? 'You' : 'MedBridge'}</span>
           {message.role === 'assistant' && message.metadata?.response ? <ResponseBlocks response={message.metadata.response} approvalStatus={message.metadata.approvalStatus}
@@ -218,11 +209,20 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
         {activity && !messages.some((message) => message.metadata?.response?.runId === activity.runId) && <ExecutionActivity activity={activity} />}
         {busy && !activity && <div className="assistant-working" role="status">Working on your request… Your results will appear here.</div>}
       </div>
-      <form className="assistant-composer" onSubmit={send}><label htmlFor="assistant-input">Your request</label>
-        <textarea id="assistant-input" value={content} onChange={(event) => setContent(event.target.value)} placeholder="Tell us what you are looking for…" rows={3} maxLength={2000} disabled={busy} required />
+      <form className="assistant-composer" onSubmit={send}><label htmlFor="assistant-input">{messages.length ? 'Ask a follow-up' : 'Your request'}</label>
+        <textarea id="assistant-input" value={content} onChange={(event) => setContent(event.target.value)} placeholder={messages.length ? 'Ask about these options, evidence or next steps…' : 'Treatment, location, budget — start in your own words…'} rows={3} maxLength={2000} disabled={busy} required />
         <div><small>For discovery and coordination. A clinician must assess symptoms and treatment decisions.</small><button className="button button--primary" type="submit" disabled={busy || !content.trim()}>{busy ? 'Working…' : 'Send request'}</button></div>
         {notice && <p className="assistant-error" role="alert">{notice}</p>}</form>
+      {messages.length === 0 && <div className="assistant-empty"><p className="eyebrow">A FEW STARTING POINTS</p>
+        {['I need a cardiologist in India.', 'Find hospitals for knee replacement in Mumbai.', 'Compare knee replacement in India and Turkey.'].map((example) =>
+          <button key={example} type="button" onClick={() => setContent(example)}>{example}</button>)}</div>}
       <div className="assistant-support">
+            <details className="assistant-case-context" open={Boolean(selectedCase)}><summary>{selectedCase ? `Linked case · ${selectedCase.title}` : "Case context · optional"}</summary>
+      <label htmlFor="case-select">Case<select id="case-select" value={caseId} disabled={Boolean(conversationId) || busy} onChange={(event) => setCaseId(event.target.value)}>
+        <option value="">No linked case record</option>{cases.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
+      {selectedCase && <><p>{selectedCase.agentConsent ? 'Assistant access granted for this case.' : 'Case owner consent is needed before the assistant reads this case.'}</p>
+        {selectedCase.canManageConsent && <button type="button" disabled={busy} onClick={() => changeConsent(selectedCase)}>{selectedCase.agentConsent ? 'Revoke assistant consent' : 'Grant assistant consent'}</button>}</>}
+      <small>Case information stays within the selected conversation. Document contents are not sent to the assistant.</small></details>
       <DocumentPanel key={`${session.user.id}:${conversationId??'new'}`} token={session.access_token} conversationId={conversationId} disabled={busy} contextual={latest?.agent === 'document_coordination'}
         onResponse={async response=>{setConversationId(response.conversationId);setLatest(response);setActivity(response.activity);await refresh(response.conversationId);}} />
       {carePlan?.context.patientCase && <details className="assistant-support__section" open={latest?.workflow === 'case_intake'}><summary>Your saved case</summary><CasePanel draft={carePlan.context.patientCase} busy={busy} onAction={(text) => { void submitRequest(text); }} /></details>}

@@ -43,6 +43,8 @@ export interface RuntimeContext {
     taskLinks?: Record<string, string>;
     diagnostics?: Record<string, string | boolean | null>;
     continueOnToolFailure?: boolean;
+    /** Server-planned workflows may finish through their deterministic aggregator. */
+    allowModelFollowUps?: boolean;
     nextSteps?: (results: Array<{ tool: string; input?: string; taskId?: string; result: ToolResult }>, tasks: AgentTaskView[]) => Promise<AgentPlan['steps']>;
     finalize?: (response: AgentResponse, results: Array<{ tool: string; input?: string; taskId?: string; result: ToolResult }>) => Promise<AgentResponse>;
   };
@@ -312,7 +314,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
       }
       if (['awaiting_approval', 'awaiting_user_input'].includes(status) || limited) break;
       if (activePlan.missingInformation && findings.length === 0) { status = 'awaiting_user_input'; question = activePlan.missingInformation; break; }
-      const mayExtend = execution.calls.length > 0 && !requestBoundary(request.content) && !context.execution?.messageSourceId && !(typeof context.execution?.diagnostics?.workflow === 'string' && context.execution.diagnostics.workflow.startsWith('reference'))
+      const mayExtend = context.execution?.allowModelFollowUps !== false && execution.calls.length > 0 && !requestBoundary(request.content) && !context.execution?.messageSourceId && !(typeof context.execution?.diagnostics?.workflow === 'string' && context.execution.diagnostics.workflow.startsWith('reference'))
         && !context.execution?.referenceBoundary && context.execution?.diagnostics?.workflow !== 'external_research' && context.execution?.diagnostics?.workflow !== 'document_coordination' && context.execution?.diagnostics?.workflow !== 'provider_verification' && !results.some(r => r.result.research)
         && (!route && !context.execution || /\b(compare|check|missing|included|accommodation)\b/i.test(request.content));
       if (!mayExtend) break;

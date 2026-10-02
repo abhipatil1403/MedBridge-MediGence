@@ -6,7 +6,7 @@ export function ExecutionActivity({ activity }: { activity: RunActivity }) {
   const done = activity.steps.filter(step => ['completed', 'reused'].includes(step.status)).length;
   const active = ['planning', 'running', 'executing'].includes(activity.state);
   return <details aria-label="Recorded agent activity" className="assistant-activity" open={active}>
-    <summary>Activity · {done} of {activity.steps.length} steps complete · {statusLabel(activity.state)}</summary>
+    <summary>{active ? `Working on your request · ${done} of ${activity.steps.length} steps complete` : `${done} completed ${done === 1 ? 'check' : 'checks'} · View activity`}<span className="activity-state">{statusLabel(activity.state)}</span></summary>
     <p className="assistant-status" data-status={activity.state}><StatusMark status={activity.state} />{statusLabel(activity.state)}</p>
     {activity.steps.length > 0 && <div className="assistant-activity__details">
       <ol className="assistant-activity__steps">{activity.steps.map((step) => <li key={step.id}>

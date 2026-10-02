@@ -7,9 +7,10 @@ import { PageHeader } from '@/components/page-header';
 export const metadata: Metadata = { title: 'Care workspace', description: 'Plan and explore care options with MedBridge.' };
 export const dynamic = 'force-dynamic';
 
-export default function AssistantPage() {
+export default async function AssistantPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const { q } = await searchParams;
   return <main id="main-content" tabIndex={-1} className="assistant-page container">
     <PageHeader eyebrow="PLAN YOUR NEXT STEP" title="Care Workspace" description="Find care options, check provider information, and keep your next steps together." />
-    <AssistantWorkspace configured={isAgentConfigured()} />
+    <AssistantWorkspace key={q ?? ''} configured={isAgentConfigured()} initialRequest={typeof q === 'string' ? q.slice(0, 2000) : ''} />
   </main>;
 }

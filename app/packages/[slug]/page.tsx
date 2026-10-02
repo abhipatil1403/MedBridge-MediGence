@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { DemoNotice } from "@/components/demo-notice";
-import { DetailHero, DetailSection, FaqList } from "@/components/detail-parts";
+import { DetailHero, DetailNavigation, DetailSection, FaqList } from "@/components/detail-parts";
 import { getPackageDetail } from "@/lib/catalog/detail-service";
 import { detailMetadata } from "@/lib/seo";
 
@@ -23,12 +23,13 @@ export default async function PackageDetailPage({ params }: Props) {
     { question: "Is this an available offer?", answer: "No. This package is a synthetic example. A provider must confirm real prices, services, dates, and eligibility." },
     { question: "What happens when I prepare a planning brief?", answer: "The planning brief preserves the sample selection. It does not contact a hospital or process a payment." },
   ];
-  return <main id="main-content" tabIndex={-1} className="container detail-page">
+  return <main id="main-content" tabIndex={-1} className="container detail-page detail-page--package">
     <Breadcrumbs currentPath={`/packages/${slug}`} items={[{ label: "Home", href: "/" }, { label: "Packages", href: "/packages" }, { label: carePackage.name }]} />
     <DemoNotice compact />
     <DetailHero type="DEMO CARE PACKAGE" title={carePackage.name} intro={carePackage.description}
       facts={[country?.name ?? carePackage.country, `${carePackage.durationDays} sample days`, `USD ${carePackage.samplePriceUsd.toLocaleString()} · demo estimate`]}
       actions={[{ label: "Prepare planning brief", href: `/treatment-plan?package=${slug}`, primary: true }, { label: "View hospital", href: `/hospitals/${carePackage.hospitalSlug}` }]} />
+    <DetailNavigation items={[{label:"Provider",href:"#treatment-and-provider"},{label:"Estimate",href:"#estimated-price-and-duration"},{label:"Included",href:"#inclusions"},{label:"Excluded",href:"#exclusions"}]} />
     <div className="detail-layout"><div>
       <DetailSection title="Treatment and provider"><p>Treatment: {treatment ? <Link href={`/treatments/${treatment.slug}`}>{treatment.name}</Link> : carePackage.treatmentSlug}. Provider: {hospital ? <Link href={`/hospitals/${hospital.slug}`}>{hospital.name}</Link> : carePackage.hospitalName}.</p></DetailSection>
       <DetailSection title="Estimated price and duration"><p className="sample-price">USD {carePackage.samplePriceUsd.toLocaleString()} <small>synthetic estimate</small></p><p>Illustrative duration: {carePackage.durationDays} days. This is not a quote or a reservation.</p></DetailSection>

@@ -3,7 +3,11 @@ import type { Faq } from "@/types/catalog";
 import { PageHeader } from './page-header';
 
 export function DetailSection({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
-  return <section className="detail-section" id={id}><h2>{title}</h2>{children}</section>;
+  return <section className="detail-section" id={id ?? title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}><h2>{title}</h2>{children}</section>;
+}
+
+export function DetailNavigation({ items }: { items: readonly { label: string; href: string }[] }) {
+  return <nav className="detail-navigation" aria-label="On this page">{items.map(item=><Link key={item.href} href={item.href}>{item.label}</Link>)}</nav>;
 }
 
 export function FaqList({ items }: { items: readonly Faq[] }) {

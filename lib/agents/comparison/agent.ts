@@ -70,7 +70,10 @@ export async function prepareComparison(input: { content: string; userId: string
   const executionPlan: AgentPlan = { agent: 'comparison', understanding: `Compare ${subject?.value ?? 'catalog information'}${request.options.length ? ` between ${request.options.map((option) => option.label).join(' and ')}` : ''}.`,
     steps: runnable.map((search) => search.step), missingInformation: question };
   const route = { snapshot, normalized: QueryNormalizer.normalize(content, snapshot), plan: executionPlan };
-  return { plan: executionPlan, route, carePlanId: plan.id, continueOnToolFailure: true,
+  // Every requested side is planned above and assembled below, including cached
+  // searches. An extra model analysis cannot add to this factual matrix and can
+  // otherwise reject cached IDs that were not observed in the current run.
+  return { plan: executionPlan, route, carePlanId: plan.id, continueOnToolFailure: true, allowModelFollowUps: false,
     taskLinks: Object.fromEntries(runnable.map((search) => [`${search.step.tool}:${search.step.input}`, plan.tasks.find((task) => task.key === search.key)!.id])),
     diagnostics: { workflow: 'comparison', primaryContexts: String(request.options.length), reusedSearches: runnable.length < searches.length, modelAttempts: '0', agentDepth: '1' },
     finalize: async (response, results) => {
