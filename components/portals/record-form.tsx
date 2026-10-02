@@ -1,0 +1,570 @@
+"use client";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import {
+  fields,
+  label,
+  recordInputSchema,
+  type RecordKind,
+  type Row,
+  type Field,
+} from "@/lib/portals/config";
+import {
+  commonColumns,
+  date,
+  ErrorPanel,
+  Modal,
+  Panel,
+  ResourceTable,
+  Status,
+  usePortal,
+  useResource,
+} from "./core";
+
+const formSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Enter a name of at least two characters.")
+    .max(180),
+  values: z.record(
+    z.string(),
+    z.union([z.string().max(10000), z.boolean(), z.array(z.string())]),
+  ),
+});
+type FormValues = z.infer<typeof formSchema>;
+export function FieldControl({
+  field,
+  register,
+  defaultValue,
+}: {
+  field: Field;
+  register: ReturnType<typeof useForm<FormValues>>["register"];
+  defaultValue?: unknown;
+}) {
+  const { organizationId } = usePortal();
+  const { data, error, loading } = useResource<{ rows: Row[] }>(
+    field.catalog ?? "",
+    {
+      size: "200",
+      ...(["provider_documents", "provider_records"].includes(
+        field.catalog ?? "",
+      )
+        ? { organizationId }
+        : {}),
+      ...field.catalogParams,
+    },
+  );
+  const inputProps = register(`values.${field.key}`);
+  if (field.type === "checkbox")
+    return (
+      <label className="portal-check">
+        <input type="checkbox" {...inputProps} />
+        {field.label}
+      </label>
+    );
+  return (
+    <label className="portal-field">
+      <span>{field.label}</span>
+      {field.type === "list" && field.catalog ? (
+        <select
+          multiple
+          size={5}
+          disabled={loading || Boolean(error)}
+          {...inputProps}
+        >
+          {data?.rows.map((row) => (
+            <option key={row.id} value={row.id}>
+              {String(row.name ?? row.title ?? "Unnamed")}
+            </option>
+          ))}
+        </select>
+      ) : field.type === "textarea" || field.type === "list" ? (
+        <textarea
+          rows={field.type === "list" ? 4 : 3}
+          placeholder={field.type === "list" ? "One item per line" : undefined}
+          {...inputProps}
+        />
+      ) : field.type === "select" ? (
+        <select disabled={loading || Boolean(error)} {...inputProps}>
+          <option value="">Select {field.label.toLowerCase()}</option>
+          {field.options?.map((option) => (
+            <option key={option} value={option}>
+              {label(option)}
+            </option>
+          ))}
+          {field.catalog &&
+            data?.rows.map((row) => (
+              <option key={row.id} value={row.id}>
+                {String(
+                  row.name ??
+                    row.title ??
+                    row.source_name ??
+                    (row.data as Record<string, unknown> | undefined)?.title ??
+                    `Workspace ${String(row.id).slice(0, 8)}`,
+                )}
+                {field.catalog === "cities"
+                  ? ` · ${String((row.country as { name?: string } | undefined)?.name ?? "")}`
+                  : ""}
+              </option>
+            ))}
+          {Boolean(defaultValue) &&
+            !field.options?.includes(String(defaultValue)) &&
+            !data?.rows.some((row) => row.id === defaultValue) && (
+              <option value={String(defaultValue)}>Current selection</option>
+            )}
+        </select>
+      ) : (
+        <input
+          type={
+            field.type === "number"
+              ? "number"
+              : field.type === "email"
+                ? "email"
+                : field.type === "url"
+                  ? "url"
+                  : field.type === "date"
+                    ? "date"
+                    : "text"
+          }
+          min={field.min}
+          step={field.type === "number" ? "any" : undefined}
+          {...inputProps}
+        />
+      )}
+      <small>
+        {field.help ??
+          (field.type === "list"
+            ? "Enter only services or facts you can support. One per line."
+            : "")}
+      </small>
+      {loading && <small role="status">Loading choices…</small>}
+      {error && (
+        <small role="alert" className="portal-field-error">
+          {error}
+        </small>
+      )}
+    </label>
+  );
+}
+export function RecordForm({
+  kind,
+  row,
+  onClose,
+}: {
+  kind: RecordKind;
+  row?: Row;
+  onClose: () => void;
+}) {
+  const { organizationId, command } = usePortal();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const defaultValues: FormValues = {
+    name: String(row?.name ?? ""),
+    values: Object.fromEntries(
+      fields[kind].map((field) => {
+        const entry = row?.data?.[field.key];
+        return [
+          field.key,
+          field.type === "checkbox"
+            ? Boolean(entry)
+            : field.type === "list" && field.catalog
+              ? Array.isArray(entry)
+                ? entry
+                : []
+              : Array.isArray(entry)
+                ? entry.join("\n")
+                : entry == null
+                  ? ""
+                  : String(entry),
+        ];
+      }),
+    ),
+  };
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues,
+  });
+  useEffect(() => {
+    if (!form.formState.isDirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [form.formState.isDirty]);
+  const save = form.handleSubmit(async (values) => {
+    setError("");
+    const data: Record<string, unknown> = { ...row?.data };
+    for (const field of fields[kind]) {
+      const value = values.values[field.key];
+      if (value === "" || value === undefined) {
+        delete data[field.key];
+        continue;
+      }
+      data[field.key] =
+        field.type === "number"
+          ? Number(value)
+          : field.type === "list"
+            ? Array.isArray(value)
+              ? value
+              : String(value)
+                  .split("\n")
+                  .map((item) => item.trim())
+                  .filter(Boolean)
+            : value;
+    }
+    const parsed = recordInputSchema.safeParse({
+      organizationId,
+      ...(row ? { recordId: row.id, expectedRevision: row.revision } : {}),
+      kind,
+      name: values.name,
+      data,
+    });
+    if (!parsed.success) {
+      setError(parsed.error.issues.map((issue) => issue.message).join(" "));
+      return;
+    }
+    setBusy(true);
+    try {
+      await command("save_record", parsed.data);
+      form.reset(values);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save.");
+    } finally {
+      setBusy(false);
+    }
+  });
+  return (
+    <Modal
+      title={row ? `Edit ${label(kind)}` : `Add ${label(kind)}`}
+      onClose={onClose}
+      dirty={form.formState.isDirty}
+    >
+      <p className="portal-muted">
+        Save a private draft now. Required fields and evidence are checked when
+        you submit.
+      </p>
+      <form onSubmit={save} className="portal-form">
+        <label className="portal-field">
+          <span>
+            {kind === "organization" ? "Organization name" : "Name"} *
+          </span>
+          <input
+            autoFocus
+            {...form.register("name")}
+            aria-invalid={Boolean(form.formState.errors.name)}
+          />
+          {form.formState.errors.name && (
+            <small className="portal-field-error">
+              {form.formState.errors.name.message}
+            </small>
+          )}
+        </label>
+        <div className="portal-form-grid">
+          {fields[kind].map((field) => (
+            <FieldControl
+              key={field.key}
+              field={field}
+              register={form.register}
+              defaultValue={row?.data?.[field.key]}
+            />
+          ))}
+        </div>
+        {error && (
+          <p className="portal-field-error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="portal-actions">
+          <button
+            className="portal-button secondary"
+            type="button"
+            onClick={(event) =>
+              event.currentTarget
+                .closest("dialog")
+                ?.dispatchEvent(new Event("cancel", { cancelable: true }))
+            }
+          >
+            Cancel
+          </button>
+          <button className="portal-button" disabled={busy} type="submit">
+            {busy ? "Saving draft…" : "Save draft"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+export function RecordDetails({
+  row,
+  onClose,
+  onEdit,
+}: {
+  row: Row;
+  onClose: () => void;
+  onEdit: (row: Row) => void;
+}) {
+  const { organizationId, portal } = usePortal();
+  const [history, setHistory] = useState<Row>();
+  return (
+    <Modal title={String(row.name)} onClose={onClose}>
+      <div className="portal-actions">
+        <Status value={row.status} />
+        <span>
+          Draft revision {row.revision} · Published revision{" "}
+          {String(row.published_revision ?? "none")}
+        </span>
+      </div>
+      <dl className="portal-facts">
+        {Object.entries(row.data ?? {}).map(([key, value]) => (
+          <div key={key}>
+            <dt>{label(key.replace(/([A-Z])/g, " $1"))}</dt>
+            <dd>
+              {Array.isArray(value)
+                ? value.join(", ")
+                : typeof value === "boolean"
+                  ? value
+                    ? "Yes"
+                    : "No"
+                  : String(value ?? "Not provided")}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <div className="portal-actions">
+        {!["submitted", "under_review", "archived"].includes(
+          String(row.status),
+        ) && (
+          <button className="portal-button" onClick={() => onEdit(row)}>
+            Edit draft
+          </button>
+        )}
+        <RecordActions row={row} onDone={onClose} />
+      </div>
+      <ResourceTable
+        resource="provider_revisions"
+        params={{ organizationId, recordId: String(row.id) }}
+        title="Version history"
+        columns={[
+          { key: "revision", label: "Revision" },
+          { key: "name", label: "Saved name" },
+          {
+            key: "created_at",
+            label: "Saved",
+            render: (item) => date(item.created_at),
+          },
+        ]}
+        onOpen={setHistory}
+      />
+      {history && (
+        <Modal
+          title={`Saved revision ${history.revision}`}
+          onClose={() => setHistory(undefined)}
+        >
+          <p>
+            {String(history.name)} · {date(history.created_at)}
+          </p>
+          <dl className="portal-facts">
+            {Object.entries(history.data ?? {}).map(([key, value]) => (
+              <div key={key}>
+                <dt>{label(key)}</dt>
+                <dd>
+                  {Array.isArray(value)
+                    ? value.join(", ")
+                    : String(value ?? "Not provided")}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <p className="portal-muted">
+            This immutable snapshot is read only. Edit the current draft to make
+            changes.
+          </p>
+        </Modal>
+      )}
+      {portal === "admin" && (
+        <p className="portal-muted">
+          Use Submissions to review the frozen revision and publish it.
+        </p>
+      )}
+    </Modal>
+  );
+}
+import { Action } from "./core";
+export function RecordActions({
+  row,
+  onDone,
+}: {
+  row: Row;
+  onDone?: () => void;
+}) {
+  const { organizationId, portal } = usePortal();
+  return (
+    <>
+      {["draft", "changes_requested"].includes(String(row.status)) && (
+        <Action
+          action="submit"
+          input={{ organizationId, recordId: row.id }}
+          onDone={onDone}
+        >
+          Submit
+        </Action>
+      )}
+      {row.kind !== "organization" && (
+        <Action
+          action="duplicate_record"
+          input={{ recordId: row.id }}
+          onDone={onDone}
+        >
+          Duplicate
+        </Action>
+      )}
+      {(!row.published_revision || portal === "admin") && (
+        <Action
+          action="archive_record"
+          onDone={onDone}
+          input={{ recordId: row.id, expectedRevision: row.revision }}
+          confirm
+          danger
+        >
+          Archive
+        </Action>
+      )}
+      {portal === "admin" && Boolean(row.published_revision) && (
+        <Action
+          action="unpublish_record"
+          onDone={onDone}
+          input={{ recordId: row.id, expectedRevision: row.revision }}
+          confirm
+        >
+          Unpublish
+        </Action>
+      )}
+    </>
+  );
+}
+export function RecordWorkspace({ kind }: { kind: RecordKind }) {
+  const { organizationId } = usePortal();
+  const [editing, setEditing] = useState<Row | null | undefined>();
+  const [selected, setSelected] = useState<Row>();
+  const { data, error } = useResource<{ rows: Row[] }>("provider_records", {
+    organizationId,
+    kind,
+    size: "1",
+  });
+  if (error) return <ErrorPanel message={error} />;
+  return (
+    <>
+      <ResourceTable
+        title={label(kind === "organization" ? "Organization profile" : kind)}
+        resource="provider_records"
+        params={{ organizationId, kind }}
+        columns={
+          kind === "package"
+            ? [
+                { key: "name", label: "Package" },
+                {
+                  key: "data",
+                  label: "Price",
+                  render: (row) =>
+                    row.data?.price === undefined
+                      ? "Not provided"
+                      : `${row.data.currency ?? ""} ${Number(row.data.price).toLocaleString()}`,
+                },
+                {
+                  key: "data.durationDays",
+                  label: "Duration",
+                  render: (row) =>
+                    row.data?.durationDays
+                      ? `${row.data.durationDays} days`
+                      : "Not provided",
+                },
+                ...commonColumns.slice(1),
+              ]
+            : commonColumns
+        }
+        onOpen={setSelected}
+        extra={
+          (kind !== "organization" || !data?.rows.length) && (
+            <button className="portal-button" onClick={() => setEditing(null)}>
+              Add {label(kind)}
+            </button>
+          )
+        }
+      />
+      {editing !== undefined && (
+        <RecordForm
+          kind={kind}
+          row={editing ?? undefined}
+          onClose={() => setEditing(undefined)}
+        />
+      )}{" "}
+      {selected && (
+        <RecordDetails
+          row={selected}
+          onClose={() => setSelected(undefined)}
+          onEdit={(row) => {
+            setSelected(undefined);
+            setEditing(row);
+          }}
+        />
+      )}
+      {kind === "specialty" && <SpecialtyRequest />}
+    </>
+  );
+}
+function SpecialtyRequest() {
+  const { organizationId, command } = usePortal();
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <Panel title="Request a new specialty">
+      <p>
+        Requests go to the platform team. A requested specialty cannot be
+        published until it exists in the reviewed canonical catalog.
+      </p>
+      <form
+        className="portal-inline-form"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          try {
+            await command("organization_message", {
+              organizationId,
+              body: `Canonical specialty request: ${name}`,
+            });
+            setName("");
+          } catch (err) {
+            setError(
+              String(
+                err instanceof Error ? err.message : "Unable to send request.",
+              ),
+            );
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <label className="portal-field">
+          <span>Requested specialty</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            minLength={3}
+            maxLength={150}
+          />
+        </label>
+        <button className="portal-button secondary" disabled={busy}>
+          Send request
+        </button>
+        {error && <p role="alert">{error}</p>}
+      </form>
+    </Panel>
+  );
+}

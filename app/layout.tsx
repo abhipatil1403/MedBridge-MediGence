@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { SiteFooter } from "@/components/site-footer";
-import { SiteHeader } from "@/components/site-header";
+import { PublicChrome } from "@/components/public-chrome";
 import "./globals.css";
 import "./product.css";
 import "./ui-system.css";
@@ -14,12 +13,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body>
         <a className="skip-link" href="#main-content">Skip to content</a>
-        <SiteHeader />
+        <PublicChrome position="header" />
         {children}
-        <SiteFooter />
+        <PublicChrome position="footer" />
       </body>
     </html>
   );
