@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { DiscoveryResults } from "@/types/discovery";
+import { packagePrice } from '@/lib/catalog/pricing';
 
 const labels = { treatments: "Treatments", hospitals: "Hospitals", doctors: "Doctors", packages: "Packages", countries: "Countries", services: "Services" } as const;
 type SectionKey = keyof typeof labels;
@@ -34,16 +35,16 @@ export function ResultSections({ results, limit = 4, idPrefix = '' }: { results:
             <Link className="result-action" href={`/treatments/${item.slug}`}>View treatment <ArrowRight size={16} aria-hidden="true" /></Link>
           </article>)}
           {key === "hospitals" && sections.hospitals.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }) => <article className="result-row" key={item.slug}>
-            <div><span className="result-kicker">{item.city}, {item.country}</span><h3><Link href={`/hospitals/${item.slug}`}>{item.name}</Link></h3><p>{item.specialties.slice(0, 3).join(" · ")}</p><small>Synthetic provider · not verified</small><details><summary>Why this appears</summary><p>{reason}</p><p>Sample beds: {item.sampleBedCount}. {item.verification}.</p></details></div>
+            <div><span className="result-kicker">{item.city}, {item.country}</span><h3><Link href={`/hospitals/${item.slug}`}>{item.name}</Link></h3><p>{item.specialties.slice(0, 3).join(" · ")}</p><small>{item.demo?'Synthetic provider · not verified':'Published provider · inspect field evidence'}</small><details><summary>Why this appears</summary><p>{reason}</p><p>{item.sampleBedCount>0?`${item.demo?'Sample':'Provider-listed'} beds: ${item.sampleBedCount}. `:''}{item.verification}.</p></details></div>
             <div className="result-row__actions"><Link className="result-action" href={`/hospitals/${item.slug}`}>View hospital <ArrowRight size={16} aria-hidden="true" /></Link><Link href={`/treatment-plan?hospital=${item.slug}`}>Prepare planning brief</Link></div>
           </article>)}
           {key === "doctors" && sections.doctors.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }) => <article className="result-row" key={item.slug}>
-            <div><span className="doctor-monogram" aria-hidden="true">{item.name.split(' ').filter(part=>!['Demo','Clinician'].includes(part)).slice(0,2).map(part=>part[0]).join('')}</span><span className="result-kicker">{item.specialty}</span><h3><Link href={`/doctors/${item.slug}`}>{item.name}</Link></h3><p>{item.city}, {item.country}<br />{item.hospitalName}</p><small>Synthetic clinician · no live appointments</small><details><summary>Profile context</summary><p>{reason} Sample experience: {item.sampleExperienceYears} years · {item.consultationMode}.</p></details></div>
+            <div><span className="doctor-monogram" aria-hidden="true">{item.name.split(' ').filter(part=>!['Demo','Clinician'].includes(part)).slice(0,2).map(part=>part[0]).join('')}</span><span className="result-kicker">{item.specialty}</span><h3><Link href={`/doctors/${item.slug}`}>{item.name}</Link></h3><p>{item.city}, {item.country}<br />{item.hospitalName}</p><small>{item.demo?'Synthetic clinician · no live appointments':'Published clinician · availability requires confirmation'}</small><details><summary>Profile context</summary><p>{reason} {item.sampleExperienceYears>0?`${item.demo?'Sample':'Provider-listed'} experience: ${item.sampleExperienceYears} years · `:''}{item.consultationMode}.</p></details></div>
             <Link className="result-action" href={`/doctors/${item.slug}`}>View profile <ArrowRight size={16} aria-hidden="true" /></Link>
           </article>)}
           {key === "packages" && sections.packages.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }) => <article className="result-row" key={item.slug}>
-            <div><span className="result-kicker">{item.country} · demo package</span><h3><Link href={`/packages/${item.slug}`}>{item.name}</Link></h3><p>{item.hospitalName}</p><small>{item.durationDays} illustrative days</small><details><summary>Matching information</summary><p>{reason}</p></details></div>
-            <div className="package-decision"><span>SYNTHETIC ESTIMATE</span><strong>USD {item.samplePriceUsd.toLocaleString()}</strong><span>Not a quote or available offer</span><Link className="result-action" href={`/packages/${item.slug}`}>View package <ArrowRight size={16} aria-hidden="true" /></Link></div>
+            <div><span className="result-kicker">{item.country} · {item.demo?'demo package':'published package'}</span><h3><Link href={`/packages/${item.slug}`}>{item.name}</Link></h3><p>{item.hospitalName}</p><small>{item.durationDays} {item.demo?'illustrative':'listed'} days</small><details><summary>Matching information</summary><p>{reason}</p></details></div>
+            <div className="package-decision"><span>{item.demo?'SYNTHETIC ESTIMATE':'PROVIDER-LISTED ESTIMATE'}</span><strong>{packagePrice(item)}</strong><span>{item.demo?'Not a quote or available offer':'Confirm current quote and availability'}</span><Link className="result-action" href={`/packages/${item.slug}`}>View package <ArrowRight size={16} aria-hidden="true" /></Link></div>
           </article>)}
           {key === "countries" && sections.countries.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }) => <article className="result-row" key={item.slug}>
             <div><span className="result-kicker">Destination · {item.code}</span><h3><Link href={`/compare?countryA=${item.slug}`}>{item.name}</Link></h3><p>{item.description}</p><small>{reason}</small></div>

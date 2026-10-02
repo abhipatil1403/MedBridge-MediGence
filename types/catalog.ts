@@ -62,6 +62,8 @@ export interface Country extends CatalogRecord {
 }
 
 export interface Package extends CatalogRecord {
+  readonly currency?: string;
+  readonly listedPrice?: number;
   readonly treatmentSlug: string;
   readonly hospitalSlug: string;
   readonly hospitalName: string;

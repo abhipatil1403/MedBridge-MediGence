@@ -31,9 +31,11 @@ export const RequirementEvaluator = {
         return result(matches ? 'exact' : 'not_met', `The documented ${days}-day package duration ${matches ? 'meets' : 'does not meet'} the requested duration criterion; it does not establish recovery time.`, [`${days} days`], ['durationDays']);
       }
       if (type === 'price') {
-        const price = item.samplePriceUsd;
+        const price = item.listedPrice??item.samplePriceUsd;
+        const currency=typeof item.currency==='string'?item.currency:'USD';
+        const priceFields=item.listedPrice!==undefined?['listedPrice','currency']:['samplePriceUsd'];
         return typeof price === 'number' && Number.isFinite(price) && price > 0
-          ? result('exact', 'The catalog documents a USD sample price; it is not a provider quote.', [`USD ${price}`], ['samplePriceUsd'])
+          ? result('exact', `The catalog documents a ${currency} listed estimate; it is not a provider quote.`, [`${currency} ${price}`], priceFields)
           : result('unknown', 'No listed sample price is available.', [], ['samplePriceUsd']);
       }
       if ((packageAttributes as readonly string[]).includes(type)) {
@@ -42,13 +44,15 @@ export const RequirementEvaluator = {
         return { ...base, ...evidence };
       }
       if (type === 'budget') {
-        const price = item.samplePriceUsd;
+        const price = item.listedPrice??item.samplePriceUsd;
+        const currency=typeof item.currency==='string'?item.currency:'USD';
+        const priceFields=item.listedPrice!==undefined?['listedPrice','currency']:['samplePriceUsd'];
         if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) return result('unknown', 'No listed sample price is available to check this budget.', [], ['samplePriceUsd']);
-        if (requirement.currency !== 'USD') return result('unknown', `The listed price is USD; the requested currency is ${requirement.currency ?? 'unspecified'}. No currency conversion was applied.`, [`USD ${price}`], ['samplePriceUsd']);
+        if (requirement.currency !== currency) return result('unknown', `The listed price is ${currency}; the requested currency is ${requirement.currency ?? 'unspecified'}. No currency conversion was applied.`, [`${currency} ${price}`], priceFields);
         const min = requirement.minimum, max = requirement.maximum;
         const matches = (min === undefined || (requirement.operator === 'gt' ? price > min : price >= min))
           && (max === undefined || (requirement.operator === 'lt' ? price < max : price <= max));
-        return result(matches ? 'exact' : 'not_met', `The listed USD ${price.toLocaleString('en-US')} sample price ${matches ? 'meets' : 'does not meet'} “${requirement.originalExpression}”. A sample price is not a provider quote.`, [`USD ${price}`], ['samplePriceUsd']);
+        return result(matches ? 'exact' : 'not_met', `The listed ${currency} ${price.toLocaleString('en-US')} ${record.demo?'sample price':'estimate'} ${matches ? 'meets' : 'does not meet'} “${requirement.originalExpression}”. A listed estimate is not a provider quote.`, [`${currency} ${price}`], priceFields);
       }
       if (type === 'procedure') {
         const values = finding.kind === 'treatments' ? [record.slug] : finding.kind === 'packages' ? [item.treatmentSlug] : Array.isArray(item.treatmentSlugs) ? item.treatmentSlugs : [];

@@ -174,8 +174,9 @@ const hrefKinds: Record<string, string> = { treatments: 'treatments', hospitals:
 export function toFinding(kind: string, record: CatalogRecord, matchType: Finding['matchType'] = 'exact', matchReason = 'Selected catalog record.'): Finding {
   const facts: Record<string, string | number | null> = {};
   const item = record as unknown as Record<string, unknown>;
-  for (const key of ['city', 'country', 'specialty', 'hospitalSlug', 'hospitalName', 'treatmentSlug', 'samplePriceUsd', 'sampleBaseCostUsd', 'durationDays', 'verification', 'travelNote', 'consultationMode', 'sampleBedCount', 'sampleAccreditation', 'sampleExperienceYears']) {
+  for (const key of ['city', 'country', 'specialty', 'hospitalSlug', 'hospitalName', 'treatmentSlug', 'samplePriceUsd', 'listedPrice', 'currency', 'sampleBaseCostUsd', 'durationDays', 'verification', 'travelNote', 'consultationMode', 'sampleBedCount', 'sampleAccreditation', 'sampleExperienceYears']) {
     const value = item[key];
+    if(key==='samplePriceUsd'&&item.currency&&item.currency!=='USD') continue;
     // The legacy catalog adapter uses zero for absent optional counts. Do not present these as sourced attributes.
     if (['sampleBedCount', 'sampleExperienceYears'].includes(key) && (typeof value !== 'number' || value <= 0)) continue;
     if (typeof value === 'string' || typeof value === 'number') facts[key] = value;
@@ -185,7 +186,7 @@ export function toFinding(kind: string, record: CatalogRecord, matchType: Findin
   if (Array.isArray(item.inclusions)) facts.inclusions = item.inclusions.join('; ');
   if (Array.isArray(item.exclusions)) facts.exclusions = item.exclusions.join('; ');
   for (const key of ['qualifications', 'languages', 'infrastructure', 'countries']) if (Array.isArray(item[key])) facts[key] = item[key].join('; ');
-  if (kind === 'packages') facts.currency = 'USD';
+  if (kind === 'packages') facts.currency = typeof item.currency==='string'?item.currency:'USD';
   return {
     sourceKind: 'medbridge_catalog', kind, slug: record.slug, title: record.name, detail: record.description,
     href: hrefKinds[kind] ? `/${hrefKinds[kind]}/${record.slug}` : undefined,

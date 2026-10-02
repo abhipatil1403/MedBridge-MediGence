@@ -154,10 +154,10 @@ export async function prepareReferenceExecution(input: { content: string; conver
 function referenceSummary(reference: EntityReference, findings: AgentResponse['findings'], operation: string, attribute?: string) {
   const item = findings[0];
   if (operation === 'packages') return `I found ${findings.length} catalog package${findings.length === 1 ? '' : 's'} associated with ${reference.displayName}. Listed sample prices are not provider quotes.`;
-  const price = item.facts.samplePriceUsd;
+  const price = item.facts.listedPrice??item.facts.samplePriceUsd;
   const budget = item.requirementEvaluation?.evaluations.find((e) => e.type === 'budget');
   if (operation === 'price' && budget) return `${item.title}: ${budget.label} — ${budget.status.replaceAll('_', ' ')}. ${budget.explanation} Listed sample prices are not provider quotes.`.slice(0, 1600);
   if ((operation === 'price' || attribute === 'cheaper' || attribute === 'expensive') && typeof price === 'number')
-    return `${item.title} lists ${item.provenance.sourceKind === 'synthetic' ? 'a synthetic' : 'a catalog'} sample price of USD ${price.toLocaleString('en-US')}.${attribute ? ' This identifies the requested price extreme among the previously returned records only.' : ''} This is not a provider quote or a clinical recommendation.`;
+    return `${item.title} lists ${item.provenance.sourceKind === 'synthetic' ? 'a synthetic sample price' : 'a catalog estimate'} of ${item.facts.currency??'USD'} ${price.toLocaleString('en-US')}.${attribute ? ' This identifies the requested price extreme among the previously returned records only.' : ''} This is not a provider quote or a clinical recommendation.`;
   return `Here are the sourced catalog details for ${reference.displayName}.${item.provenance.sourceKind === 'synthetic' ? ' This is synthetic demo data.' : ''} Resolving this reference does not recommend the provider or treatment.`;
 }
