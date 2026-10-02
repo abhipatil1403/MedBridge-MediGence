@@ -241,6 +241,10 @@ export type Database = {
           case_id: string | null;
           occurred_at: string;
           metadata: Json;
+          organization_id: string | null;
+          actor_role: string | null;
+          old_value: Json | null;
+          new_value: Json | null;
         };
         Insert: {
           id?: string;
@@ -252,6 +256,10 @@ export type Database = {
           case_id?: string | null;
           occurred_at?: string;
           metadata?: Json;
+          organization_id?: string | null;
+          actor_role?: string | null;
+          old_value?: Json | null;
+          new_value?: Json | null;
         };
         Update: {
           id?: string;
@@ -263,6 +271,10 @@ export type Database = {
           case_id?: string | null;
           occurred_at?: string;
           metadata?: Json;
+          organization_id?: string | null;
+          actor_role?: string | null;
+          old_value?: Json | null;
+          new_value?: Json | null;
         };
         Relationships: [];
       };
@@ -506,6 +518,51 @@ export type Database = {
         };
         Relationships: [];
       };
+      catalog_drafts: {
+        Row: {
+          id: string;
+          entity: string;
+          target_id: string | null;
+          name: string;
+          data: Json;
+          revision: number;
+          expected_updated_at: string | null;
+          status: string;
+          created_by: string;
+          approved_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          entity: string;
+          target_id?: string | null;
+          name: string;
+          data: Json;
+          revision?: number;
+          expected_updated_at?: string | null;
+          status?: string;
+          created_by: string;
+          approved_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          entity?: string;
+          target_id?: string | null;
+          name?: string;
+          data?: Json;
+          revision?: number;
+          expected_updated_at?: string | null;
+          status?: string;
+          created_by?: string;
+          approved_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       cities: {
         Row: {
           id: string;
@@ -515,6 +572,7 @@ export type Database = {
           aliases: string[];
           created_at: string;
           updated_at: string;
+          publication_status: string;
         };
         Insert: {
           id?: string;
@@ -524,6 +582,7 @@ export type Database = {
           aliases?: string[];
           created_at?: string;
           updated_at?: string;
+          publication_status?: string;
         };
         Update: {
           id?: string;
@@ -533,6 +592,7 @@ export type Database = {
           aliases?: string[];
           created_at?: string;
           updated_at?: string;
+          publication_status?: string;
         };
         Relationships: [];
       };
@@ -1112,6 +1172,132 @@ export type Database = {
         };
         Relationships: [];
       };
+      organization_invites: {
+        Row: {
+          id: string;
+          organization_id: string;
+          email: string;
+          role: string;
+          invited_by: string;
+          accepted_by: string | null;
+          expires_at: string;
+          revoked_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          email: string;
+          role: string;
+          invited_by: string;
+          accepted_by?: string | null;
+          expires_at?: string;
+          revoked_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          email?: string;
+          role?: string;
+          invited_by?: string;
+          accepted_by?: string | null;
+          expires_at?: string;
+          revoked_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      organization_members: {
+        Row: {
+          organization_id: string;
+          user_id: string;
+          role: string;
+          active: boolean;
+          joined_at: string;
+          last_active_at: string | null;
+        };
+        Insert: {
+          organization_id: string;
+          user_id: string;
+          role: string;
+          active?: boolean;
+          joined_at?: string;
+          last_active_at?: string | null;
+        };
+        Update: {
+          organization_id?: string;
+          user_id?: string;
+          role?: string;
+          active?: boolean;
+          joined_at?: string;
+          last_active_at?: string | null;
+        };
+        Relationships: [];
+      };
+      organization_messages: {
+        Row: {
+          id: string;
+          organization_id: string;
+          actor_id: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          actor_id: string;
+          body: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          actor_id?: string;
+          body?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      organizations: {
+        Row: {
+          id: string;
+          name: string;
+          legal_name: string;
+          provider_type: string;
+          source_kind: string;
+          status: string;
+          hospital_id: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          legal_name?: string;
+          provider_type: string;
+          source_kind: string;
+          status?: string;
+          hospital_id?: string | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          legal_name?: string;
+          provider_type?: string;
+          source_kind?: string;
+          status?: string;
+          hospital_id?: string | null;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       package_exclusions: {
         Row: {
           package_id: string;
@@ -1171,6 +1357,7 @@ export type Database = {
           source_record_id: string | null;
           created_at: string;
           updated_at: string;
+          publication_status: string;
         };
         Insert: {
           id?: string;
@@ -1194,6 +1381,7 @@ export type Database = {
           source_record_id?: string | null;
           created_at?: string;
           updated_at?: string;
+          publication_status?: string;
         };
         Update: {
           id?: string;
@@ -1217,6 +1405,109 @@ export type Database = {
           source_record_id?: string | null;
           created_at?: string;
           updated_at?: string;
+          publication_status?: string;
+        };
+        Relationships: [];
+      };
+      portal_accounts: {
+        Row: {
+          user_id: string;
+          active: boolean;
+          notification_preferences: Json;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          active?: boolean;
+          notification_preferences?: Json;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          active?: boolean;
+          notification_preferences?: Json;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      portal_notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          body: string;
+          resource_type: string;
+          resource_id: string | null;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title: string;
+          body?: string;
+          resource_type: string;
+          resource_id?: string | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          body?: string;
+          resource_type?: string;
+          resource_id?: string | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      portal_settings: {
+        Row: {
+          key: string;
+          value: Json;
+          updated_by: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          key: string;
+          value: Json;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          key?: string;
+          value?: Json;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      portal_verification_checks: {
+        Row: {
+          id: string;
+          organization_id: string;
+          initiated_by: string;
+          provider_id: string;
+          report: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          initiated_by: string;
+          provider_id: string;
+          report: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          initiated_by?: string;
+          provider_id?: string;
+          report?: Json;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -1303,6 +1594,240 @@ export type Database = {
           locale?: string | null;
           timezone?: string | null;
           created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      provider_documents: {
+        Row: {
+          id: string;
+          organization_id: string;
+          record_id: string | null;
+          name: string;
+          document_type: string;
+          storage_path: string;
+          mime_type: string;
+          size_bytes: number;
+          expires_on: string | null;
+          status: string;
+          review_message: string;
+          uploaded_by: string;
+          reviewed_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          record_id?: string | null;
+          name: string;
+          document_type: string;
+          storage_path: string;
+          mime_type: string;
+          size_bytes: number;
+          expires_on?: string | null;
+          status?: string;
+          review_message?: string;
+          uploaded_by: string;
+          reviewed_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          record_id?: string | null;
+          name?: string;
+          document_type?: string;
+          storage_path?: string;
+          mime_type?: string;
+          size_bytes?: number;
+          expires_on?: string | null;
+          status?: string;
+          review_message?: string;
+          uploaded_by?: string;
+          reviewed_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      provider_field_reviews: {
+        Row: {
+          sequence: number;
+          id: string;
+          record_id: string;
+          revision: number;
+          organization_id: string;
+          field: string;
+          status: string;
+          evidence: string;
+          source_url: string | null;
+          document_id: string | null;
+          expires_on: string | null;
+          reviewed_by: string;
+          created_at: string;
+        };
+        Insert: {
+          sequence: number;
+          id?: string;
+          record_id: string;
+          revision: number;
+          organization_id: string;
+          field: string;
+          status: string;
+          evidence?: string;
+          source_url?: string | null;
+          document_id?: string | null;
+          expires_on?: string | null;
+          reviewed_by: string;
+          created_at?: string;
+        };
+        Update: {
+          sequence?: number;
+          id?: string;
+          record_id?: string;
+          revision?: number;
+          organization_id?: string;
+          field?: string;
+          status?: string;
+          evidence?: string;
+          source_url?: string | null;
+          document_id?: string | null;
+          expires_on?: string | null;
+          reviewed_by?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      provider_records: {
+        Row: {
+          id: string;
+          organization_id: string;
+          kind: string;
+          name: string;
+          data: Json;
+          revision: number;
+          published_revision: number | null;
+          status: string;
+          canonical_id: string | null;
+          created_by: string;
+          updated_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          kind: string;
+          name: string;
+          data: Json;
+          revision?: number;
+          published_revision?: number | null;
+          status?: string;
+          canonical_id?: string | null;
+          created_by: string;
+          updated_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          kind?: string;
+          name?: string;
+          data?: Json;
+          revision?: number;
+          published_revision?: number | null;
+          status?: string;
+          canonical_id?: string | null;
+          created_by?: string;
+          updated_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      provider_revisions: {
+        Row: {
+          record_id: string;
+          revision: number;
+          organization_id: string;
+          name: string;
+          data: Json;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          record_id: string;
+          revision: number;
+          organization_id: string;
+          name: string;
+          data: Json;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: {
+          record_id?: string;
+          revision?: number;
+          organization_id?: string;
+          name?: string;
+          data?: Json;
+          created_by?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      provider_submission_items: {
+        Row: {
+          submission_id: string;
+          record_id: string;
+          revision: number;
+        };
+        Insert: {
+          submission_id: string;
+          record_id: string;
+          revision: number;
+        };
+        Update: {
+          submission_id?: string;
+          record_id?: string;
+          revision?: number;
+        };
+        Relationships: [];
+      };
+      provider_submissions: {
+        Row: {
+          id: string;
+          organization_id: string;
+          status: string;
+          submitted_by: string;
+          reviewer_id: string | null;
+          message: string;
+          review_message: string;
+          submitted_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          status?: string;
+          submitted_by: string;
+          reviewer_id?: string | null;
+          message?: string;
+          review_message?: string;
+          submitted_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          status?: string;
+          submitted_by?: string;
+          reviewer_id?: string | null;
+          message?: string;
+          review_message?: string;
+          submitted_at?: string;
           updated_at?: string;
         };
         Relationships: [];
@@ -1398,6 +1923,7 @@ export type Database = {
           created_at: string;
           updated_at: string;
           source_record_id: string | null;
+          publication_status: string;
         };
         Insert: {
           id?: string;
@@ -1408,6 +1934,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           source_record_id?: string | null;
+          publication_status?: string;
         };
         Update: {
           id?: string;
@@ -1418,6 +1945,211 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           source_record_id?: string | null;
+          publication_status?: string;
+        };
+        Relationships: [];
+      };
+      staff_roles: {
+        Row: {
+          user_id: string;
+          role: string;
+          active: boolean;
+          granted_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          role: string;
+          active?: boolean;
+          granted_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          role?: string;
+          active?: boolean;
+          granted_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      support_case_events: {
+        Row: {
+          id: string;
+          case_id: string;
+          actor_id: string;
+          action: string;
+          summary: string;
+          visibility: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          case_id: string;
+          actor_id: string;
+          action: string;
+          summary: string;
+          visibility: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          case_id?: string;
+          actor_id?: string;
+          action?: string;
+          summary?: string;
+          visibility?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      support_case_messages: {
+        Row: {
+          id: string;
+          case_id: string;
+          actor_id: string;
+          body: string;
+          visibility: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          case_id: string;
+          actor_id: string;
+          body: string;
+          visibility: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          case_id?: string;
+          actor_id?: string;
+          body?: string;
+          visibility?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      support_cases: {
+        Row: {
+          id: string;
+          patient_id: string;
+          organization_id: string | null;
+          source_case_id: string | null;
+          conversation_id: string | null;
+          document_workspace_id: string | null;
+          title: string;
+          description: string;
+          case_type: string;
+          status: string;
+          priority: string;
+          assigned_to: string | null;
+          due_at: string | null;
+          escalation_reason: string | null;
+          share_conversation: boolean;
+          share_documents: boolean;
+          share_with_provider: boolean;
+          consent_granted_at: string;
+          consent_revoked_at: string | null;
+          revision: number;
+          created_at: string;
+          updated_at: string;
+          hospital_id: string | null;
+        };
+        Insert: {
+          id?: string;
+          patient_id: string;
+          organization_id?: string | null;
+          source_case_id?: string | null;
+          conversation_id?: string | null;
+          document_workspace_id?: string | null;
+          title: string;
+          description?: string;
+          case_type?: string;
+          status?: string;
+          priority?: string;
+          assigned_to?: string | null;
+          due_at?: string | null;
+          escalation_reason?: string | null;
+          share_conversation?: boolean;
+          share_documents?: boolean;
+          share_with_provider?: boolean;
+          consent_granted_at: string;
+          consent_revoked_at?: string | null;
+          revision?: number;
+          created_at?: string;
+          updated_at?: string;
+          hospital_id?: string | null;
+        };
+        Update: {
+          id?: string;
+          patient_id?: string;
+          organization_id?: string | null;
+          source_case_id?: string | null;
+          conversation_id?: string | null;
+          document_workspace_id?: string | null;
+          title?: string;
+          description?: string;
+          case_type?: string;
+          status?: string;
+          priority?: string;
+          assigned_to?: string | null;
+          due_at?: string | null;
+          escalation_reason?: string | null;
+          share_conversation?: boolean;
+          share_documents?: boolean;
+          share_with_provider?: boolean;
+          consent_granted_at?: string;
+          consent_revoked_at?: string | null;
+          revision?: number;
+          created_at?: string;
+          updated_at?: string;
+          hospital_id?: string | null;
+        };
+        Relationships: [];
+      };
+      support_tasks: {
+        Row: {
+          id: string;
+          case_id: string;
+          title: string;
+          assigned_to: string | null;
+          due_at: string | null;
+          priority: string;
+          status: string;
+          created_by: string;
+          revision: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          case_id: string;
+          title: string;
+          assigned_to?: string | null;
+          due_at?: string | null;
+          priority?: string;
+          status?: string;
+          created_by: string;
+          revision?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          case_id?: string;
+          title?: string;
+          assigned_to?: string | null;
+          due_at?: string | null;
+          priority?: string;
+          status?: string;
+          created_by?: string;
+          revision?: number;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -1642,6 +2374,16 @@ export type Database = {
       release_assistant_turn: { Args: { p_conversation_id: string; p_token: string }; Returns: undefined };
       save_care_plan: { Args: { p_plan: Json; p_token: string }; Returns: undefined };
       save_document_workspace: { Args: { p_workspace: Json; p_expected_revision: number; p_action: string }; Returns: undefined };
+      portal_context: { Args: Record<string, never>; Returns: Json };
+      portal_account_active: { Args: Record<string, never>; Returns: boolean };
+      portal_command: { Args: { p_action: string; p_input?: Json }; Returns: Json };
+      support_command: { Args: { p_action: string; p_input?: Json }; Returns: Json };
+      portal_publication_command: { Args: { p_action: string; p_input: Json }; Returns: Json };
+      portal_catalog_command: { Args: { p_action: string; p_input: Json }; Returns: Json };
+      portal_case_context: { Args: { p_case_id: string }; Returns: Json };
+      portal_users: { Args: { p_search?: string }; Returns: Json };
+      portal_analytics: { Args: Record<string, never>; Returns: Json };
+      bootstrap_portal_super_admin: { Args: { p_email: string }; Returns: string };
     };
     Enums: {
       case_lifecycle_status: "draft" | "intake" | "planning" | "awaiting_patient" | "awaiting_provider" | "in_progress" | "completed" | "cancelled";

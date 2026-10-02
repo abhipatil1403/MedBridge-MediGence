@@ -65,6 +65,16 @@ lines.push('    };', '    Views: Record<string, never>;', '    Functions: {',
   '      release_assistant_turn: { Args: { p_conversation_id: string; p_token: string }; Returns: undefined };',
   '      save_care_plan: { Args: { p_plan: Json; p_token: string }; Returns: undefined };',
   '      save_document_workspace: { Args: { p_workspace: Json; p_expected_revision: number; p_action: string }; Returns: undefined };',
+  '      portal_context: { Args: Record<string, never>; Returns: Json };',
+  '      portal_account_active: { Args: Record<string, never>; Returns: boolean };',
+  '      portal_command: { Args: { p_action: string; p_input?: Json }; Returns: Json };',
+  '      support_command: { Args: { p_action: string; p_input?: Json }; Returns: Json };',
+  '      portal_publication_command: { Args: { p_action: string; p_input: Json }; Returns: Json };',
+  '      portal_catalog_command: { Args: { p_action: string; p_input: Json }; Returns: Json };',
+  '      portal_case_context: { Args: { p_case_id: string }; Returns: Json };',
+  '      portal_users: { Args: { p_search?: string }; Returns: Json };',
+  '      portal_analytics: { Args: Record<string, never>; Returns: Json };',
+  '      bootstrap_portal_super_admin: { Args: { p_email: string }; Returns: string };',
   '    };', '    Enums: {');
 for (const [name, values] of Object.entries(enums).sort(([a], [b]) => a.localeCompare(b))) {
   lines.push(`      ${name}: ${values.map((value) => JSON.stringify(value)).join(' | ')};`);

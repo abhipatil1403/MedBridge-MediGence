@@ -71,6 +71,7 @@ create table public.provider_documents (
   foreign key(organization_id,record_id) references public.provider_records(organization_id,id)
 );
 create table public.provider_field_reviews (
+  sequence bigint generated always as identity unique,
   id uuid primary key default gen_random_uuid(), record_id uuid not null, revision integer not null,
   organization_id uuid not null references public.organizations(id), field text not null,
   status text not null check(status in ('approved','verified','needs_confirmation','conflicting','rejected','stale','not_applicable')),
@@ -178,12 +179,14 @@ end;$$;
 create function private.portal_notify_org(p_org uuid,p_title text,p_body text,p_type text,p_id uuid) returns void
 language sql security definer set search_path='' as $$
   insert into public.portal_notifications(user_id,title,body,resource_type,resource_id)
-  select user_id,p_title,p_body,p_type,p_id from public.organization_members where organization_id=p_org and active;
+  select m.user_id,p_title,p_body,p_type,p_id from public.organization_members m where m.organization_id=p_org and m.active
+    and not exists(select 1 from public.portal_accounts a where a.user_id=m.user_id and (not a.active or a.notification_preferences->>'in_app'='false'));
 $$;
 create function private.portal_notify_staff(p_title text,p_body text,p_type text,p_id uuid) returns void
 language sql security definer set search_path='' as $$
   insert into public.portal_notifications(user_id,title,body,resource_type,resource_id)
-  select user_id,p_title,p_body,p_type,p_id from public.staff_roles where active and role in ('admin','super_admin');
+  select s.user_id,p_title,p_body,p_type,p_id from public.staff_roles s where s.active and s.role in ('admin','super_admin')
+    and not exists(select 1 from public.portal_accounts a where a.user_id=s.user_id and (not a.active or a.notification_preferences->>'in_app'='false'));
 $$;
 
 -- A security-definer command is the sole authenticated write path. No direct CRUD grants.

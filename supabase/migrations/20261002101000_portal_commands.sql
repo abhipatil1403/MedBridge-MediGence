@@ -13,10 +13,17 @@ create policy assigned_review_documents on public.provider_documents for select 
 create policy assigned_review_fields on public.provider_field_reviews for select to authenticated using(private.portal_org_reviewer(organization_id));
 
 create function private.portal_validate_record(p_kind text,p_data jsonb,p_submit boolean default false) returns void language plpgsql set search_path='' as $$
+declare required_field text;
 begin
   if jsonb_typeof(p_data)<>'object' or octet_length(p_data::text)>50000 then raise exception 'PORTAL_INVALID';end if;
+  if nullif(p_data->>'website','') is not null and p_data->>'website' !~ '^https://[^[:space:]]+$' then raise exception 'PORTAL_INVALID';end if;
+  if nullif(p_data->>'experienceYears','') is not null and (p_data->>'experienceYears')::integer not between 0 and 80 then raise exception 'PORTAL_INVALID';end if;
+  if nullif(p_data->>'quantity','') is not null and (p_data->>'quantity')::integer<0 then raise exception 'PORTAL_INVALID';end if;
   if p_kind='organization' and p_submit then
-    if length(coalesce(p_data->>'description',''))<10 or length(coalesce(p_data->>'phone',''))<3 or coalesce(p_data->>'email','') !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
+    for required_field in select jsonb_array_elements_text(value) from public.portal_settings where key='provider_required_fields' loop
+      if required_field<>'name' and length(trim(coalesce(p_data->>required_field,'')))=0 then raise exception 'PORTAL_PROFILE_REQUIRED';end if;
+    end loop;
+    if length(coalesce(p_data->>'description',''))<10 or (nullif(p_data->>'email','') is not null and p_data->>'email' !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$')
       or not exists(select 1 from public.cities c join public.countries co on co.id=c.country_id where c.id=(p_data->>'cityId')::uuid and co.publication_status='published') then raise exception 'PORTAL_PROFILE_REQUIRED';end if;
   elsif p_kind in ('specialty','treatment') and p_submit then
     if p_kind='specialty' and not exists(select 1 from public.specialties where id=(p_data->>'specialtyId')::uuid) then raise exception 'PORTAL_CATALOG_REQUIRED';end if;
@@ -202,7 +209,7 @@ begin
     old_row:=to_jsonb(o);update public.organizations set status=p_input->>'status',updated_at=now() where id=org returning * into o;
     perform private.portal_audit('organization.status_changed','organization',org,org,old_row,to_jsonb(o));return to_jsonb(o);
   elsif p_action='save_setting' then
-    if v_role<>'super_admin' then raise exception 'PORTAL_DENIED';end if;
+    if v_role is distinct from 'super_admin' then raise exception 'PORTAL_DENIED';end if;
     if p_input->>'key'='provider_required_fields' and (jsonb_typeof(p_input->'value')<>'array' or not p_input->'value' @> '["name","description","cityId"]'::jsonb) then raise exception 'PORTAL_INVALID';end if;
     if p_input->>'key'='publication_requires_identity_evidence' and p_input->'value'<>'true'::jsonb then raise exception 'PORTAL_INVALID';end if;
     select to_jsonb(ps) into old_row from public.portal_settings ps where key=p_input->>'key';

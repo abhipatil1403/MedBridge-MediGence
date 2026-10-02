@@ -18,6 +18,7 @@ insert into portal_test_ids(k,id) select 'record_a',(public.portal_command('save
 select pg_temp.portal_assert((select count(*)=1 from public.organizations),'provider can read its own organization');
 select pg_temp.portal_denied('update public.provider_records set status=''published''','permission denied');
 select pg_temp.portal_denied('select public.portal_command(''set_staff_role'',''{}'')','PORTAL_DENIED');
+select pg_temp.portal_denied('select public.portal_command(''save_setting'',''{"key":"provider_required_fields","value":["name","description","cityId"]}'')','PORTAL_DENIED');
 select pg_temp.portal_denied(format('select public.portal_command(''save_record'',%L)',jsonb_build_object('organizationId',(select id from portal_test_ids where k='org_a'),'recordId',(select id from portal_test_ids where k='record_a'),'kind','organization','name','QA changed','data','{}'::jsonb,'expectedRevision',0)::text),'PORTAL_CONFLICT');
 select set_config('request.jwt.claim.sub',(select id::text from portal_test_ids where k='b'),true);
 insert into portal_test_ids(k,id) select 'org_b',(public.portal_command('create_organization','{"name":"QA ONLY Provider B","providerType":"clinic","sourceKind":"synthetic"}') ->>'id')::uuid;
