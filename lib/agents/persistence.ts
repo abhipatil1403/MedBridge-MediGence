@@ -41,6 +41,8 @@ export async function verifyUser(token: string): Promise<{ id: string; email?: s
   const db = createUserClient(token);
   const { data, error } = await db.auth.getUser(token);
   if (error || !data.user) throw new AgentError('AUTH_REQUIRED', 'Sign in to use the care workspace.');
+  const active=await db.rpc('portal_account_active',{});
+  if(active.error||active.data!==true) throw new AgentError('AUTH_REQUIRED','This account is inactive or unavailable.');
   return { id: data.user.id, email: data.user.email };
 }
 

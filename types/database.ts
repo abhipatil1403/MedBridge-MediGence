@@ -2375,6 +2375,7 @@ export type Database = {
       save_care_plan: { Args: { p_plan: Json; p_token: string }; Returns: undefined };
       save_document_workspace: { Args: { p_workspace: Json; p_expected_revision: number; p_action: string }; Returns: undefined };
       portal_context: { Args: Record<string, never>; Returns: Json };
+      portal_touch_activity: { Args: Record<string, never>; Returns: undefined };
       portal_account_active: { Args: Record<string, never>; Returns: boolean };
       portal_command: { Args: { p_action: string; p_input?: Json }; Returns: Json };
       support_command: { Args: { p_action: string; p_input?: Json }; Returns: Json };
@@ -2383,6 +2384,12 @@ export type Database = {
       portal_case_context: { Args: { p_case_id: string }; Returns: Json };
       portal_users: { Args: { p_search?: string }; Returns: Json };
       portal_analytics: { Args: Record<string, never>; Returns: Json };
+      public_provider_profile: { Args: { p_hospital_id: string }; Returns: Json };
+      public_provider_image: { Args: { p_doctor_id: string }; Returns: Json };
+      public_provider_record: { Args: { p_kind: string; p_id: string }; Returns: Json };
+      portal_team: { Args: { p_organization_id: string }; Returns: Json };
+      portal_staff_directory: { Args: Record<string, never>; Returns: Json };
+      record_portal_verification: { Args: { p_actor: string; p_organization_id: string; p_provider_id: string; p_report: Json }; Returns: string };
       bootstrap_portal_super_admin: { Args: { p_email: string }; Returns: string };
     };
     Enums: {
