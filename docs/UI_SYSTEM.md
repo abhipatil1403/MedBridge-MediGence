@@ -29,3 +29,9 @@ The [reference audit](MEDIGENCE_REFERENCE_AUDIT.md) shows a dense directory-and-
 ## Reusable primitives by milestone
 
 Foundation: `Container`, `SiteHeader`, `MobileNav`, `SiteFooter`, `Button`, `SectionHeading`. Discovery: `SearchBox`, `FilterPanel`, `ResultRow`, `StatusBlock`, `SourceNote`. Detail: `Breadcrumbs`, `KeyFacts`, `SectionNav`, `RelatedList`, `EnquiryPanel`. Operations: `CaseTimeline`, `TaskList`, `DataTable`, `DocumentStatus`, `ReviewBanner`, `AuditTrail`. Build each when its actual task ships, not as speculative UI inventory.
+
+## Implemented shared refinement — 2 October 2026
+
+The delivered system is `app/ui-system.css`, `components/page-header.tsx` and `components/ui/status-badge.tsx`. H1 uses a shared 36–64px/700/1.08 scale (compact authentication 32–44px); H2/H3/body/meta and a 4px spacing base are shared. Containers are 1216px maximum with 18–32px responsive gutters. Main landmarks are focusable skip-link destinations.
+
+Public navigation uses active route labels; mobile navigation is a disclosure. Discovery filters use a focus-trapped mobile dialog. Comparison cells wrap on mobile, retaining explicit country headings. The Care Workspace uses two columns, with primary results before collapsed completed activity and contextual case/documents. Evidence, unresolved criteria, ownership and actual audit/history records remain accessible. No speculative dashboard or staff component was introduced. See [the measured audit and release validation](UX_UI_REFINEMENT.md).

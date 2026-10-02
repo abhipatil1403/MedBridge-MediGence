@@ -2,10 +2,13 @@
 
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { isActiveNavigation } from "@/lib/navigation";
 import { useEffect, useRef, useState } from "react";
 import { navigation } from "@/lib/navigation";
 
 export function SiteHeader() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
 
@@ -31,7 +34,7 @@ export function SiteHeader() {
 
         <nav className="desktop-nav" aria-label="Primary navigation">
           {navigation.map((item) => (
-            <Link key={item.href} href={item.href}>{item.label}</Link>
+            <Link aria-current={isActiveNavigation(pathname, item.href) ? "page" : undefined} key={item.href} href={item.href}>{item.label}</Link>
           ))}
         </nav>
 
@@ -52,7 +55,7 @@ export function SiteHeader() {
         <nav id="mobile-navigation" className="mobile-nav" aria-label="Mobile navigation">
           <div className="container mobile-nav__inner">
             {navigation.map((item, index) => (
-              <Link key={item.href} href={item.href} onClick={() => setOpen(false)}>
+              <Link aria-current={isActiveNavigation(pathname, item.href) ? "page" : undefined} key={item.href} href={item.href} onClick={() => setOpen(false)}>
                 <span className="mobile-nav__number">0{index + 1}</span>
                 {item.label}
               </Link>

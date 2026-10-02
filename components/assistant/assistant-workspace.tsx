@@ -177,29 +177,35 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
     finally { setBusy(false); }
   }
 
-  if (!configured) return <section className="assistant-state" role="status"><h2>Assistant configuration needed</h2>
-    <p>Care workspace runs need the Supabase server configuration and workspace migrations. Add these in your local or deployment environment, then reload this page. Structured catalog searches and planning can continue when model assistance is unavailable.</p>
-    <Link href="/discover">Explore the catalog meanwhile →</Link></section>;
+  if (!configured) return <section className="assistant-state" role="status"><h2>Care Workspace is temporarily unavailable</h2>
+    <p>Please try again later. You can continue exploring care options through search.</p>
+    <Link href="/discover">Explore care options →</Link></section>;
 
   if (!session) return <section className="assistant-state assistant-signin"><div><p className="eyebrow">PRIVATE WORKSPACE</p><h2>Sign in to begin</h2>
     <p>Your conversations are saved to your account. Case information is used only when you select a case and grant assistant consent.</p></div>
     <form onSubmit={signIn}><label>Email address<input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setLinkSent(false); }} autoComplete="email" required /></label>
-      <button type="submit" className="button" disabled={busy}>{linkSent ? 'Send another sign-in link' : 'Send sign-in link'}</button>
+      <button type="submit" className="button button--primary" disabled={busy}>{linkSent ? 'Send another sign-in link' : 'Send sign-in link'}</button>
       {notice && <p role="status">{notice}</p>}</form></section>;
 
   const selectedCase = cases.find((item) => item.id === caseId);
   const latestRequest = [...messages].reverse().find((message) => message.role === 'user')?.content;
-  const sources = latest ? [...new Map(latest.findings.map((finding) => [finding.provenance.table, finding.provenance])).values()] : [];
   return <div className="assistant-shell">
     <aside className="assistant-rail" aria-label="Conversations"><div className="assistant-rail__head"><h2>Workspace</h2>
       <button type="button" disabled={busy} onClick={() => { setActivity(undefined); setConversationId(undefined); setCaseId(''); setMessages([]); setLatest(null); setCarePlan(undefined); setNotice(''); }}>New conversation</button></div>
-      <div className="assistant-rail__list">{conversations.map((item) => <button key={item.id} type="button" className={item.id === conversationId ? 'active' : ''}
-        aria-pressed={item.id === conversationId} disabled={busy} onClick={() => { setActivity(undefined); setConversationId(item.id); setCaseId(item.case_id ?? ''); setLatest(null); setCarePlan(undefined); }}>{item.title}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}</div>
+      <details className="assistant-conversations"><summary>Saved conversations · {conversations.length}</summary><div className="assistant-rail__list">{conversations.map((item) => <button key={item.id} type="button" className={item.id === conversationId ? 'active' : ''}
+        aria-pressed={item.id === conversationId} disabled={busy} onClick={() => { setActivity(undefined); setConversationId(item.id); setCaseId(item.case_id ?? ''); setLatest(null); setCarePlan(undefined); }}>{item.title}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}</div></details>
       <button type="button" className="assistant-signout" onClick={() => auth?.auth.signOut()}>Sign out</button></aside>
 
     <section className="assistant-main" aria-label="Care conversation">
       <div className="assistant-main__intro"><span className="eyebrow">CARE COORDINATION</span><h2>{conversationId ? 'Your conversation' : 'What can we help you explore?'}</h2>
-        <p>Catalog records and external research are labelled separately. Demo providers, costs, and packages remain marked as samples.</p></div>
+        <p>Start with a treatment, location or question. Sample providers are clearly labelled.</p></div>
+            <details className="assistant-case-context" open={Boolean(selectedCase)}><summary>{selectedCase ? `Linked case · ${selectedCase.title}` : "Case context · optional"}</summary>
+      <label htmlFor="case-select">Case<select id="case-select" value={caseId} disabled={Boolean(conversationId) || busy} onChange={(event) => setCaseId(event.target.value)}>
+        <option value="">No linked case record</option>{cases.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
+      {selectedCase && <><p>{selectedCase.agentConsent ? 'Assistant access granted for this case.' : 'Case owner consent is needed before the assistant reads this case.'}</p>
+        {selectedCase.canManageConsent && <button type="button" disabled={busy} onClick={() => changeConsent(selectedCase)}>{selectedCase.agentConsent ? 'Revoke assistant consent' : 'Grant assistant consent'}</button>}</>}
+      <small>Case information stays within the selected conversation. Document contents are not sent to the assistant.</small></details>
+
       <div className="assistant-messages" aria-live="polite">{messages.length === 0 && <div className="assistant-empty"><p>Try a specific care planning request:</p>
         {['I need a cardiologist in India.', 'Find hospitals for knee replacement in Mumbai.', 'Compare knee replacement in India and Turkey.'].map((example) =>
           <button key={example} type="button" onClick={() => setContent(example)}>{example}</button>)}</div>}
@@ -210,72 +216,53 @@ export function AssistantWorkspace({ configured }: { configured: boolean }) {
             disabled={busy} onRequest={text=>{void submitRequest(text);}} /> : <p>{message.content}</p>}
         </article>)}
         {activity && !messages.some((message) => message.metadata?.response?.runId === activity.runId) && <ExecutionActivity activity={activity} />}
-        {busy && !activity && <div className="assistant-working" role="status">Working on your request. Results and recorded task states will appear when the run finishes.</div>}
+        {busy && !activity && <div className="assistant-working" role="status">Working on your request… Your results will appear here.</div>}
       </div>
-      <DocumentPanel key={`${session.user.id}:${conversationId??'new'}`} token={session.access_token} conversationId={conversationId} disabled={busy}
-        onResponse={async response=>{setConversationId(response.conversationId);setLatest(response);setActivity(response.activity);await refresh(response.conversationId);}} />
       <form className="assistant-composer" onSubmit={send}><label htmlFor="assistant-input">Your request</label>
         <textarea id="assistant-input" value={content} onChange={(event) => setContent(event.target.value)} placeholder="Tell us what you are looking for…" rows={3} maxLength={2000} disabled={busy} required />
-        <div><small>For discovery and coordination. A clinician must assess symptoms and treatment decisions.</small><button className="button" type="submit" disabled={busy || !content.trim()}>{busy ? 'Working…' : 'Plan my next step'}</button></div>
+        <div><small>For discovery and coordination. A clinician must assess symptoms and treatment decisions.</small><button className="button button--primary" type="submit" disabled={busy || !content.trim()}>{busy ? 'Working…' : 'Send request'}</button></div>
         {notice && <p className="assistant-error" role="alert">{notice}</p>}</form>
+      <div className="assistant-support">
+      <DocumentPanel key={`${session.user.id}:${conversationId??'new'}`} token={session.access_token} conversationId={conversationId} disabled={busy} contextual={latest?.agent === 'document_coordination'}
+        onResponse={async response=>{setConversationId(response.conversationId);setLatest(response);setActivity(response.activity);await refresh(response.conversationId);}} />
+      {carePlan?.context.patientCase && <details className="assistant-support__section" open={latest?.workflow === 'case_intake'}><summary>Your saved case</summary><CasePanel draft={carePlan.context.patientCase} busy={busy} onAction={(text) => { void submitRequest(text); }} /></details>}
+      {carePlan && <details className="assistant-support__section"><summary>Saved care plan · tasks and progress</summary><CarePlanPanel plan={carePlan} busy={busy} onTaskAction={completePlanTask} /></details>}
+      </div>
     </section>
 
-    <aside className="assistant-context" aria-label="Plan and case context"><div className="assistant-context__panel"><p className="eyebrow">CASE CONTEXT</p><h2>Scope this conversation</h2>
-      <label htmlFor="case-select">Case<select id="case-select" value={caseId} disabled={Boolean(conversationId) || busy} onChange={(event) => setCaseId(event.target.value)}>
-        <option value="">No linked case record</option>{cases.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
-      {selectedCase && <><p>{selectedCase.agentConsent ? 'Assistant access granted for this case.' : 'Case owner consent is needed before the assistant reads this case.'}</p>
-        {selectedCase.canManageConsent && <button type="button" disabled={busy} onClick={() => changeConsent(selectedCase)}>{selectedCase.agentConsent ? 'Revoke assistant consent' : 'Grant assistant consent'}</button>}</>}
-      <small>Case information stays within the selected conversation. Document contents are not sent to the assistant.</small></div>
-      {carePlan?.context.patientCase && <CasePanel draft={carePlan.context.patientCase} busy={busy} onAction={(text) => { void submitRequest(text); }} />}
-      {carePlan && <CarePlanPanel plan={carePlan} busy={busy} onTaskAction={completePlanTask} />}
-      <div className="assistant-context__panel"><p className="eyebrow">CURRENT REQUEST</p><p>{busy ? content.trim() : latestRequest || 'Describe what you want to explore.'}</p></div>
-      <div className="assistant-context__panel"><p className="eyebrow">CURRENT PLAN</p><h2>{latest?.workflow === 'case_intake' ? 'Case intake agent' : latest ? agentsLabel(latest.agent) : 'No run yet'}</h2>
-        {latest ? <ol className="assistant-task-list">{latest.tasks.map((task) => <li key={task.id}><strong>{task.objective}</strong><span>{task.status.replaceAll('_', ' ')}</span></li>)}</ol>
-          : <p>Actual tasks appear here after a request runs.</p>}</div>
-      <div className="assistant-context__panel"><p className="eyebrow">FINDINGS</p>{latest?.documents ? <><strong>{latest.documents.requirements.length} requested documents</strong><p>{latest.documents.documents.filter(d=>d.uploadStatus==='uploaded').length} private uploaded files. Review the checklist and confirmation state below the conversation.</p></> : <><strong>{latest?.findings.length ?? 0} catalog records</strong>
-        <p>Source labels reflect each catalog record. Synthetic records are demo data.</p>{latest?.research && <p>{latest.research.findings.length} external evidence items · {latest.research.sources.length} retrieved sources</p>}</>}</div>
-      <div className="assistant-context__panel"><p className="eyebrow">SOURCES</p>{latest?.documents ? <ul className="assistant-source-list">{[...new Set(latest.documents.requirements.map(r=>r.source.label))].map(label=><li key={label}>{label}</li>)}</ul> : sources.length ? <ul className="assistant-source-list">{sources.map((source) =>
-        <li key={source.table}>{source.label} · {source.table}{source.sourceKind === 'synthetic' ? ' · Demo data' : ''}</li>)}</ul> : <p>{latest?.research ? 'External citations and exact evidence appear with the research results.' : 'Sources appear with retrieved results.'}</p>}</div>
-      {latest?.nextSteps.length ? <div className="assistant-context__panel"><p className="eyebrow">NEXT ACTIONS</p><ul className="assistant-source-list">{latest.nextSteps.map((step) => <li key={step}>{step}</li>)}</ul></div> : null}
-    </aside>
   </div>;
 }
 
-function agentsLabel(agent: AgentResponse['agent']) {
-  return ({ discovery: 'Discovery agent', treatment_planning: 'Treatment planning agent', hospital_matching: 'Hospital matching agent', comparison: 'Comparison agent', research: 'Research agent', document_coordination: 'Document coordination agent',provider_verification:'Provider verification agent' })[agent];
-}
-
-function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, onRequest, disabled }: { response: AgentResponse; approvalStatus?: string;
+export function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, onRequest, disabled }: { response: AgentResponse; approvalStatus?: string;
   onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; onRetry?: () => void; onRequest?:(content:string)=>void; disabled: boolean }) {
   return <div className="assistant-response">
-    {response.activity && <ExecutionActivity activity={response.activity} />}
     <RequestUnderstanding response={response} />
-    <RequestProgress request={response.compoundRequest} />
     {response.workflow === 'case_intake' && response.caseSummary && <CaseSummaryContent summary={response.caseSummary} />}
     {response.caseHandoff && <p>Using the reviewed case for catalog coordination. Reported medical information is separate from search requirements and does not establish treatment suitability. No case has been submitted to a provider.</p>}
     {response.agent === 'document_coordination' ? <p>{response.summary}</p> : <FindingsSummary response={response} />}
+    {response.verification && <VerificationResults result={response.verification} onRequest={onRequest} disabled={disabled} />}
     <div className="assistant-catalog-results">
       {response.research && response.findings.length > 0 && <h3 className="assistant-section-title">MEDBRIDGE CATALOG</h3>}
-      {!response.resultGroups?.length && response.discovery && <div className="assistant-match-state" role="status"><strong>{response.status === 'awaiting_user_input' ? 'One detail needed' : response.findings.some((f) => f.requirementEvaluation && f.requirementEvaluation.overallStatus !== 'fully_satisfies') ? 'Catalog results · review requirements' : response.discovery.matchType === 'exact' ? 'Exact catalog matches' : response.discovery.matchType === 'related' ? 'Related catalog information' : 'No exact catalog match'}</strong>
-        <p>{response.discovery.matchReason}</p>
-        {response.discovery.recovered && <p>Catalog criteria were checked directly to complete this search.</p>}</div>}
       {response.status === 'failed' && <div className="assistant-recovery">{onRetry && <button type="button" disabled={disabled} onClick={onRetry}>Retry this request</button>}
         <Link href="/discover">Continue with standard catalog search →</Link></div>}
-      {response.hospitalMatches && <HospitalMatchResults matches={response.hospitalMatches} />}
-      {response.comparison ? <ComparisonResults comparison={response.comparison} /> : response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : <FindingCards findings={response.findings} />}</div>
-    {response.comparison && response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} /> : null}
+      {response.comparison ? <ComparisonResults comparison={response.comparison} /> : response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} onRequest={onRequest} disabled={disabled} /> : <FindingCards findings={response.findings} onRequest={onRequest} disabled={disabled} />}</div>
+    {response.hospitalMatches && <details className="assistant-evidence-review"><summary>Hospital matching evidence</summary><HospitalMatchResults matches={response.hospitalMatches} /></details>}
+    {response.comparison && response.resultGroups?.length ? <details><summary>Options in this comparison</summary><PlanningResultGroups groups={response.resultGroups} onRequest={onRequest} disabled={disabled} /></details> : null}
     {response.research && <ResearchResults result={response.research} comparison={response.researchComparison} />}
-    {response.verification && <VerificationResults result={response.verification} onRequest={onRequest} disabled={disabled} />}
+
     {response.analyses?.map((analysis, index) => <details className="assistant-evidence-review" key={index}><summary>CATALOG EVIDENCE REVIEW</summary><p>{analysis.summary}</p>
       {analysis.missingInformation.length > 0 && <ul>{analysis.missingInformation.map((gap, i) => <li key={i}>{gap}</li>)}</ul>}
       <small>Derived from {analysis.recordIds.length} sourced catalog records · {analysis.complete ? 'Evidence review completed' : 'Incomplete evidence'}</small></details>)}
     <ClarificationQuestion question={response.question} />
+    {response.findings.length > 0 && response.summarySource !== 'model' && <details className="assistant-evidence-review"><summary>About these results</summary><p>{response.summary}</p></details>}
     {response.approvalProposal && <div className="assistant-response__approval"><small>PROPOSED ACTION</small><p>{response.approvalProposal.detail}</p>
       {response.approvalProposal.action === 'request_external_action' ? <p>External sharing and bookings are not connected. This request remains pending human review.</p>
         : approvalStatus === 'proposed' && response.approvalId ? <div className="assistant-approval-actions">
           <button type="button" disabled={disabled} onClick={() => onDecision(response.approvalId!, 'approved')}>Approve this change</button>
           <button type="button" disabled={disabled} onClick={() => onDecision(response.approvalId!, 'rejected')}>Reject</button></div>
           : <p>Status: {approvalStatus ?? 'pending'}</p>}</div>}
-    {response.nextSteps.length > 0 && <div className="assistant-next-steps"><h3 className="assistant-section-title">NEXT STEPS</h3><ul>{response.nextSteps.filter(step => visibleText(step)).map((step) => <li key={step}>{step}</li>)}</ul></div>}
+    {response.nextSteps.length > 0 && !response.verification && <details className="assistant-next-steps"><summary>Suggested next steps</summary><ul>{response.nextSteps.filter(step => visibleText(step)).map((step) => <li key={step}>{step}</li>)}</ul></details>}
+    <RequestProgress request={response.compoundRequest} />
+    {response.activity && <ExecutionActivity activity={response.activity} />}
   </div>;
 }

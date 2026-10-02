@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
 import { CompareForm } from "@/components/compare-form";
 import { DemoNotice } from "@/components/demo-notice";
@@ -12,8 +13,8 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const requested = Boolean(params.procedure && params.countryA && params.countryB);
   const comparison = requested ? await getComparison(params.procedure!, params.countryA!, params.countryB!) : undefined;
   const columns = comparison ? [comparison.first, comparison.second] : [];
-  return <main id="main-content" className="container compare-page">
-    <div className="directory-page__head"><p className="eyebrow">COUNTRY COMPARISON</p><h1>Compare care across destinations.</h1><p>Choose a treatment and two countries. This demonstration uses synthetic estimates and sample provider records, not live quotes.</p></div>
+  return <main id="main-content" tabIndex={-1} className="container compare-page">
+    <PageHeader eyebrow="COUNTRY COMPARISON" title="Compare destinations" description="Choose a treatment and two countries to compare sample costs, providers and travel needs." />
     <CompareForm treatments={treatments} countries={countries} procedure={params.procedure} countryA={params.countryA} countryB={params.countryB} />
     <DemoNotice compact />
     {requested && !comparison && <div className="result-state" role="alert"><h2>Choose two different, available countries.</h2><p>We could not build a comparison from those selections. Adjust the form above and try again.</p></div>}

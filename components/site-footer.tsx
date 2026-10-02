@@ -14,7 +14,7 @@ export function SiteFooter() {
         </div>
         <nav aria-label="Footer navigation">
           <span className="footer-label">Explore</span>
-          {navigation.slice(1).map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}
+          {[...navigation.slice(1), {label:"Packages",href:"/packages"}, {label:"Medical travel",href:"/medical-travel"}, {label:"Recovery",href:"/recovery"}].map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}
         </nav>
         <div className="footer-note">
           <span className="footer-label">Platform status</span>

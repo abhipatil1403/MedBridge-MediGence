@@ -1,6 +1,7 @@
 'use client';
 import type { CarePlan } from '@/lib/agents/schemas';
 import { planningResultGroup, resultGroupLabel } from '@/lib/agents/treatment-planning/results';
+import { statusLabel } from '@/components/ui/status-badge';
 import { ComparisonResults } from './comparison-results';
 
 export function CarePlanPanel({ plan, busy, onTaskAction }: { plan: CarePlan; busy: boolean;
@@ -11,13 +12,13 @@ export function CarePlanPanel({ plan, busy, onTaskAction }: { plan: CarePlan; bu
     <p className="eyebrow">YOUR COORDINATION PLAN</p><h2>{plan.title}</h2>
     <p>{plan.goal}</p><p>{[plan.context.city, plan.context.country].filter(Boolean).join(' · ') || 'Destination not chosen'}</p>
     {Boolean(plan.context.requirements?.length) && <details open><summary>Saved requirements</summary><ul>{plan.context.requirements!.map((requirement) => <li key={requirement.id}>{requirement.label}{requirement.desired === false ? ' · excluded' : ''}</li>)}</ul></details>}
-    <p className="assistant-care-plan__progress" role="status">{completed} of {tasks.length} planning tasks complete · {plan.status.replaceAll('_', ' ')}</p>
+    <p className="assistant-care-plan__progress" role="status">{completed} of {tasks.length} planning tasks complete · {statusLabel(plan.status)}</p>
     {plan.context.budget && <p>Your budget preference: {plan.context.budget.currency} {plan.context.budget.amount.toLocaleString('en-US')}
       {plan.context.budget.currency === 'INR' ? ' · No currency conversion applied' : ' · Compared with sample package prices'}</p>}
     <ol className="assistant-care-plan__tasks">{tasks.map((task) => {
       const group = ['completed', 'blocked'].includes(task.status) ? planningResultGroup(task) : undefined;
       return <li key={task.id}>
-      <strong>{task.title}</strong><span>{task.status.replaceAll('_', ' ')}</span>
+      <strong>{task.title}</strong><span>{statusLabel(task.status)}</span>
       {group && <small>{group.findings.some((f) => f.requirementEvaluation && f.requirementEvaluation.overallStatus !== 'fully_satisfies') ? 'Catalog results · requirements unconfirmed' : resultGroupLabel(group)}</small>}
       {task.description && <p>{task.description}</p>}
       {task.comparison && <details><summary>Saved comparison</summary><ComparisonResults comparison={task.comparison} /></details>}

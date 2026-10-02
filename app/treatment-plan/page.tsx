@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Breadcrumbs } from "@/components/breadcrumbs";
@@ -15,9 +16,9 @@ export default async function TreatmentPlanPage({ searchParams }: { searchParams
   const selectedPackage = packages.find((item) => item.slug === params.package);
   const treatment = treatments.find((item) => item.slug === (params.treatment ?? selectedPackage?.treatmentSlug));
   const hospital = hospitals.find((item) => item.slug === (params.hospital ?? selectedPackage?.hospitalSlug));
-  return <main id="main-content" className="container service-page">
+  return <main id="main-content" tabIndex={-1} className="container service-page">
     <Breadcrumbs currentPath="/treatment-plan" items={[{ label: "Home", href: "/" }, { label: "Treatment planning brief" }]} />
-    <div className="service-page__head"><p className="eyebrow">CARE COORDINATION</p><h1>Prepare a treatment planning brief.</h1><p>Select sample care options to see what a future coordinator request would need. No provider is contacted and no quote is generated.</p></div>
+    <PageHeader eyebrow="CARE COORDINATION" title="Treatment planning brief" description="Keep your sample care options together. This brief does not contact a provider or generate a quote." />
     <DemoNotice compact />
     <form className="plan-form" action="/treatment-plan" method="get"><input type="hidden" name="plan" value="1" />
       <label>Treatment<select name="treatment" defaultValue={treatment?.slug ?? ""}><option value="">Choose a treatment</option>{treatments.map((item) => <option value={item.slug} key={item.slug}>{item.name}</option>)}</select></label>

@@ -1,4 +1,5 @@
 'use client';
+import { PageHeader } from "@/components/page-header";
 
 import { useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
@@ -49,8 +50,8 @@ export function AuthCallback() {
     void completeSignIn();
   }, []);
 
-  return <main id="main-content" className="auth-page container"><section className="auth-card" role="status">
-    <p className="eyebrow">MEDBRIDGE ACCOUNT</p><h1>Checking your sign-in link</h1>
+  return <main id="main-content" tabIndex={-1} className="auth-page container"><section className="auth-card" role="status">
+    <PageHeader eyebrow="MEDBRIDGE ACCOUNT" title="Checking your sign-in link" compact />
     <p>Please wait while we finish signing you in.</p>
   </section></main>;
 }

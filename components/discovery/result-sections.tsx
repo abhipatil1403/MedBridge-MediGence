@@ -35,7 +35,7 @@ export function ResultSections({ results, limit = 4 }: { results: DiscoveryResul
           </article>)}
           {key === "hospitals" && sections.hospitals.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }) => <article className="result-row" key={item.slug}>
             <div><span className="result-kicker">Demo hospital · {item.city}, {item.country}</span><h3><Link href={`/hospitals/${item.slug}`}>{item.name}</Link></h3><p>{item.specialties.slice(0, 3).join(" · ")}</p><small>{reason} Sample beds: {item.sampleBedCount}. {item.verification}.</small></div>
-            <div className="result-row__actions"><Link className="result-action" href={`/hospitals/${item.slug}`}>View hospital <ArrowRight size={16} aria-hidden="true" /></Link><Link href={`/treatment-plan?hospital=${item.slug}`}>Get treatment quote</Link></div>
+            <div className="result-row__actions"><Link className="result-action" href={`/hospitals/${item.slug}`}>View hospital <ArrowRight size={16} aria-hidden="true" /></Link><Link href={`/treatment-plan?hospital=${item.slug}`}>Prepare planning brief</Link></div>
           </article>)}
           {key === "doctors" && sections.doctors.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }) => <article className="result-row" key={item.slug}>
             <div><span className="result-kicker">Demo clinician · {item.specialty}</span><h3><Link href={`/doctors/${item.slug}`}>{item.name}</Link></h3><p>{item.hospitalName} · {item.city}, {item.country}</p><small>{reason} Sample experience: {item.sampleExperienceYears} years · {item.consultationMode}.</small></div>

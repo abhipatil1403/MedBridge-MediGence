@@ -1,4 +1,5 @@
 "use client";
+import { PageHeader } from "@/components/page-header";
 
 import { SlidersHorizontal, X } from "lucide-react";
 import Link from "next/link";
@@ -68,6 +69,7 @@ export function DiscoveryExperience({ facets }: { facets: Facets }) {
   const error = loading ? undefined : response.error;
   const [filterOpen, setFilterOpen] = useState(false);
   const filterButton = useRef<HTMLButtonElement>(null);
+  const filterDialog = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -84,9 +86,20 @@ export function DiscoveryExperience({ facets }: { facets: Facets }) {
 
   useEffect(() => {
     if (!filterOpen) return;
-    const onEscape = (event: KeyboardEvent) => { if (event.key === "Escape") { setFilterOpen(false); filterButton.current?.focus(); } };
-    document.addEventListener("keydown", onEscape);
-    return () => document.removeEventListener("keydown", onEscape);
+    const dialog = filterDialog.current;
+    const returnButton = filterButton.current;
+    const controls = () => Array.from(dialog?.querySelectorAll<HTMLElement>('button:not(:disabled),select:not(:disabled),input:not(:disabled),a[href]') ?? []);
+    controls()[0]?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setFilterOpen(false); }
+      if (event.key === "Tab") {
+        const items = controls(), first = items[0], last = items.at(-1);
+        if (event.shiftKey && (document.activeElement === first || !dialog?.contains(document.activeElement))) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && (document.activeElement === last || !dialog?.contains(document.activeElement))) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("keydown", onKey); returnButton?.focus(); };
   }, [filterOpen]);
 
   function push(next: URLSearchParams) { router.push(`/discover${next.size ? `?${next}` : ""}`); }
@@ -119,12 +132,9 @@ export function DiscoveryExperience({ facets }: { facets: Facets }) {
     ...(type === "hospitals" || type === "doctors" ? [{ value: "location" as const, label: "Location A–Z" }] : []),
   ];
 
-  return <main id="main-content" className="discover-page">
+  return <main id="main-content" tabIndex={-1} className="discover-page">
     <div className="container discover-page__intro">
-      <p className="eyebrow">HEALTHCARE DISCOVERY</p>
-      <h1>{query ? "Here’s what we found" : "Explore care options"}</h1>
-      <p>Search treatments, sample providers, destinations, packages and care services. Results are informational and do not replace professional advice.</p>
-      <SearchBox key={query} initialQuery={query} label="Search healthcare options" />
+      <PageHeader eyebrow="HEALTHCARE DISCOVERY" title={query ? "Here’s what we found" : "Explore care options"} description="Search treatments, hospitals, doctors and care services. Sample results help you explore your next step."><SearchBox key={query} initialQuery={query} label="Search healthcare options" /></PageHeader>
       <DemoNotice compact />
     </div>
     <div className="container discover-page__body">
@@ -144,6 +154,6 @@ export function DiscoveryExperience({ facets }: { facets: Facets }) {
         </div>
       </div>
     </div>
-    {filterOpen && <div className="filter-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setFilterOpen(false); }}><div className="filter-drawer" role="dialog" aria-modal="true" aria-label="Search filters"><div className="filter-drawer__head"><strong>Filters</strong><button type="button" onClick={() => { setFilterOpen(false); filterButton.current?.focus(); }} aria-label="Close filters"><X size={21} /></button></div><FilterControls facets={facets} type={type} params={params} update={update} clear={clear} /><button className="button button--primary button--default filter-drawer__done" type="button" onClick={() => setFilterOpen(false)}>View results</button></div></div>}
+    {filterOpen && <div className="filter-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setFilterOpen(false); }}><div ref={filterDialog} className="filter-drawer" role="dialog" aria-modal="true" aria-label="Search filters"><div className="filter-drawer__head"><strong>Filters</strong><button type="button" onClick={() => { setFilterOpen(false); filterButton.current?.focus(); }} aria-label="Close filters"><X size={21} /></button></div><FilterControls facets={facets} type={type} params={params} update={update} clear={clear} /><button className="button button--primary button--default filter-drawer__done" type="button" onClick={() => setFilterOpen(false)}>View results</button></div></div>}
   </main>;
 }

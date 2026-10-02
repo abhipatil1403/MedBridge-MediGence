@@ -5,7 +5,7 @@ import { StatusMark } from './response-presentation';
 export function ResearchResults({ result, comparison }: { result: ResearchResult; comparison?: AgentResponse['researchComparison'] }) {
   const entities = [...new Map(result.findings.map(f => [f.entity.id, f.entity])).values()];
   return <section className="assistant-research" aria-label="External research">
-    <h3 className="assistant-section-title">EXTERNAL RESEARCH · PUBLIC SOURCE EVIDENCE</h3>
+    <h3>Public source research</h3>
     <p className="assistant-research__caveat">Separate from the MedBridge catalog. Provider statements are not independently verified. Retrieved {new Date(result.retrievedAt).toLocaleDateString('en-GB', { timeZone: 'UTC' })}; retrieval does not establish currentness.</p>
     {entities.map((entity, index) => <article className="assistant-research__entity" key={entity.id}><h4>{index + 1}. {entity.name}</h4><dl className="assistant-evidence">
       {result.findings.filter(f => f.entity.id === entity.id).map(f => <div className="assistant-evidence__finding" key={f.id}>
@@ -14,8 +14,8 @@ export function ResearchResults({ result, comparison }: { result: ResearchResult
           <span className="assistant-evidence__status"><StatusMark status={f.status} />{f.status.replaceAll('_', ' ')} · external source</span>
           {f.evidence.map(e => { const source = result.sources.find(s => s.id === e.sourceId)!; return <div className="assistant-evidence__source" key={e.sourceId}>
             <a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}</a>
-            <div className="assistant-source-metadata"><span>{source.sourceType.replaceAll('_', ' ')}</span><span>authority tier {source.authorityLevel}</span><span>{source.domain}</span>
-              <span>Retrieved {source.retrievedAt.slice(0, 10)}</span><span>{source.freshness.replaceAll('-', ' ')}</span>{source.publishedAt && <span>Published {source.publishedAt.slice(0, 10)}</span>}</div>
+            <details className="assistant-source-metadata"><summary>Source details</summary><span>{source.sourceType.replaceAll('_', ' ')}</span><span>authority tier {source.authorityLevel}</span><span>{source.domain}</span>
+              <span>Retrieved {source.retrievedAt.slice(0, 10)}</span><span>{source.freshness.replaceAll('-', ' ')}</span>{source.publishedAt && <span>Published {source.publishedAt.slice(0, 10)}</span>}</details>
             <details><summary>Source and exact evidence</summary><blockquote>{e.snippet}</blockquote></details>
           </div>; })}
         </dd></div>)}

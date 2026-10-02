@@ -1,6 +1,6 @@
 export function DemoNotice({ compact = false }: { compact?: boolean }) {
   return <div className={compact ? "demo-notice demo-notice--compact" : "demo-notice"} role="note">
-    <strong>Demonstration data</strong>
-    <span>Providers, clinicians, credentials, prices, stays and packages shown here are synthetic examples. Nothing is verified, bookable, or a medical recommendation.</span>
+    <strong>Demo data</strong>
+    <span>Synthetic providers and sample prices. Not live, verified or bookable care.</span>
   </div>;
 }

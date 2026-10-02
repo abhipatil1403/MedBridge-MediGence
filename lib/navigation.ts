@@ -10,3 +10,7 @@ export const navigation: NavigationItem[] = [
   { label: "Compare", href: "/compare" },
   { label: "Second opinion", href: "/second-opinion" },
 ];
+
+export function isActiveNavigation(pathname: string, href: string) {
+  return pathname === href || href !== "/" && pathname.startsWith(`${href}/`);
+}

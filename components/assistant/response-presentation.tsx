@@ -9,9 +9,9 @@ export function StatusMark({ status }: { status: string }) {
 }
 
 export function RequestUnderstanding({ response }: { response: AgentResponse }) {
-  return <section className="assistant-understanding" aria-label="What I understood">
-    <h3 className="assistant-section-title">WHAT I UNDERSTOOD</h3>
-    <p>{response.understanding}</p>
+  if (response.verification || !response.requirements?.length) return null;
+  return <section className="assistant-understanding" aria-label="Your search criteria">
+    <h3 className="assistant-section-title">YOU’RE LOOKING FOR</h3>
     {Boolean(response.requirements?.length) && <ul className="assistant-request-chips" aria-label="Request requirements">
       {response.requirements!.map(requirement => <li key={requirement.id}>{requirement.label}{requirement.desired === false ? ' · excluded' : ''}</li>)}
     </ul>}
@@ -19,16 +19,13 @@ export function RequestUnderstanding({ response }: { response: AgentResponse }) 
 }
 
 export function FindingsSummary({ response }: { response: AgentResponse }) {
+  if (response.verification || response.workflow === 'case_intake') return null;
+  const counts = new Map<string, number>();
+  for (const finding of response.findings) counts.set(finding.kind, (counts.get(finding.kind) ?? 0) + 1);
+  const nouns: Record<string, [string, string]> = { hospitals: ['hospital', 'hospitals'], doctors: ['doctor', 'doctors'], packages: ['package', 'packages'], treatments: ['treatment', 'treatments'], services: ['service', 'services'], countries: ['destination', 'destinations'] };
   return <section className="assistant-findings-summary" aria-label="Findings summary">
-    <h3 className="assistant-section-title">FINDINGS</h3>
-    <dl className="assistant-summary-metrics">
-      <div><dt>Catalog records</dt><dd>{response.findings.length}</dd></div>
-      {response.research && <>
-        <div><dt>External evidence items</dt><dd>{response.research.findings.length}</dd></div>
-        <div><dt>Retrieved sources</dt><dd>{response.research.sources.length}</dd></div>
-      </>}
-    </dl>
-    <p>{response.summary}</p>
-    {response.summarySource === 'model' && <small>Model-generated coordination explanation. Catalog facts are sourced below.</small>}
+    {response.findings.length > 0 ? <h3>{[...counts].map(([kind, count]) => `${count} ${(nouns[kind] ?? ['option', 'options'])[count === 1 ? 0 : 1]} found`).join(' · ')}</h3> : !response.research && <p>{response.summary}</p>}
+    {response.findings.length > 0 && response.summarySource === 'model' && <p>{response.summary}<small>Coordination explanation generated from the sources below.</small></p>}
+    {response.compoundRequest?.operations.filter(operation => ['incomplete','skipped'].includes(operation.status) && operation.note).map(operation => <p className="assistant-result-notice" role="status" key={operation.id}>{operation.note}</p>)}
   </section>;
 }

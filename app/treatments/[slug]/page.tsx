@@ -19,7 +19,7 @@ export default async function TreatmentDetailPage({ params }: Props) {
   const data = await getTreatmentDetail(slug);
   if (!data) notFound();
   const { treatment, hospitals, doctors, packages, countries, related } = data;
-  return <main id="main-content" className="container detail-page">
+  return <main id="main-content" tabIndex={-1} className="container detail-page">
     <Breadcrumbs currentPath={`/treatments/${slug}`} items={[{ label: "Home", href: "/" }, { label: "Treatments", href: "/treatments" }, { label: treatment.name }]} />
     <DemoNotice compact />
     <DetailHero type={`TREATMENT · ${treatment.specialty}`} title={treatment.name} intro={treatment.overview}

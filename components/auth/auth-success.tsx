@@ -1,4 +1,5 @@
 'use client';
+import { PageHeader } from "@/components/page-header";
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -26,8 +27,8 @@ export function AuthSuccess({ next }: { next: string }) {
     return () => { active = false; if (timer) window.clearTimeout(timer); };
   }, [next]);
 
-  return <main id="main-content" className="auth-page container"><section className="auth-card" role="status">
-    <p className="eyebrow">MEDBRIDGE ACCOUNT</p><h1>{verified ? 'You’re signed in' : 'Confirming your session'}</h1>
+  return <main id="main-content" tabIndex={-1} className="auth-page container"><section className="auth-card" role="status">
+    <PageHeader eyebrow="MEDBRIDGE ACCOUNT" title={verified ? 'You’re signed in' : 'Confirming your session'} compact />
     <p>{verified ? 'Your email link worked. We’ll take you back to where you started.' : 'Please wait while we verify your account.'}</p>
     {verified && <Link className="auth-card__action" href={next}>Continue now →</Link>}
   </section></main>;

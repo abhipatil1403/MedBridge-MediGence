@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 export default function DiscoveryLoading() {
-  return <main id="main-content" className="container state-page" role="status" aria-live="polite"><p className="eyebrow">HEALTHCARE DISCOVERY</p><h1>Loading care options…</h1></main>;
+  return <main id="main-content" tabIndex={-1} className="container state-page" role="status" aria-live="polite"><PageHeader eyebrow="HEALTHCARE DISCOVERY" title="Loading care options…" /></main>;
 }

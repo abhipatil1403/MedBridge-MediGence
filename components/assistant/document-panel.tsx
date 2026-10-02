@@ -5,7 +5,7 @@ import type { AgentResponse } from '@/lib/agents/schemas';
 import type { DocumentWorkspace, DocumentTool } from '@/lib/documents/schemas';
 
 type Options={hospitals:Array<{id:string;name:string;source_kind:string}>;services:Array<{id:string;name:string}>;workspace?:DocumentWorkspace};
-export function DocumentPanel({token,conversationId,disabled,onResponse}:{token:string;conversationId?:string;disabled:boolean;onResponse:(response:AgentResponse)=>Promise<void>}) {
+export function DocumentPanel({token,conversationId,disabled,onResponse,contextual=false}:{token:string;conversationId?:string;disabled:boolean;contextual?:boolean;onResponse:(response:AgentResponse)=>Promise<void>}) {
   const [options,setOptions]=useState<Options>({hospitals:[],services:[]});
   const [w,setWorkspace]=useState<DocumentWorkspace>();
   const [hospital,setHospital]=useState(''),[service,setService]=useState(''),[serviceId,setServiceId]=useState('');
@@ -69,7 +69,7 @@ export function DocumentPanel({token,conversationId,disabled,onResponse}:{token:
   const available=(id:string)=>active.filter(d=>d.matchStatus==='matched'&&d.requirementId===id);
   const missing=w?.requirements.filter(r=>r.required&&!available(r.id).length).length??0;
   const locked=busy||disabled;
-  return <details className="assistant-documents" open={Boolean(w)}><summary>Documents · hospital/service checklist</summary>
+  return <details className="assistant-documents" open={Boolean(w) && contextual}><summary>Documents{w ? ` · ${active.length} private files` : ' · optional checklist and uploads'}</summary>
     <p>Organize explicitly requested documents. Files remain private. MedBridge does not interpret their content or determine treatment needs.</p>
     {!w?<form className="assistant-document-target" onSubmit={event=>{event.preventDefault();void action('start',{hospitalId:hospital,serviceLabel:service,serviceId:serviceId||undefined});}}>
       <label>Selected hospital<select required value={hospital} disabled={locked} onChange={event=>setHospital(event.target.value)}><option value="">Choose a hospital</option>{options.hospitals.map(h=><option key={h.id} value={h.id}>{h.name}{h.source_kind==='synthetic'?' · demo':''}</option>)}</select></label>
