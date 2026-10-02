@@ -41,7 +41,7 @@ npm run build
 
 After migrations and seed, regenerate database types from a migrated PostgreSQL database by setting `MEDBRIDGE_TYPES_DB_URL` and running `node scripts/generate-db-types.mjs`. With a local server running, `npm run smoke` checks the catalog inventory, searches, filtering, sorting, suggestions, empty/error responses and linked routes. Set `MEDBRIDGE_TEST_ORIGIN` if the server uses a port other than 3000. `scripts/validate-rls.sql` exercises anonymous directory access, case ownership, caregiver revocation, unauthorized access and private agent/audit tables against a test database.
 
-`GET /api/health` returns a generic status. `GET /api/discover` returns ranked synthetic catalog results from PostgreSQL; `GET /api/discover/suggestions` provides search suggestions. Neither API accepts patient information. `/api/assistant` requires a verified Supabase access token and uses the authenticated client for case reads. The server-only key writes private agent records after ownership and consent checks.
+`GET /api/health` returns a generic status. `GET /api/discover` returns ranked published catalog results from PostgreSQL; synthetic examples retain their provenance labels. `GET /api/discover/suggestions` provides search suggestions. Neither API accepts patient information. `/api/assistant` requires a verified Supabase access token and uses the authenticated client for case reads. The server-only key writes private agent records after ownership and consent checks.
 
 ## Architecture
 
@@ -53,6 +53,7 @@ After migrations and seed, regenerate database types from a migrated PostgreSQL 
 - [Compound intent validation](docs/COMPOUND_INTENT_VALIDATION.md): shared requirements, dependent catalog operations, saved references, partial results, and automated/browser verification.
 - [UI system](docs/UI_SYSTEM.md), [design quality](docs/DESIGN_QUALITY_RULES.md) and [content rules](docs/CONTENT_RULES.md): product and editorial standards.
 - [Implementation roadmap](docs/IMPLEMENTATION_ROADMAP.md): milestone gates.
+- [Operational portals](docs/MULTI_PORTAL_PLATFORM.md): provider onboarding, staff roles, evidence review, publishing, support consent, hosting and validation.
 
 ## Code layout
 
@@ -62,4 +63,4 @@ The button primitive follows the shadcn/ui composition style and `components.jso
 
 ## Safety and provenance
 
-Reference pages were inspected for product architecture only. MedBridge uses original branding and copy. Every provider, clinician, price, stay length, credential and experience figure in the catalog is synthetic and labeled as sample data. Public medical information and provider/price claims require review and source evidence before publication. The prototype is set `noindex` until real content and services are ready.
+Reference pages were inspected for product architecture only. MedBridge uses original branding and copy. The seeded providers, clinicians and prices are synthetic and labeled as examples. Provider workspaces can submit first-party information for evidence review and publication; only approved frozen snapshots reach the public catalog and existing agents. Publication approval does not establish clinical suitability or verify every claim. Public medical information and provider/price claims require review and source evidence before publication. The site remains `noindex` until real content and services are ready.

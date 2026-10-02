@@ -20,6 +20,7 @@ insert into qa_ids(k,id) select 'submission',(public.portal_command('submit',jso
 select pg_temp.denied_qa(format('select public.portal_command(''save_record'',%L)',jsonb_build_object('organizationId',(select id from qa_ids where k='org'),'recordId',(select id from qa_ids where k='profile'),'kind','organization','name','Locked','data','{}'::jsonb,'expectedRevision',1)::text),'PORTAL_RECORD_LOCKED');
 select set_config('request.jwt.claim.sub',(select id::text from qa_ids where k='admin'),true);
 select public.portal_command('review_submission',jsonb_build_object('submissionId',(select id from qa_ids where k='submission'),'status','changes_requested','message','Please clarify the profile description.'));
+select public.portal_command('assign_reviewer',jsonb_build_object('submissionId',(select id from qa_ids where k='submission'),'userId',(select id from qa_ids where k='support')));
 select set_config('request.jwt.claim.sub',(select id::text from qa_ids where k='provider'),true);
 select pg_temp.check_qa(exists(select 1 from public.portal_notifications where title='changes requested'),'provider receives changes request');
 select public.portal_command('save_record',jsonb_build_object('organizationId',(select id from qa_ids where k='org'),'recordId',id,'kind',kind,'name',name,'data',data||'{"description":"Revised synthetic QA description."}'::jsonb,'expectedRevision',revision)) from public.provider_records where id=(select id from qa_ids where k='profile');
@@ -32,6 +33,13 @@ select pg_temp.check_qa((select count(*)=6 from public.provider_records where pu
 select set_config('request.jwt.claim.sub',(select id::text from qa_ids where k='provider'),true);
 select public.portal_command('save_record',jsonb_build_object('organizationId',(select id from qa_ids where k='org'),'recordId',id,'kind',kind,'name','SECRET DRAFT NAME','data',data,'expectedRevision',revision)) from public.provider_records where id=(select id from qa_ids where k='profile');
 reset role;
+select public.record_portal_verification((select id from qa_ids where k='support'),(select id from qa_ids where k='org'),(select id from qa_ids where k='hospital'),'{"status":"incomplete","testOnly":true}'::jsonb);
+set local role authenticated;
+select set_config('request.jwt.claim.sub',(select id::text from qa_ids where k='support'),true);
+select pg_temp.check_qa((select count(*)=1 from public.portal_verification_checks),'assigned reviewer sees scoped verification history');
+select set_config('request.jwt.claim.sub',(select id::text from qa_ids where k='other_support'),true);
+select pg_temp.check_qa((select count(*)=0 from public.portal_verification_checks),'unassigned reviewer cannot see verification history');
+reset role;
 grant select on qa_ids to anon;
 set local role anon;
 select pg_temp.check_qa(exists(select 1 from public.hospitals where id=(select id from qa_ids where k='hospital') and name='QA ONLY Workflow Hospital'),'published hospital visible, draft does not leak');
@@ -40,6 +48,7 @@ select pg_temp.check_qa(exists(select 1 from public.search_catalog_candidates('Q
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub',(select id::text from qa_ids where k='patient'),true);
+select pg_temp.denied_qa('select public.support_command(''create_case'',''{"title":"Missing consent must be denied"}''::jsonb)','PORTAL_CONSENT_REQUIRED');
 insert into qa_ids(k,id) select 'case',(public.support_command('create_case',jsonb_build_object('title','QA coordination request','consent',true,'hospitalId',(select id from qa_ids where k='hospital'),'shareWithProvider',true))->>'id')::uuid;
 select set_config('request.jwt.claim.sub',(select id::text from qa_ids where k='support'),true);
 select public.support_command('update_case',jsonb_build_object('caseId',(select id from qa_ids where k='case'),'expectedRevision',1,'assignedTo',(select id from qa_ids where k='support'),'status','in_progress'));
