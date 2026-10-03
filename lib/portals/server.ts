@@ -13,6 +13,8 @@ export class PortalError extends Error {
   }
 }
 const messages: Record<string, string> = {
+  PORTAL_SECTIONS_UNRESOLVED:
+    "An administrator must approve every frozen section, with accepted current evidence, before approving or publishing this submission.",
   PORTAL_CONFLICT:
     "This record changed since you opened it. Reload before saving.",
   PORTAL_DENIED: "You do not have access to this operation.",

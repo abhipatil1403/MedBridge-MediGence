@@ -22,6 +22,7 @@ const resources = {
   provider_submission_items: { search: null, sort: "revision" },
   provider_documents: { search: "name", sort: "created_at" },
   provider_field_reviews: { search: "field", sort: "sequence" },
+  provider_section_reviews: { search: "comment", sort: "sequence" },
   organization_members: { search: null, sort: "last_active_at" },
   organization_invites: { search: "email", sort: "created_at" },
   organization_messages: { search: "body", sort: "created_at" },
@@ -58,6 +59,7 @@ const orgTables = new Set([
   "provider_submissions",
   "provider_documents",
   "provider_field_reviews",
+  "provider_section_reviews",
   "organization_members",
   "organization_invites",
   "organization_messages",
@@ -218,6 +220,15 @@ export async function GET(request: NextRequest) {
           }),
         ),
       );
+    if (resource === "listing_status") {
+      return portalResponse(
+        checked(
+          await db.rpc("portal_listing_status", {
+            p_organization_id: z.uuid().parse(params.get("organizationId")),
+          }),
+        ),
+      );
+    }
     if (resource === "submission_context") {
       const id = z.uuid().parse(params.get("id"));
       const submission = checked(
@@ -249,7 +260,14 @@ export async function GET(request: NextRequest) {
           ),
         })),
       );
-      return portalResponse({ submission, items: snapshots });
+      const reviews = checked(
+        await db
+          .from("provider_section_reviews")
+          .select("*")
+          .eq("submission_id", id)
+          .order("sequence", { ascending: false }),
+      );
+      return portalResponse({ submission, items: snapshots, reviews });
     }
     if (resource === "analytics") {
       const metrics = checked(await db.rpc("portal_analytics", {})) as Record<
@@ -409,7 +427,7 @@ export async function GET(request: NextRequest) {
         "created_at",
         "updated_at",
       ],
-      provider_submissions: ["status", "submitted_at", "reviewed_at"],
+      provider_submissions: ["status", "submitted_at", "updated_at"],
       provider_documents: ["name", "status", "created_at", "expires_on"],
       organizations: ["name", "status", "created_at", "updated_at"],
     };
@@ -442,11 +460,15 @@ export async function GET(request: NextRequest) {
       [
         "provider_revisions",
         "provider_field_reviews",
+        "provider_section_reviews",
         "provider_submission_items",
       ].includes(table)
     )
       query = query.eq("record_id", z.uuid().parse(params.get("recordId")));
-    if (params.get("submissionId") && table === "provider_submission_items")
+    if (
+      params.get("submissionId") &&
+      ["provider_submission_items", "provider_section_reviews"].includes(table)
+    )
       query = query.eq(
         "submission_id",
         z.uuid().parse(params.get("submissionId")),
@@ -521,8 +543,24 @@ export async function GET(request: NextRequest) {
         nullsFirst: false,
       })
       .range((page - 1) * size, page * size - 1);
+    const resultRows = checked(result);
+    const enrichedRows =
+      table === "provider_submissions"
+        ? await Promise.all(
+            resultRows.map(async (row) => ({
+              ...(row as unknown as Record<string, unknown>),
+              ...(checked(
+                await db.rpc("portal_submission_summary", {
+                  p_submission_id: String(
+                    (row as unknown as { id: string }).id,
+                  ),
+                }),
+              ) as Record<string, unknown>),
+            })),
+          )
+        : resultRows;
     return portalResponse({
-      rows: checked(result),
+      rows: enrichedRows,
       total: result.count ?? 0,
       page,
       size,
@@ -540,6 +578,8 @@ const portalActions = [
   "assign_reviewer",
   "review_submission",
   "review_field",
+  "review_section",
+  "open_submission",
   "invite_member",
   "accept_invite",
   "update_member",
@@ -599,13 +639,15 @@ export async function POST(request: NextRequest) {
     if (body.action === "save_record") recordInputSchema.parse(body.input);
     if (JSON.stringify(body.input).length > 60000)
       throw new PortalError(413, "This change is too large.");
-    const rpc = (supportActions as readonly string[]).includes(body.action)
-      ? "support_command"
-      : (publicationActions as readonly string[]).includes(body.action)
-        ? "portal_publication_command"
-        : (catalogActions as readonly string[]).includes(body.action)
-          ? "portal_catalog_command"
-          : "portal_command";
+    const rpc = ["review_section", "open_submission"].includes(body.action)
+      ? "portal_review_command"
+      : (supportActions as readonly string[]).includes(body.action)
+        ? "support_command"
+        : (publicationActions as readonly string[]).includes(body.action)
+          ? "portal_publication_command"
+          : (catalogActions as readonly string[]).includes(body.action)
+            ? "portal_catalog_command"
+            : "portal_command";
     return portalResponse(
       checked(
         await db.rpc(rpc, {

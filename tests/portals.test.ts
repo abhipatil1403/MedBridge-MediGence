@@ -13,11 +13,82 @@ import { packagePrice } from "@/lib/catalog/pricing";
 import { toFinding } from "@/lib/agents/tools";
 import { RequirementEvaluator } from "@/lib/requirements/RequirementEvaluator";
 import { extractBudget } from "@/lib/requirements/RequirementNormalizer";
-import { pkg, snapshot } from "./fixtures/comparison-harness";
+import { pkg, snapshot, hospital, tools } from "./fixtures/comparison-harness";
 import { randomUUID } from "node:crypto";
 import { validProviderFile } from "@/app/api/portals/documents/route";
+import { attributeEvidence } from "@/lib/requirements/RequirementEvidence";
+import { SearchService } from "@/lib/discovery/search-service";
 
 describe("portal boundaries and provider input", () => {
+  it("finds a hospital's published secondary location without moving its package there", async () => {
+    const branch = { ...hospital, locationCities: ["Nashik"] };
+    const service = new SearchService({
+      ...tools.repository,
+      loadSnapshot: async () => ({ ...snapshot, hospitals: [branch] }),
+    });
+    const hospitals = await service.search({
+      q: "Find knee replacement hospitals in Nashik",
+      type: "hospitals",
+      sort: "relevance",
+    });
+    expect(hospitals.sections.hospitals.map((match) => match.item.recordId)).toContain(
+      branch.recordId,
+    );
+    const packages = await service.search({
+      q: "Find knee replacement packages in Nashik",
+      type: "packages",
+      sort: "relevance",
+    });
+    expect(packages.sections.packages).toHaveLength(0);
+  });
+  it("uses explicit published service states without inferring accommodation from stay", () => {
+    const base = { ...pkg, inclusions: ["Hospital stay"], exclusions: [] };
+    expect(attributeEvidence(base, "accommodation").status).toBe("unknown");
+    for (const [status, expected] of [
+      ["included", "exact"],
+      ["excluded", "not_met"],
+      ["conditional", "incomplete"],
+      ["not_confirmed", "unknown"],
+    ] as const) {
+      const record = {
+        ...base,
+        serviceDetails: { accommodation: { status, information: null } },
+      };
+      expect(attributeEvidence(record, "accommodation").status).toBe(expected);
+      expect(toFinding("packages", record).facts.accommodationStatus).toBe(
+        status.replaceAll("_", " "),
+      );
+    }
+  });
+  it("keeps contradictory package information unresolved", () => {
+    const record = {
+      ...pkg,
+      inclusions: [],
+      exclusions: ["Accommodation"],
+      serviceDetails: {
+        accommodation: {
+          status: "included" as const,
+          information: "Two hotel nights",
+        },
+      },
+    };
+    expect(attributeEvidence(record, "accommodation").status).toBe(
+      "incomplete",
+    );
+    expect(
+      attributeEvidence(
+        {
+          ...record,
+          inclusions: ["Accommodation"],
+          exclusions: [],
+          serviceDetails: {
+            accommodation: { status: "excluded", information: null },
+          },
+        },
+        "accommodation",
+      ).status,
+    ).toBe("incomplete");
+  });
   it("never grants a staff portal from provider or patient status", () => {
     for (const role of [null, "provider_admin", "provider_editor", "patient"]) {
       expect(portalAllowed("admin", role)).toBe(false);

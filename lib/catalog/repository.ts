@@ -15,6 +15,8 @@ import type {
   Treatment,
 } from "@/types/catalog";
 import type { ParsedQuery } from "@/types/discovery";
+import { packageServicesSchema } from "./package-services";
+import { normalize } from "@/lib/discovery/normalize";
 
 const faqSchema = z.array(
   z.object({ question: z.string(), answer: z.string() }),
@@ -66,6 +68,8 @@ const loadSnapshot = cache(async () => {
     exclusionQuery,
     serviceQuery,
     priceQuery,
+    packageDetailsQuery,
+    hospitalDetailsQuery,
   ] = await Promise.all([
     db.from("countries").select("*"),
     db.from("cities").select("*"),
@@ -84,6 +88,8 @@ const loadSnapshot = cache(async () => {
     db.from("package_exclusions").select("*"),
     db.from("healthcare_services").select("*"),
     db.from("price_estimates").select("*"),
+    db.rpc("public_provider_package_details", {}),
+    db.rpc("public_provider_hospital_details", {}),
   ]);
   const countryRows = rows(countryQuery.data, countryQuery.error, "countries");
   const cityRows = rows(cityQuery.data, cityQuery.error, "cities");
@@ -134,6 +140,28 @@ const loadSnapshot = cache(async () => {
     "hospital doctors",
   );
   const packageRows = rows(packageQuery.data, packageQuery.error, "packages");
+  if (packageDetailsQuery.error)
+    throw new Error("Published package details are unavailable.");
+  const packageDetails = z
+    .array(z.object({ id: z.string(), serviceDetails: packageServicesSchema }))
+    .parse(packageDetailsQuery.data);
+  const detailsById = new Map(
+    packageDetails.map((item) => [item.id, item.serviceDetails]),
+  );
+  if (hospitalDetailsQuery.error)
+    throw new Error("Published hospital details are unavailable.");
+  const hospitalDetails = z
+    .array(
+      z.object({
+        id: z.string(),
+        accreditations: z.array(z.object({ name: z.string() })),
+        locations: z.array(z.object({ city: z.string().nullable() })),
+      }),
+    )
+    .parse(hospitalDetailsQuery.data);
+  const hospitalDetailsById = new Map(
+    hospitalDetails.map((item) => [item.id, item]),
+  );
   const inclusionRows = rows(
     inclusionQuery.data,
     inclusionQuery.error,
@@ -253,6 +281,10 @@ const loadSnapshot = cache(async () => {
       demo: item.source_kind === "synthetic",
       sourceKind: sourceKind(item.source_kind),
       city: city.name,
+      locationCities: hospitalDetailsById
+        .get(item.id)
+        ?.locations.map((location) => location.city)
+        .filter((name): name is string => Boolean(name)),
       country: required(countryById.get(city.country_id), "hospital country")
         .slug,
       specialties: hospitalSpecialtyRows
@@ -278,8 +310,12 @@ const loadSnapshot = cache(async () => {
               .slug,
         ),
       sampleBedCount: item.bed_count ?? 0,
-      sampleAccreditation:
-        item.source_kind === "synthetic"
+      sampleAccreditation: hospitalDetailsById.has(item.id)
+        ? hospitalDetailsById
+            .get(item.id)!
+            .accreditations.map((entry) => entry.name)
+            .join("; ") || "No current accreditation evidence published"
+        : item.source_kind === "synthetic"
           ? (item.accreditation_note ?? "No credential listed")
           : "Provider-submitted credentials require current evidence confirmation",
       verification:
@@ -385,6 +421,7 @@ const loadSnapshot = cache(async () => {
       country: required(countryById.get(item.country_id), "package country")
         .slug,
       durationDays: item.duration_days,
+      serviceDetails: detailsById.get(item.id),
       currency: item.currency.trim(),
       listedPrice: item.estimated_min,
       samplePriceUsd: item.currency.trim() === "USD" ? item.estimated_min : 0,
@@ -467,6 +504,16 @@ export const catalogRepository: CatalogRepository = {
     for (const match of rows(data, error, "catalog search")) {
       if (kinds.includes(match.kind as CatalogKind))
         candidates[match.kind as CatalogKind].add(match.slug);
+    }
+    if (parsed.entities.city) {
+      for (const hospital of (await loadSnapshot()).hospitals) {
+        if (
+          hospital.locationCities?.some(
+            (city) => normalize(city) === normalize(parsed.entities.city!),
+          )
+        )
+          candidates.hospitals.add(hospital.slug);
+      }
     }
     return candidates;
   },

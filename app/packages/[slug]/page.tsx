@@ -13,6 +13,7 @@ import { getPackageDetail } from "@/lib/catalog/detail-service";
 import { detailMetadata } from "@/lib/seo";
 import { packagePrice } from "@/lib/catalog/pricing";
 import { publishedRecordProfile } from "@/lib/catalog/provider-profile";
+import { packageServiceNames } from "@/lib/catalog/package-services";
 
 type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -32,11 +33,8 @@ export default async function PackageDetailPage({ params }: Props) {
   const data = await getPackageDetail(slug);
   if (!data) notFound();
   const { carePackage, hospital, treatment, country } = data;
-  if (!carePackage.demo) {
-    const profile = await publishedRecordProfile(
-      "package",
-      carePackage.recordId,
-    );
+  const profile = await publishedRecordProfile("package", carePackage.recordId);
+  if (!carePackage.demo || profile?.serviceDetails) {
     return (
       <main
         id="main-content"
@@ -51,6 +49,7 @@ export default async function PackageDetailPage({ params }: Props) {
             { label: carePackage.name },
           ]}
         />
+        {carePackage.demo && <DemoNotice />}
         <DetailHero
           type="PUBLISHED CARE PACKAGE"
           title={carePackage.name}
@@ -116,6 +115,32 @@ export default async function PackageDetailPage({ params }: Props) {
                 {profile?.validUntil ?? "End date not provided"}
               </p>
               <p>{profile?.terms ?? "Confirm terms with the provider."}</p>
+              {profile?.notes && <p>{profile.notes}</p>}
+            </DetailSection>
+            <DetailSection title="Package services">
+              <dl className="fact-list">
+                {Object.entries(packageServiceNames).map(([key, name]) => {
+                  const service =
+                    profile?.serviceDetails?.[
+                      key as keyof typeof packageServiceNames
+                    ];
+                  return (
+                    <div key={key}>
+                      <dt>{name}</dt>
+                      <dd>
+                        {!service || service.status === "not_confirmed"
+                          ? "Not confirmed in published package information."
+                          : service.status === "included"
+                            ? "Included in the published package."
+                            : service.status === "excluded"
+                              ? "Excluded from the published package."
+                              : "Conditional; confirm the published limits with the provider."}
+                        {service?.information && <p>{service.information}</p>}
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
             </DetailSection>
           </div>
           <aside className="detail-aside">

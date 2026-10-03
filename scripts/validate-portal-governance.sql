@@ -15,6 +15,7 @@ insert into qg(k,id) select 'submission',(public.portal_command('submit',jsonb_b
 select public.portal_touch_activity();
 select pg_temp.qg_assert((select public.portal_team((select id from qg where k='org'))->0->>'last_active_at' is not null),'last active records actual use');
 select set_config('request.jwt.claim.sub',(select id::text from qg where k='admin'),true);
+select public.portal_review_command('review_section',jsonb_build_object('submissionId',submission_id,'recordId',record_id,'expectedRevision',revision,'status','approved')) from public.provider_submission_items where submission_id=(select id from qg where k='submission');
 select public.portal_command('review_submission',jsonb_build_object('submissionId',(select id from qg where k='submission'),'status','approved'));
 select pg_temp.qg_denied(format('select public.portal_publication_command(''publish_submission'',%L)',jsonb_build_object('submissionId',(select id from qg where k='submission'))::text),'PORTAL_EVIDENCE_REQUIRED');
 select public.portal_command('review_field',jsonb_build_object('submissionId',(select id from qg where k='submission'),'recordId',(select id from qg where k='record'),'field','name','status','verified','evidence','Local fixture attestation only, not a real provider claim.','sourceUrl','https://qa.invalid'));
@@ -29,6 +30,7 @@ reset role;
 set local role anon;
 select pg_temp.qg_assert((public.public_provider_profile((select id from qg where k='hospital'))->'fieldReviews'->0->>'status')='verified','latest approved field evidence exposed without private actor IDs');
 select pg_temp.qg_assert(position('reviewed_by' in public.public_provider_profile((select id from qg where k='hospital'))::text)=0,'public evidence excludes reviewer identity and private storage paths');
+select pg_temp.qg_assert(position('Local fixture conflict' in public.public_provider_profile((select id from qg where k='hospital'))::text)=0,'private reviewer evidence text is never published');
 select pg_temp.qg_assert(public.public_provider_profile(gen_random_uuid())='{}','unknown provider does not expose private staging');
 reset role;
 set local role authenticated;

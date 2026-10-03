@@ -396,6 +396,7 @@
   max-width: 200px;
 }
 .portal-table-scroll {
+  position: relative;
   width: 100%;
   overflow: auto;
   border: 1px solid #e4eae5;
@@ -491,6 +492,7 @@
   border-color: #dce6f8;
 }
 .status-changes_requested,
+.status-evidence_required,
 .status-waiting_patient,
 .status-waiting_provider,
 .status-needs_confirmation {

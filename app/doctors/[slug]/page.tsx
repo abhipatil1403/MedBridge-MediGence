@@ -33,8 +33,8 @@ export default async function DoctorDetailPage({ params }: Props) {
   const data = await getDoctorDetail(slug);
   if (!data) notFound();
   const { doctor, hospital, country, treatments } = data;
-  if (!doctor.demo) {
-    const profile = await publishedRecordProfile("doctor", doctor.recordId);
+  const profile = await publishedRecordProfile("doctor", doctor.recordId);
+  if (!doctor.demo || profile) {
     return (
       <main
         id="main-content"
@@ -49,6 +49,7 @@ export default async function DoctorDetailPage({ params }: Props) {
             { label: doctor.name },
           ]}
         />
+        {doctor.demo && <DemoNotice compact />}
         {profile?.hasImage && (
           <Image
             src={`/api/providers/${doctor.recordId}/image`}
@@ -79,8 +80,9 @@ export default async function DoctorDetailPage({ params }: Props) {
           <div>
             <DetailSection title="Specialty and hospital">
               <p>
-                {profile?.professionalTitle} · {doctor.specialty} ·{" "}
-                {profile?.department}
+                {profile?.professionalTitle ?? "Professional title not provided"}
+                {" · "}{doctor.specialty}{" · "}
+                {profile?.department ?? "Department not provided"}
               </p>
               {hospital && (
                 <Link href={`/hospitals/${hospital.slug}`}>
@@ -97,12 +99,14 @@ export default async function DoctorDetailPage({ params }: Props) {
               {doctor.qualifications.map((item) => (
                 <p key={item}>{item}</p>
               ))}
+              {!doctor.qualifications.length && <p>Qualifications not provided</p>}
               <p>
                 Publication review does not independently verify professional
                 registration or establish clinical suitability.
               </p>
             </DetailSection>
             <DetailSection title="Languages">
+              {!doctor.languages.length && <p>Languages not provided</p>}
               <ul>
                 {doctor.languages.map((item) => (
                   <li key={item}>{item}</li>

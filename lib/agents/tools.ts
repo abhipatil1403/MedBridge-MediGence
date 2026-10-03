@@ -182,9 +182,17 @@ export function toFinding(kind: string, record: CatalogRecord, matchType: Findin
     if (typeof value === 'string' || typeof value === 'number') facts[key] = value;
   }
   if (Array.isArray(item.specialties)) facts.specialties = item.specialties.join(', ');
+  if (Array.isArray(item.locationCities)) facts.publishedLocations = item.locationCities.join(', ');
   if (Array.isArray(item.treatmentSlugs)) facts.treatments = item.treatmentSlugs.join(', ');
   if (Array.isArray(item.inclusions)) facts.inclusions = item.inclusions.join('; ');
   if (Array.isArray(item.exclusions)) facts.exclusions = item.exclusions.join('; ');
+  if (kind === 'packages') {
+    const details = (record as import('@/types/catalog').Package).serviceDetails;
+    for (const [key, service] of Object.entries(details ?? {})) {
+      facts[`${key}Status`] = service.status.replaceAll('_', ' ');
+      if (service.information) facts[`${key}Information`] = service.information;
+    }
+  }
   for (const key of ['qualifications', 'languages', 'infrastructure', 'countries']) if (Array.isArray(item[key])) facts[key] = item[key].join('; ');
   if (kind === 'packages') facts.currency = typeof item.currency==='string'?item.currency:'USD';
   return {

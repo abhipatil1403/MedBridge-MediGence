@@ -34,8 +34,8 @@ export default async function HospitalDetailPage({ params }: Props) {
   const data = await getHospitalDetail(slug);
   if (!data) notFound();
   const { hospital, country, treatments, doctors, packages } = data;
-  if (!hospital.demo) {
-    const profile = await publishedProviderProfile(hospital.recordId);
+  const profile = await publishedProviderProfile(hospital.recordId);
+  if (!hospital.demo || profile?.sections) {
     return (
       <main
         id="main-content"
@@ -50,6 +50,7 @@ export default async function HospitalDetailPage({ params }: Props) {
             { label: hospital.name },
           ]}
         />
+        {hospital.demo && <DemoNotice />}
         <DetailHero
           type="PUBLISHED PROVIDER"
           title={hospital.name}
@@ -94,7 +95,6 @@ export default async function HospitalDetailPage({ params }: Props) {
                       <dt>{field.field}</dt>
                       <dd>
                         <StatusBadge status={field.status} />
-                        <p>{field.evidence}</p>
                         {field.sourceUrl && (
                           <a
                             href={field.sourceUrl}
@@ -126,6 +126,35 @@ export default async function HospitalDetailPage({ params }: Props) {
                 ))}
               </ul>
             </DetailSection>
+            <DetailSection title="Departments and provider information">
+              {profile?.sections?.filter(
+                (item) =>
+                  item.kind === "specialty" || item.kind === "treatment",
+              ).length ? (
+                profile.sections
+                  .filter(
+                    (item) =>
+                      item.kind === "specialty" || item.kind === "treatment",
+                  )
+                  .map((item) => (
+                    <article key={`${item.kind}:${item.name}`}>
+                      <h3>{item.department || item.name}</h3>
+                      <p>
+                        {item.description ||
+                          "Provider-specific information not provided."}
+                      </p>
+                      {item.availability && (
+                        <p>
+                          Availability: {item.availability.replaceAll("_", " ")}
+                        </p>
+                      )}
+                      {item.eligibilityNote && <p>{item.eligibilityNote}</p>}
+                    </article>
+                  ))
+              ) : (
+                <p>No department information has been published.</p>
+              )}
+            </DetailSection>
             <DetailSection title="Treatments">
               <DetailLinks
                 items={treatments.map((item) => ({
@@ -135,6 +164,19 @@ export default async function HospitalDetailPage({ params }: Props) {
               />
             </DetailSection>
             <DetailSection title="Facilities">
+              {profile?.sections
+                ?.filter((item) => item.kind === "facility")
+                .map((item) => (
+                  <article key={item.name}>
+                    <h3>{item.name}</h3>
+                    <p>{item.description || "Description not provided."}</p>
+                    <p>
+                      Availability:{" "}
+                      {item.availability?.replaceAll("_", " ") ||
+                        "Not provided"}
+                    </p>
+                  </article>
+                ))}
               <ul className="plain-list">
                 {hospital.infrastructure.map((item) => (
                   <li key={item}>{item}</li>

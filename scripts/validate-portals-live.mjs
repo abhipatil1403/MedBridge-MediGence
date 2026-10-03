@@ -72,11 +72,26 @@ async function cleanup() {
       failures.push(`${label}: ${error.message}`);
     }
   };
-  for (const org of orgs)
+  for (const org of orgs) {
     await finish(
       "archive organization",
       admin.from("organizations").update({ status: "archived" }).eq("id", org),
     );
+    await finish(
+      "archive synthetic submissions",
+      admin.from("provider_submissions").update({ status: "archived" }).eq("organization_id", org),
+    );
+    await finish(
+      "archive synthetic listing records",
+      admin.from("provider_records").update({ status: "archived" }).eq("organization_id", org),
+    );
+  }
+  if (actors.patient) {
+    await finish(
+      "close synthetic support requests",
+      admin.from("support_cases").update({ status: "closed", consent_revoked_at: new Date().toISOString() }).eq("patient_id", actors.patient.id),
+    );
+  }
   if (documents.length) {
     await finish(
       "archive document metadata",
@@ -177,7 +192,9 @@ try {
     await anon.from("cities").select("id").eq("slug", "mumbai").single(),
   );
   const specialty = db(await anon.from("specialties").select("id").limit(1))[0];
-  const treatment = db(await anon.from("treatments").select("id,name").limit(1))[0];
+  const treatment = db(
+    await anon.from("treatments").select("id,name").limit(1),
+  )[0];
   const records = [];
   for (const [kind, name, data] of [
     [
@@ -216,6 +233,11 @@ try {
     ],
     ["facility", "QA ONLY Beds", { facilityType: "beds", quantity: 12 }],
     [
+      "accreditation",
+      "QA ONLY Accreditation",
+      { body: "Synthetic test issuer" },
+    ],
+    [
       "package",
       `QA ONLY Package ${stamp}`,
       {
@@ -226,6 +248,9 @@ try {
         durationDays: 3,
         inclusions: ["Synthetic inclusion"],
         exclusions: ["Flights"],
+        accommodationStatus: "not_confirmed",
+        transferStatus: "included",
+        transferInfo: "Synthetic airport transfer test information.",
       },
     ],
     [
@@ -247,7 +272,7 @@ try {
       }),
     );
   check(
-    records.length === 8,
+    records.length === 9,
     "All structured provider record kinds save as private drafts",
   );
   check(
@@ -277,8 +302,10 @@ try {
   );
   check(crossEdit.status === 403, "Cross-tenant write denied");
   const form = new FormData();
+  const accreditation = records.find((row) => row.kind === "accreditation");
   form.set("organizationId", org.id);
-  form.set("documentType", "supporting_evidence");
+  form.set("documentType", "accreditation");
+  form.set("recordId", accreditation.id);
   form.set(
     "file",
     new Blob(["%PDF-1.4\n% Synthetic MedBridge QA evidence\n%%EOF"], {
@@ -325,8 +352,25 @@ try {
     status: "approved",
     message: "Synthetic evidence reviewed for test only.",
   });
+  await command("provider", "provider", "save_record", {
+    organizationId: org.id,
+    recordId: accreditation.id,
+    expectedRevision: accreditation.revision,
+    kind: "accreditation",
+    name: accreditation.name,
+    data: { ...accreditation.data, documentId: document.id },
+  });
   const submission = await command("provider", "provider", "submit", {
     organizationId: org.id,
+  });
+  check(
+    (await api("admin", "admin", "portal_notifications")).data.rows.some(
+      (row) => row.resource_id === submission.id,
+    ),
+    "Administrator receives the actual new submission notification",
+  );
+  await command("admin", "admin", "open_submission", {
+    submissionId: submission.id,
   });
   await command("admin", "admin", "assign_reviewer", {
     submissionId: submission.id,
@@ -340,32 +384,111 @@ try {
     ).status === 200,
     "Assigned Support reviewer can read frozen submission",
   );
+  check(
+    (
+      await api(
+        "support",
+        "support",
+        "",
+        {},
+        {
+          action: "review_submission",
+          input: { submissionId: submission.id, status: "approved" },
+        },
+      )
+    ).status === 403,
+    "Assigned Support reviewer cannot approve the listing",
+  );
+  const doctor = records.find((row) => row.kind === "doctor");
+  await command("admin", "admin", "review_section", {
+    submissionId: submission.id,
+    recordId: doctor.id,
+    expectedRevision: doctor.revision,
+    status: "changes_requested",
+    comment: "Clarify the supplied doctor biography.",
+    reason: "Provider information incomplete",
+  });
+  const assignedContext = await api("support", "support", "submission_context", {
+    id: submission.id,
+  });
+  check(
+    assignedContext.status === 200,
+    "Section decisions preserve the assigned Support reviewer's access",
+  );
   await command("support", "support", "review_submission", {
     submissionId: submission.id,
     status: "changes_requested",
-    message: "Clarify synthetic organization overview.",
+    message: "Clarify the supplied doctor biography.",
   });
   check(
     (await api("provider", "provider", "portal_notifications")).data.total > 0,
     "Provider receives persisted review notification",
+  );
+  const attention = await api("provider", "provider", "listing_status", {
+    organizationId: org.id,
+  });
+  check(
+    attention.data.requestedChanges.some(
+      (row) => row.recordId === doctor.id && row.comment.includes("biography"),
+    ),
+    "Provider dashboard identifies the exact section and requested correction",
+  );
+  check(
+    (
+      await api("other", "provider", "provider_section_reviews", {
+        organizationId: org.id,
+      })
+    ).data.total === 0,
+    "Section review comments remain isolated to the organization",
   );
   const profile = (
     await api("provider", "provider", "provider_records", { id: records[0].id })
   ).data.rows[0];
   await command("provider", "provider", "save_record", {
     organizationId: org.id,
-    recordId: profile.id,
-    expectedRevision: profile.revision,
-    kind: "organization",
-    name: org.name,
+    recordId: doctor.id,
+    expectedRevision: doctor.revision,
+    kind: "doctor",
+    name: doctor.name,
     data: {
-      ...profile.data,
-      description: "Revised synthetic QA organization. No real care services.",
+      ...doctor.data,
+      biography: "Revised synthetic doctor biography. Not a real clinician.",
     },
   });
   const resubmission = await command("provider", "provider", "submit", {
     organizationId: org.id,
   });
+  check(
+    (
+      await api(
+        "admin",
+        "admin",
+        "",
+        {},
+        {
+          action: "review_submission",
+          input: { submissionId: resubmission.id, status: "approved" },
+        },
+      )
+    ).status === 400,
+    "Whole-listing approval fails while frozen sections remain unreviewed",
+  );
+  const frozen = (
+    await api("admin", "admin", "submission_context", { id: resubmission.id })
+  ).data;
+  for (const { record, snapshot } of frozen.items)
+    await command("admin", "admin", "review_section", {
+      submissionId: resubmission.id,
+      recordId: record.id,
+      expectedRevision: snapshot.revision,
+      status: "approved",
+      comment: "Reviewed the frozen synthetic section and supporting evidence.",
+    });
+  check(
+    (await anon.from("hospitals").select("id").eq("name", org.name)).data
+      .length === 0,
+    "Section approval alone does not publish any listing",
+  );
   await command("admin", "admin", "review_submission", {
     submissionId: resubmission.id,
     status: "approved",
@@ -388,12 +511,62 @@ try {
   const publicPackage = db(
     await anon
       .from("packages")
-      .select("currency,estimated_min")
+      .select("id,slug,currency,estimated_min")
       .eq("name", `QA ONLY Package ${stamp}`),
   )[0];
   check(
     publicPackage.currency === "INR" && publicPackage.estimated_min === 25000,
     "Public package preserves original currency and price",
+  );
+  const details = db(
+    await anon.rpc("public_provider_record", {
+      p_kind: "package",
+      p_id: publicPackage.id,
+    }),
+  );
+  check(
+    details.serviceDetails.accommodation.status === "not_confirmed" &&
+      details.serviceDetails.transfer.status === "included",
+    "Published package service states preserve unconfirmed accommodation and explicit transfers",
+  );
+  const publicProfile = db(
+    await anon.rpc("public_provider_profile", { p_hospital_id: hospital }),
+  );
+  check(
+    publicProfile.accreditations.some(
+      (row) => row.name === accreditation.name,
+    ) && !JSON.stringify(publicProfile).includes(document.id),
+    "Published accreditation shows accepted metadata without private document references",
+  );
+  const profileHtml = await (
+    await fetch(
+      `${origin}/hospitals/${db(await anon.from("hospitals").select("slug").eq("id", hospital).single()).slug}`,
+    )
+  ).text();
+  check(
+    profileHtml.includes("Departments and provider information") &&
+      profileHtml.includes(accreditation.name),
+    "Public hospital renders canonical published sections and accreditation",
+  );
+  const packageHtml = await (
+    await fetch(`${origin}/packages/${publicPackage.slug}`)
+  ).text();
+  check(
+    packageHtml.includes("Not confirmed in published package information.") &&
+      packageHtml.includes("Synthetic airport transfer test information."),
+    "Public package renders explicit service information and missing accommodation",
+  );
+  const publicDoctor = db(
+    await anon.from("doctors").select("slug").eq("name", doctor.name).single(),
+  );
+  const doctorHtml = await (
+    await fetch(`${origin}/doctors/${publicDoctor.slug}`)
+  ).text();
+  check(
+    doctorHtml.includes("Revised synthetic doctor biography.") &&
+      doctorHtml.includes("Professional title not provided") &&
+      !doctorHtml.includes("Clarify the supplied doctor biography."),
+    "Public doctor renders the published biography and missing fields without private review comments",
   );
   const search = db(
     await anon.rpc("search_catalog_candidates", { p_terms: org.name }),
@@ -608,7 +781,8 @@ try {
         },
       )
     ).status === 400 &&
-      (await api("support", "support", "case_context", { id: supportCase.id })).data.case.status === "resolved",
+      (await api("support", "support", "case_context", { id: supportCase.id }))
+        .data.case.status === "resolved",
     "Agent cannot reopen a resolved case without manager authority",
   );
   await command("admin", "admin", "update_case", {
@@ -721,7 +895,9 @@ try {
       Authorization: `Bearer ${actors.patient.session.access_token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ content: `Find hospitals for ${treatment.name} in Mumbai named "${org.name}".` }),
+    body: JSON.stringify({
+      content: `Find hospitals for ${treatment.name} in Mumbai named "${org.name}".`,
+    }),
   });
   const answer = await assistant.json();
   check(
@@ -729,8 +905,88 @@ try {
       answer.findings?.some(
         (finding) => finding.provenance?.recordId === hospital,
       ),
-    `Existing live assistant discovers the newly published provider: ${JSON.stringify({status:assistant.status,error:answer.error,code:answer.code,summary:answer.summary,findings:answer.findings?.map(item=>({title:item.title,id:item.provenance?.recordId}))})}`,
+    `Existing live assistant discovers the newly published provider: ${JSON.stringify({ status: assistant.status, error: answer.error, code: answer.code, summary: answer.summary, findings: answer.findings?.map((item) => ({ title: item.title, id: item.provenance?.recordId })) })}`,
   );
+  async function assistantTurn(content) {
+    const response = await fetch(`${origin}/api/assistant`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${actors.patient.session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ content }),
+    });
+    const result = await response.json();
+    assert.equal(
+      response.status,
+      200,
+      result.error || "Assistant request failed",
+    );
+    return result;
+  }
+  const packageAnswer = await assistantTurn(
+    `Show me ${treatment.name} packages in Mumbai.`,
+  );
+  check(
+    packageAnswer.findings?.some(
+      (finding) =>
+        finding.provenance?.recordId === publicPackage.id &&
+        finding.facts.transferStatus === "included" &&
+        finding.facts.accommodationStatus === "not confirmed",
+    ),
+    "Existing Package search consumes the governed package and its service facts",
+  );
+  const requirementAnswer = await assistantTurn(
+    `Show me ${treatment.name} packages in Mumbai with accommodation and airport transfer.`,
+  );
+  const packageRequirement = requirementAnswer.findings?.find(
+    (finding) => finding.provenance?.recordId === publicPackage.id,
+  )?.requirementEvaluation;
+  check(
+    packageRequirement?.evaluations.some(
+      (item) => item.type === "accommodation" && item.status === "unknown",
+    ) &&
+      packageRequirement?.evaluations.some(
+        (item) => item.type === "airport_transfer" && item.status === "exact",
+      ),
+    "Requirement matching uses explicit published evidence without inferring accommodation",
+  );
+  const comparisonAnswer = await assistantTurn(
+    `Compare hospitals for ${treatment.name} in Mumbai and Pune.`,
+  );
+  check(
+    comparisonAnswer.comparison?.sides.some((side) =>
+      side.groups.some((group) =>
+        group.findings.some(
+          (finding) => finding.provenance.recordId === hospital,
+        ),
+      ),
+    ) && comparisonAnswer.status === "completed",
+    "Existing Comparison uses the newly published hospital in its canonical results",
+  );
+  const workflowAudit = (
+    await api("admin", "admin", "audit_events", {
+      organizationId: org.id,
+      size: "200",
+    })
+  ).data.rows;
+  for (const action of [
+    "organization.created",
+    "record.saved",
+    "document.uploaded",
+    "document.approved",
+    "submission.submitted",
+    "submission.opened",
+    "section.changes_requested",
+    "section.approved",
+    "submission.changes_requested",
+    "submission.approved",
+    "submission.published",
+  ])
+    check(
+      workflowAudit.some((row) => row.event_name === action),
+      `Audit records ${action} with the actual actor`,
+    );
   const verification = await fetch(
     `${origin}/api/portals/verification?portal=support`,
     {
@@ -866,7 +1122,7 @@ try {
     });
     await new Promise((resolve) => broker.listen(4318, "127.0.0.1", resolve));
     console.log(
-      "Local browser session broker ready on port 4318. Stop with Ctrl+C after UI tests.",
+      "Local browser session broker ready on port 4318; POST /finish when UI checks are done.",
     );
     await new Promise((resolve) => {
       process.once("SIGINT", resolve);

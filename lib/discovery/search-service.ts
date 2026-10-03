@@ -147,7 +147,7 @@ export function searchHospitals(
   const results = catalog.hospitals.filter(
     (item) =>
       (!country || item.country === country) &&
-      (!city || normalize(item.city) === normalize(city)) &&
+      (!city || [item.city, ...(item.locationCities ?? [])].some((location) => normalize(location) === normalize(city))) &&
       (!filters.hospital || item.slug === filters.hospital) &&
       (!(
         filters.specialty ||
@@ -531,7 +531,7 @@ export class SearchService {
         ...new Set(catalog.treatments.map((item) => item.specialty)),
       ].sort(),
       countries: catalog.countries.map(({ slug, name }) => ({ slug, name })),
-      cities: [...new Set(catalog.hospitals.map((item) => item.city))].sort(),
+      cities: [...new Set(catalog.hospitals.flatMap((item) => [item.city, ...(item.locationCities ?? [])]))].sort(),
       hospitals: catalog.hospitals.map(({ slug, name }) => ({ slug, name })),
       treatments: catalog.treatments.map(({ slug, name }) => ({ slug, name })),
     };

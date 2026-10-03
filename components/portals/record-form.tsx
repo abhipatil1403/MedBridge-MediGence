@@ -58,6 +58,7 @@ export function FieldControl({
     },
   );
   const inputProps = register(`values.${field.key}`);
+  const currentChoice = data?.rows.find((row) => row.id === defaultValue);
   if (field.type === "checkbox")
     return (
       <label className="portal-check">
@@ -90,13 +91,28 @@ export function FieldControl({
       ) : field.type === "select" ? (
         <select disabled={loading || Boolean(error)} {...inputProps}>
           <option value="">Select {field.label.toLowerCase()}</option>
+          {field.catalog && Boolean(defaultValue) && (
+            <option key="current-choice" value={String(defaultValue)}>
+              {currentChoice
+                ? String(
+                    currentChoice.name ??
+                      currentChoice.title ??
+                      currentChoice.source_name ??
+                      "Current selection",
+                  )
+                : "Current selection"}
+              {currentChoice && field.catalog === "cities"
+                ? ` · ${String((currentChoice.country as { name?: string } | undefined)?.name ?? "")}`
+                : ""}
+            </option>
+          )}
           {field.options?.map((option) => (
             <option key={option} value={option}>
               {label(option)}
             </option>
           ))}
           {field.catalog &&
-            data?.rows.map((row) => (
+            data?.rows.filter((row) => row.id !== defaultValue).map((row) => (
               <option key={row.id} value={row.id}>
                 {String(
                   row.name ??
@@ -111,6 +127,7 @@ export function FieldControl({
               </option>
             ))}
           {Boolean(defaultValue) &&
+            !field.catalog &&
             !field.options?.includes(String(defaultValue)) &&
             !data?.rows.some((row) => row.id === defaultValue) && (
               <option value={String(defaultValue)}>Current selection</option>

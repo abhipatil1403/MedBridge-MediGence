@@ -2,7 +2,7 @@ import type { Comparison, Finding, PlanningResultGroup } from '../schemas';
 
 export const comparisonFields: Record<string, Array<[string, string]>> = {
   hospitals: [['city', 'City'], ['country', 'Country'], ['treatments', 'Treatments'], ['specialties', 'Specialties'], ['verification', 'Verification'], ['sampleAccreditation', 'Listed sample accreditation'], ['sampleBedCount', 'Sample bed count'], ['infrastructure', 'Listed infrastructure']],
-  packages: [['hospitalName', 'Hospital'], ['samplePriceUsd', 'Listed sample package price'], ['listedPrice','Listed package estimate'], ['currency', 'Currency'], ['durationDays', 'Package duration'], ['inclusions', 'Inclusions'], ['exclusions', 'Exclusions'], ['country', 'Country']],
+  packages: [['hospitalName', 'Hospital'], ['samplePriceUsd', 'Listed sample package price'], ['listedPrice','Listed package estimate'], ['currency', 'Currency'], ['durationDays', 'Package duration'], ['inclusions', 'Inclusions'], ['exclusions', 'Exclusions'], ['accommodationStatus', 'Accommodation inclusion'], ['accommodationInformation', 'Accommodation information'], ['transferStatus', 'Airport transfer inclusion'], ['interpreterStatus', 'Interpreter inclusion'], ['consultationStatus', 'Consultation inclusion'], ['diagnosticsStatus', 'Diagnostics inclusion'], ['followUpStatus', 'Follow-up inclusion'], ['country', 'Country']],
   doctors: [['specialty', 'Specialty'], ['hospitalName', 'Hospital'], ['city', 'City'], ['country', 'Country'], ['sampleExperienceYears', 'Listed sample experience'], ['qualifications', 'Listed qualifications'], ['consultationMode', 'Consultation mode'], ['verification', 'Verification']],
 };
 export function factText(finding: Finding, key: string) {

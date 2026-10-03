@@ -71,9 +71,10 @@ export const RequirementEvaluator = {
         const city = finding.kind === 'packages' ? hospital?.city : item.city;
         const country = finding.kind === 'countries' ? record.slug : item.country;
         const places = requirement.places ?? [];
-        const matches = places.some((place) => normalize(String(place.type === 'city' ? city ?? '' : country ?? '')) === normalize(place.value));
+        const cities = finding.kind === 'hospitals' && Array.isArray(item.locationCities) ? [city, ...item.locationCities].filter((value): value is string => typeof value === 'string') : typeof city === 'string' ? [city] : [];
+        const matches = places.some((place) => place.type === 'city' ? cities.some((value) => normalize(value) === normalize(place.value)) : normalize(String(country ?? '')) === normalize(place.value));
         const known = places.some((place) => Boolean(place.type === 'city' ? city : country));
-        return result(matches ? 'exact' : known ? 'not_met' : 'unknown', matches ? 'The catalog location matches a requested destination.' : known ? 'The catalog location differs from the requested destinations.' : 'The catalog does not specify the requested location field.', [city, country].filter((v): v is string => typeof v === 'string'), finding.kind === 'packages' ? ['hospitalSlug', 'hospitals.city', 'country'] : ['city', 'country']);
+        return result(matches ? 'exact' : known ? 'not_met' : 'unknown', matches ? 'The catalog location matches a requested destination.' : known ? 'The catalog location differs from the requested destinations.' : 'The catalog does not specify the requested location field.', [...cities, country].filter((v): v is string => typeof v === 'string'), finding.kind === 'packages' ? ['hospitalSlug', 'hospitals.city', 'country'] : ['city', 'locationCities', 'country']);
       }
       if (type === 'verified') {
         const verification = finding.kind === 'packages' ? hospital?.verification : item.verification;

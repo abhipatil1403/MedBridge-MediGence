@@ -1,15 +1,30 @@
 import "server-only";
 import { z } from "zod";
 import { getPublicSupabaseClient } from "@/lib/supabase/server";
+import { packageServicesSchema } from "./package-services";
 const review = z.object({
   field: z.string(),
   status: z.string(),
   sourceUrl: z.string().nullable(),
   checkedAt: z.string(),
   expiresOn: z.string().nullable(),
-  evidence: z.string(),
 });
 const profile = z.object({
+  sections: z
+    .array(
+      z.object({
+        kind: z.string(),
+        name: z.string(),
+        description: z.string().nullable(),
+        department: z.string().nullable(),
+        availability: z.string().nullable(),
+        category: z.string().nullable(),
+        eligibilityNote: z.string().nullable(),
+        quantity: z.union([z.number(), z.string()]).nullable(),
+        facilityType: z.string().nullable(),
+      }),
+    )
+    .optional(),
   website: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   email: z.string().nullable().optional(),
@@ -73,6 +88,8 @@ export async function publishedRecordProfile(
       validFrom: z.string().nullable(),
       validUntil: z.string().nullable(),
       hasImage: z.boolean(),
+      notes: z.string().nullable().optional(),
+      serviceDetails: packageServicesSchema.optional(),
     })
     .safeParse(data);
   return parsed.success ? parsed.data : undefined;

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { label, type Row } from "@/lib/portals/config";
 import {
   Action,
@@ -14,6 +14,8 @@ import {
   useResource,
 } from "./core";
 import { CommandForm } from "./command-form";
+import { FieldControl } from "./record-form";
+import { useForm } from "react-hook-form";
 import { VerificationResults } from "@/components/assistant/verification-results";
 import { verificationReportSchema } from "@/lib/verification/schemas";
 
@@ -58,6 +60,16 @@ export function Submissions({ organizationId }: { organizationId?: string }) {
             render: (row) => String(row.id).slice(0, 8),
           },
           { key: "message", label: "Provider response" },
+          { key: "organizationName", label: "Organization" },
+          { key: "providerName", label: "Provider" },
+          { key: "reviewerName", label: "Reviewer" },
+          {
+            key: "approvedSections",
+            label: "Section review",
+            render: (row) =>
+              `${row.approvedSections ?? 0}/${row.sectionCount ?? 0} approved`,
+          },
+          { key: "verificationIssues", label: "Flagged fields" },
           {
             key: "status",
             label: "Status",
@@ -69,6 +81,11 @@ export function Submissions({ organizationId }: { organizationId?: string }) {
             render: (row) => date(row.submitted_at),
           },
           { key: "review_message", label: "Review feedback" },
+          {
+            key: "updated_at",
+            label: "Updated",
+            render: (row) => date(row.updated_at),
+          },
         ]}
         onOpen={setSelected}
         extra={
@@ -224,15 +241,30 @@ export function SubmissionDetail({
   id: string;
   onClose: () => void;
 }) {
-  const { portal } = usePortal();
+  const { portal, command } = usePortal();
   const staff = portal === "admin" || portal === "support";
+  const opened = useRef<string | null>(null);
+  const [openError, setOpenError] = useState("");
+  useEffect(() => {
+    if (!staff || opened.current === id) return;
+    opened.current = id;
+    command("open_submission", { submissionId: id }).catch((error) =>
+      setOpenError(
+        error instanceof Error
+          ? error.message
+          : "Unable to record review access.",
+      ),
+    );
+  }, [command, id, staff]);
   const [selected, setSelected] = useState<Row>();
   const { data, error, loading } = useResource<{
     submission: Row;
     items: { record: Row; snapshot: Row }[];
+    reviews: Row[];
   }>("submission_context", { id });
   return (
     <Modal title={`Submission ${id.slice(0, 8)}`} onClose={onClose}>
+      {openError && <ErrorPanel message={openError} />}
       {loading ? (
         <Loading />
       ) : error ? (
@@ -262,6 +294,28 @@ export function SubmissionDetail({
                     Frozen revision {snapshot.revision} · current revision{" "}
                     {record.revision}
                   </p>
+                  <Status
+                    value={
+                      data.reviews.find(
+                        (review) => review.record_id === record.id,
+                      )?.status ?? "awaiting_review"
+                    }
+                  />
+                  {data.reviews
+                    .filter((review) => review.record_id === record.id)
+                    .slice(0, 1)
+                    .map((review) => (
+                      <div className="portal-review-feedback" key={review.id}>
+                        <p>{String(review.comment || "No section comment.")}</p>
+                        {Boolean(review.reason) && (
+                          <p>Reason: {String(review.reason)}</p>
+                        )}
+                        <small>
+                          Reviewed {date(review.created_at)} · revision{" "}
+                          {String(review.revision)}
+                        </small>
+                      </div>
+                    ))}
                   <dl className="portal-facts">
                     {Object.entries(snapshot.data ?? {}).map(([key, value]) => (
                       <div key={key}>
@@ -277,9 +331,11 @@ export function SubmissionDetail({
                   {staff && (
                     <button
                       className="portal-button secondary"
-                      onClick={() => setSelected(record)}
+                      onClick={() =>
+                        setSelected({ ...record, ...snapshot, id: record.id })
+                      }
                     >
-                      Review fields & evidence
+                      Review section & evidence
                     </button>
                   )}
                 </article>
@@ -290,6 +346,11 @@ export function SubmissionDetail({
                 String(data.submission.status),
               ) && (
                 <Panel title="Review decision">
+                  <p>
+                    Record each section decision first. Request changes here to
+                    unlock drafts for the provider. Only an administrator can
+                    approve after every section is approved.
+                  </p>
                   <CommandForm
                     action="review_submission"
                     input={{ submissionId: id }}
@@ -301,7 +362,7 @@ export function SubmissionDetail({
                         options: [
                           "under_review",
                           "changes_requested",
-                          "approved",
+                          ...(portal === "admin" ? ["approved"] : []),
                           "rejected",
                         ],
                       },
@@ -348,6 +409,108 @@ export function SubmissionDetail({
                 title={`Review: ${selected.name}`}
                 onClose={() => setSelected(undefined)}
               >
+                {["submitted", "under_review"].includes(
+                  String(data.submission.status),
+                ) && (
+                  <Panel title="Section decision">
+                    <CommandForm
+                      action="review_section"
+                      input={{
+                        submissionId: id,
+                        recordId: selected.id,
+                        expectedRevision: selected.revision,
+                      }}
+                      fields={[
+                        {
+                          key: "status",
+                          label: "Section decision",
+                          type: "select",
+                          options: [
+                            "under_review",
+                            ...(portal === "admin" ? ["approved"] : []),
+                            "changes_requested",
+                            "evidence_required",
+                            "rejected",
+                          ],
+                        },
+                        {
+                          key: "comment",
+                          label: "Comment / requested correction",
+                          type: "textarea",
+                        },
+                        { key: "reason", label: "Review reason" },
+                        {
+                          key: "documentId",
+                          label: "Supporting evidence",
+                          type: "select",
+                          catalog: "provider_documents",
+                          catalogParams: {
+                            organizationId: String(
+                              data.submission.organization_id,
+                            ),
+                          },
+                        },
+                      ]}
+                      submit="Save section decision"
+                      onDone={() => setSelected(undefined)}
+                    />
+                  </Panel>
+                )}
+                <ResourceTable
+                  resource="provider_section_reviews"
+                  params={{ recordId: String(selected.id) }}
+                  title="Section decision history"
+                  columns={[
+                    { key: "revision", label: "Revision" },
+                    {
+                      key: "status",
+                      label: "Decision",
+                      render: (row) => <Status value={row.status} />,
+                    },
+                    { key: "comment", label: "Comment" },
+                    { key: "reason", label: "Reason" },
+                    {
+                      key: "created_at",
+                      label: "Reviewed",
+                      render: (row) => date(row.created_at),
+                    },
+                  ]}
+                />
+                <Documents
+                  organizationId={String(data.submission.organization_id)}
+                />
+                <ResourceTable
+                  resource="provider_revisions"
+                  params={{ recordId: String(selected.id) }}
+                  title="Previous versions"
+                  columns={[
+                    { key: "revision", label: "Revision" },
+                    { key: "name", label: "Name" },
+                    {
+                      key: "data",
+                      label: "Snapshot",
+                      render: (row) => (
+                        <details>
+                          <summary>View saved fields</summary>
+                          <dl className="portal-facts">
+                            {Object.entries(row.data ?? {}).map(
+                              ([key, value]) => (
+                                <div key={key}>
+                                  <dt>{label(key)}</dt>
+                                  <dd>
+                                    {Array.isArray(value)
+                                      ? value.join(", ")
+                                      : String(value ?? "Not provided")}
+                                  </dd>
+                                </div>
+                              ),
+                            )}
+                          </dl>
+                        </details>
+                      ),
+                    },
+                  ]}
+                />
                 <p>
                   Publication approval and factual verification are separate
                   decisions. Mark a field verified only after checking current
@@ -566,6 +729,10 @@ export function Documents({ organizationId }: { organizationId?: string }) {
   const [selected, setSelected] = useState<Row>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const association = useForm<{
+    name: string;
+    values: Record<string, string | boolean | string[]>;
+  }>({ defaultValues: { name: "", values: { recordId: "" } } });
   const download = async (row: Row) => {
     setBusy(true);
     try {
@@ -643,6 +810,8 @@ export function Documents({ organizationId }: { organizationId?: string }) {
               setError("");
               const form = new FormData(e.currentTarget);
               form.set("organizationId", organizationId);
+              const recordId = association.getValues("values.recordId");
+              if (recordId) form.set("recordId", String(recordId));
               try {
                 const result = await fetch(
                   `/api/portals/documents?portal=${portal}`,
@@ -665,6 +834,16 @@ export function Documents({ organizationId }: { organizationId?: string }) {
               }
             }}
           >
+            <FieldControl
+              field={{
+                key: "recordId",
+                label: "Associated listing section",
+                type: "select",
+                catalog: "provider_records",
+                catalogParams: { organizationId },
+              }}
+              register={association.register}
+            />
             <label className="portal-field">
               <span>Document type</span>
               <select name="documentType" required>
@@ -730,6 +909,30 @@ export function Documents({ organizationId }: { organizationId?: string }) {
             {Number(selected.size_bytes).toLocaleString()} bytes
           </p>
           <p>{String(selected.review_message ?? "")}</p>
+          {organizationId &&
+            portal === "provider" &&
+            ["rejected", "expired"].includes(String(selected.status)) && (
+              <div className="portal-review-feedback">
+                <p>
+                  Upload a replacement for the same section, then update its
+                  supporting document selection and resubmit the draft. The
+                  earlier document and review stay in history.
+                </p>
+                <button
+                  className="portal-button"
+                  onClick={() => {
+                    association.setValue(
+                      "values.recordId",
+                      String(selected.record_id ?? ""),
+                    );
+                    setSelected(undefined);
+                    setUpload(true);
+                  }}
+                >
+                  Upload replacement evidence
+                </button>
+              </div>
+            )}
           {error && (
             <p role="alert" className="portal-field-error">
               {error}

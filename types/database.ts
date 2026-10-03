@@ -1778,6 +1778,51 @@ export type Database = {
         };
         Relationships: [];
       };
+      provider_section_reviews: {
+        Row: {
+          id: string;
+          sequence: number;
+          submission_id: string;
+          record_id: string;
+          revision: number;
+          organization_id: string;
+          status: string;
+          comment: string;
+          reason: string;
+          document_id: string | null;
+          reviewed_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          sequence: number;
+          submission_id: string;
+          record_id: string;
+          revision: number;
+          organization_id: string;
+          status: string;
+          comment?: string;
+          reason?: string;
+          document_id?: string | null;
+          reviewed_by: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          sequence?: number;
+          submission_id?: string;
+          record_id?: string;
+          revision?: number;
+          organization_id?: string;
+          status?: string;
+          comment?: string;
+          reason?: string;
+          document_id?: string | null;
+          reviewed_by?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       provider_submission_items: {
         Row: {
           submission_id: string;
@@ -1807,6 +1852,7 @@ export type Database = {
           review_message: string;
           submitted_at: string;
           updated_at: string;
+          requires_section_review: boolean;
         };
         Insert: {
           id?: string;
@@ -1818,6 +1864,7 @@ export type Database = {
           review_message?: string;
           submitted_at?: string;
           updated_at?: string;
+          requires_section_review?: boolean;
         };
         Update: {
           id?: string;
@@ -1829,6 +1876,7 @@ export type Database = {
           review_message?: string;
           submitted_at?: string;
           updated_at?: string;
+          requires_section_review?: boolean;
         };
         Relationships: [];
       };
@@ -2378,6 +2426,10 @@ export type Database = {
       portal_touch_activity: { Args: Record<string, never>; Returns: undefined };
       portal_account_active: { Args: Record<string, never>; Returns: boolean };
       portal_command: { Args: { p_action: string; p_input?: Json }; Returns: Json };
+      portal_review_command: { Args: { p_action: string; p_input: Json }; Returns: Json };
+      portal_listing_status: { Args: { p_organization_id: string }; Returns: Json };
+      portal_submission_summary: { Args: { p_submission_id: string }; Returns: Json };
+      public_provider_hospital_details: { Args: Record<string, never>; Returns: Json };
       support_command: { Args: { p_action: string; p_input?: Json }; Returns: Json };
       portal_publication_command: { Args: { p_action: string; p_input: Json }; Returns: Json };
       portal_catalog_command: { Args: { p_action: string; p_input: Json }; Returns: Json };
@@ -2387,6 +2439,7 @@ export type Database = {
       public_provider_profile: { Args: { p_hospital_id: string }; Returns: Json };
       public_provider_image: { Args: { p_doctor_id: string }; Returns: Json };
       public_provider_record: { Args: { p_kind: string; p_id: string }; Returns: Json };
+      public_provider_package_details: { Args: Record<string, never>; Returns: Json };
       portal_team: { Args: { p_organization_id: string }; Returns: Json };
       portal_staff_directory: { Args: Record<string, never>; Returns: Json };
       record_portal_verification: { Args: { p_actor: string; p_organization_id: string; p_provider_id: string; p_report: Json }; Returns: string };

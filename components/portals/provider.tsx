@@ -87,6 +87,7 @@ export function Dashboard() {
       {portal === "provider" ? (
         <>
           <Onboarding compact />
+          <ListingAttention />
           <ResourceTable
             resource="provider_submissions"
             title="Recent submissions"
@@ -109,6 +110,31 @@ export function Dashboard() {
             resource="audit_events"
             title="Recent activity"
             params={{ organizationId }}
+            columns={activityColumns}
+          />
+        </>
+      ) : portal === "admin" ? (
+        <>
+          <Panel title="Review priorities">
+            <div className="portal-actions">
+              <Link className="portal-button" href="/admin/applications">
+                Review applications
+              </Link>
+              <Link className="portal-button secondary" href="/admin/documents">
+                Review evidence
+              </Link>
+              <Link
+                className="portal-button secondary"
+                href="/admin/verification"
+              >
+                Check verification issues
+              </Link>
+            </div>
+          </Panel>
+          <Submissions />
+          <ResourceTable
+            resource="audit_events"
+            title="Recent activity"
             columns={activityColumns}
           />
         </>
@@ -140,6 +166,140 @@ const steps = [
   ["Review", "preview"],
   ["Submit", "submissions"],
 ] as const;
+type ListingStatus = {
+  required: string[];
+  missing: string[];
+  completed: number;
+  total: number;
+  profileStatus: string;
+  publishedRevision: number | null;
+  submissionStatus: string | null;
+  lastSubmitted: string | null;
+  lastReviewed: string | null;
+  reviewComment: string | null;
+  pendingDocuments: number;
+  documentsNeedingReplacement: number;
+  packagesAwaitingReview: number;
+  requestedChanges: {
+    id: string;
+    name: string;
+    kind: string;
+    status: string;
+    comment: string;
+    reason: string;
+    revision: number;
+    currentRevision: number;
+  }[];
+};
+function ListingAttention() {
+  const { organizationId } = usePortal();
+  const { data, error, loading } = useResource<ListingStatus>(
+    "listing_status",
+    { organizationId },
+  );
+  const checks = useResource<{ rows: Row[] }>("portal_verification_checks", {
+    organizationId,
+    size: "1",
+  });
+  const verificationStatus = (
+    checks.data?.rows[0]?.report as { status?: string } | undefined
+  )?.status;
+  return (
+    <Panel title="Your next steps">
+      {loading ? (
+        <Loading />
+      ) : error ? (
+        <ErrorPanel message={error} />
+      ) : (
+        data && (
+          <>
+            <dl className="portal-facts">
+              <div>
+                <dt>Submission</dt>
+                <dd>
+                  {data.submissionStatus ? (
+                    <Status value={data.submissionStatus} />
+                  ) : (
+                    "Not submitted"
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>Publication</dt>
+                <dd>
+                  {data.publishedRevision
+                    ? `Revision ${data.publishedRevision} is published`
+                    : "Not published"}
+                </dd>
+              </div>
+              <div>
+                <dt>Last submitted</dt>
+                <dd>{date(data.lastSubmitted)}</dd>
+              </div>
+              <div>
+                <dt>Last section review</dt>
+                <dd>{date(data.lastReviewed)}</dd>
+              </div>
+              <div>
+                <dt>Latest factual verification check</dt>
+                <dd>
+                  {checks.loading ? (
+                    "Loading check history…"
+                  ) : checks.error ? (
+                    "Check history unavailable"
+                  ) : verificationStatus ? (
+                    <Status value={verificationStatus} />
+                  ) : (
+                    "No factual verification check recorded"
+                  )}
+                  {" · "}
+                  <Link href="/provider/verification">Review evidence</Link>
+                </dd>
+              </div>
+            </dl>
+            {data.reviewComment && (
+              <div className="portal-review-feedback">
+                <h3>Admin feedback</h3>
+                <p>{data.reviewComment}</p>
+              </div>
+            )}
+            {data.requestedChanges.map((review) => (
+              <article key={review.id} className="portal-review-feedback">
+                <h3>{review.name}</h3>
+                <Status value={review.status} />
+                <p>{review.comment}</p>
+                {review.reason && <p>{review.reason}</p>}
+                <Link
+                  href={`/provider/${Object.keys(sectionKind).find((section) => sectionKind[section] === review.kind) ?? "submissions"}`}
+                >
+                  Continue this section
+                </Link>
+                <p className="portal-muted">
+                  Reviewed revision {review.revision}
+                  {review.currentRevision > review.revision
+                    ? " · draft revised; submit it for another review"
+                    : ""}
+                </p>
+              </article>
+            ))}
+            <div className="portal-actions">
+              <Link href="/provider/documents">
+                {data.pendingDocuments} documents awaiting review ·{" "}
+                {data.documentsNeedingReplacement} need replacement
+              </Link>
+              <Link href="/provider/packages">
+                {data.packagesAwaitingReview} packages awaiting review
+              </Link>
+              <Link className="portal-button" href="/provider/submissions">
+                Open submissions
+              </Link>
+            </div>
+          </>
+        )
+      )}
+    </Panel>
+  );
+}
 function Onboarding({ compact = false }: { compact?: boolean }) {
   const { portal, organizationId } = usePortal();
   const { data, error, loading } = useResource<{ rows: Row[] }>(
@@ -151,10 +311,13 @@ function Onboarding({ compact = false }: { compact?: boolean }) {
     { organizationId, size: "1" },
   );
   const profile = data?.rows.find((row) => row.kind === "organization");
-  const required = ["description", "cityId", "email", "phone"];
-  const completed =
-    (profile?.name ? 1 : 0) +
-    required.filter((key) => Boolean(profile?.data?.[key])).length;
+  const {
+    data: listing,
+    error: listingError,
+    loading: listingLoading,
+  } = useResource<ListingStatus>("listing_status", { organizationId });
+  const completed = listing?.completed ?? 0;
+  const total = listing?.total ?? 1;
   const complete = (name: string) =>
     name === "Organization"
       ? Boolean(profile?.data?.description && profile?.data?.cityId)
@@ -182,15 +345,15 @@ function Onboarding({ compact = false }: { compact?: boolean }) {
                 );
   return (
     <Panel title="Organization onboarding">
-      {error ? (
-        <ErrorPanel message={error} />
-      ) : loading ? (
+      {error || listingError ? (
+        <ErrorPanel message={error || listingError} />
+      ) : loading || listingLoading ? (
         <Loading />
       ) : (
         <>
           <div className="portal-progress-heading">
             <strong>
-              {Math.round((completed / 5) * 100)}% required profile fields
+              {Math.round((completed / total) * 100)}% required profile fields
               complete
             </strong>
             <span>
@@ -203,9 +366,22 @@ function Onboarding({ compact = false }: { compact?: boolean }) {
           </div>
           <progress
             value={completed}
-            max={5}
+            max={total}
             aria-label="Required profile completeness"
           />
+          {listing?.missing.length ? (
+            <p className="portal-review-feedback">
+              Required:{" "}
+              {listing.missing
+                .map((key) => label(key.replace(/([A-Z])/g, " $1")))
+                .join(", ")}
+              . <Link href="/provider/profile">Complete profile</Link>
+            </p>
+          ) : (
+            <p className="portal-muted">
+              All required profile fields are supplied.
+            </p>
+          )}
           <p className="portal-muted">
             Optional sections can be added later. Each saved draft persists when
             you leave and return.
@@ -234,7 +410,11 @@ function Preview() {
   const [published, setPublished] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
-  const { data, error } = useResource<{ rows: Row[] }>("provider_records", {
+  const {
+    data,
+    error,
+    loading: draftLoading,
+  } = useResource<{ rows: Row[] }>("provider_records", {
     organizationId,
     size: "200",
   });
@@ -279,7 +459,7 @@ function Preview() {
       </div>
       {error || previewError ? (
         <ErrorPanel message={error || previewError} />
-      ) : loading ? (
+      ) : loading || (mode === "draft" && draftLoading) ? (
         <Loading />
       ) : !profile ? (
         <Empty

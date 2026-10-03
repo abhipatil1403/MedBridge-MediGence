@@ -91,8 +91,21 @@ export const fields: Record<RecordKind, Field[]> = {
     },
     { key: "department", label: "Department" },
     { key: "description", label: "Provider information", type: "textarea" },
+    {
+      key: "treatmentIds",
+      label: "Related treatments",
+      type: "list",
+      catalog: "treatments",
+    },
   ],
   treatment: [
+    { key: "category", label: "Provider category" },
+    {
+      key: "availability",
+      label: "Availability",
+      type: "select",
+      options: ["available", "on_request", "unavailable", "not_confirmed"],
+    },
     {
       key: "treatmentId",
       label: "Canonical treatment",
@@ -111,6 +124,12 @@ export const fields: Record<RecordKind, Field[]> = {
     },
   ],
   doctor: [
+    {
+      key: "documentIds",
+      label: "Supporting credentials",
+      type: "list",
+      catalog: "provider_documents",
+    },
     {
       key: "specialtyId",
       label: "Primary specialty",
@@ -158,6 +177,18 @@ export const fields: Record<RecordKind, Field[]> = {
     },
   ],
   facility: [
+    {
+      key: "availability",
+      label: "Availability",
+      type: "select",
+      options: ["available", "on_request", "unavailable", "not_confirmed"],
+    },
+    {
+      key: "documentIds",
+      label: "Supporting evidence",
+      type: "list",
+      catalog: "provider_documents",
+    },
     {
       key: "facilityType",
       label: "Facility type",
@@ -216,6 +247,30 @@ export const fields: Record<RecordKind, Field[]> = {
     { key: "durationDays", label: "Duration (days)", type: "number", min: 1 },
     { key: "inclusions", label: "Explicit inclusions", type: "list" },
     { key: "exclusions", label: "Explicit exclusions", type: "list" },
+    ...(
+      [
+        ["accommodation", "Accommodation"],
+        ["transfer", "Airport transfer"],
+        ["interpreter", "Interpreter"],
+        ["consultation", "Consultation"],
+        ["diagnostics", "Diagnostics"],
+        ["followUp", "Follow-up"],
+      ] as const
+    ).flatMap(([key, name]): Field[] => [
+      {
+        key: `${key}Status`,
+        label: `${name} inclusion`,
+        type: "select",
+        options: ["included", "excluded", "conditional", "not_confirmed"],
+      },
+      {
+        key: `${key}Info`,
+        label: `${name} information`,
+        type: "textarea",
+        help: "Describe the actual service, limits and extra charges. Leave empty if not documented.",
+      },
+    ]),
+    { key: "notes", label: "Published package notes", type: "textarea" },
     { key: "validFrom", label: "Valid from", type: "date" },
     { key: "validUntil", label: "Valid until", type: "date" },
     { key: "terms", label: "Terms and limitations", type: "textarea" },

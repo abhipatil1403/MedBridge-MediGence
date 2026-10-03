@@ -28,7 +28,7 @@ const genericProcedure = /^(?:a |an |the )?(?:surgery|operation|procedure|treatm
 function procedurePhrase(query: string, catalog: MatchCatalog): string | undefined {
   const text = normalize(query);
   const afterFor = /\bfor (.+?)(?=\s+(?:in|at|near)\s+|\s+and\s+(?:show|find|compare|include)\b|$)/.exec(text)?.[1];
-  const locations = [...catalog.hospitals.map((item) => item.city), ...catalog.countries.flatMap((item) => [item.name, ...item.aliases])]
+  const locations = [...catalog.hospitals.flatMap((item) => [item.city, ...(item.locationCities ?? [])]), ...catalog.countries.flatMap((item) => [item.name, ...item.aliases])]
     .map(normalize).filter(Boolean).sort((a, b) => b.length - a.length);
   let direct = !afterFor && procedureWords.test(text)
     ? text.split(/\s+(?:in|at|near)\s+/)[0].replace(/^(?:(?:find|show|search|explore|compare|i need|i want|i am looking for)\s+)+/, '')

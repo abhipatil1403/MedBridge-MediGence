@@ -3,6 +3,20 @@ import { attributePatterns } from './RequirementExtractor';
 import type { RequirementEvaluation } from './RequirementTypes';
 
 export function attributeEvidence(record: Package, type: string): Pick<RequirementEvaluation, 'status' | 'evidence' | 'sourceFields' | 'explanation'> {
+  const serviceKeys: Record<string, keyof NonNullable<Package['serviceDetails']>> = { accommodation: 'accommodation', airport_transfer: 'transfer', interpreter: 'interpreter', consultation: 'consultation', diagnostics: 'diagnostics', follow_up: 'followUp' };
+  const key = serviceKeys[type];
+  const detail = key ? record.serviceDetails?.[key] : undefined;
+  const listed = listedAttributeEvidence(record, type);
+  if (detail) {
+    const status = detail.status === 'included' ? 'exact' : detail.status === 'excluded' ? 'not_met' : detail.status === 'conditional' ? 'incomplete' : 'unknown';
+    if ((status === 'exact' && ['not_met', 'incomplete'].includes(listed.status)) || (status === 'not_met' && ['exact', 'incomplete'].includes(listed.status))) {
+      return { status: 'incomplete', evidence: [...listed.evidence, detail.information || `Published service status: ${detail.status}.`], sourceFields: [...listed.sourceFields, `serviceDetails.${key}`], explanation: 'The published service status conflicts with listed inclusions or exclusions. Confirmation is required.' };
+    }
+    return { status, evidence: [detail.information || `Published package service: ${detail.status.replaceAll('_', ' ')}.`], sourceFields: [`serviceDetails.${key}`], explanation: detail.status === 'not_confirmed' ? 'Not confirmed in published package information. No inclusion has been inferred.' : 'The published package explicitly documents this service status.' };
+  }
+  return listed;
+}
+function listedAttributeEvidence(record: Package, type: string): Pick<RequirementEvaluation, 'status' | 'evidence' | 'sourceFields' | 'explanation'> {
   const pattern = attributePatterns[type];
   const matches = (values: readonly string[]) => values.filter((value) => pattern.test(type === 'accommodation' ? value.replace(/companion accommodation/gi, '') : value));
   const includes = matches(record.inclusions), excludes = matches(record.exclusions);

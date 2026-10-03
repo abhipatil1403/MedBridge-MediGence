@@ -32,6 +32,7 @@ export interface Treatment extends CatalogRecord {
 }
 
 export interface Hospital extends CatalogRecord {
+  readonly locationCities?: readonly string[];
   readonly city: string;
   readonly country: string;
   readonly specialties: readonly string[];
@@ -62,6 +63,7 @@ export interface Country extends CatalogRecord {
 }
 
 export interface Package extends CatalogRecord {
+  readonly serviceDetails?: import("@/lib/catalog/package-services").PackageServices;
   readonly currency?: string;
   readonly listedPrice?: number;
   readonly treatmentSlug: string;
