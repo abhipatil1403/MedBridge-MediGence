@@ -62,7 +62,7 @@ export function Submissions({ organizationId }: { organizationId?: string }) {
           },
           { key: "message", label: referenceMode ? "Reference review note" : "Provider response" },
           { key: "organizationName", label: "Organization" },
-          { key: "providerName", label: "Provider" },
+          { key: "providerName", label: "Submitted by", render: (row) => referenceMode ? "MedBridge Admin" : String(row.providerName ?? "Submitting member") },
           { key: "reviewerName", label: "Reviewer" },
           {
             key: "approvedSections",
