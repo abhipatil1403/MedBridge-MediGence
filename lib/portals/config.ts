@@ -353,6 +353,7 @@ export const supportSections = [
 ] as const;
 export const adminSections = [
   ["dashboard", "Dashboard"],
+  ["reference-data", "Reference data"],
   ["users", "Users & roles"],
   ["providers", "Providers"],
   ["applications", "Provider applications"],

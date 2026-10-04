@@ -200,7 +200,7 @@ export function toFinding(kind: string, record: CatalogRecord, matchType: Findin
     href: hrefKinds[kind] ? `/${hrefKinds[kind]}/${record.slug}` : undefined,
     facts, matchType, matchReason,
     provenance: { kind: 'catalog', table: kind === 'services' ? 'healthcare_services' : kind,
-      recordId: record.recordId, sourceRecordId: record.sourceRecordId, label: record.provenance?.origin === 'provider_published' ? 'Published provider information' : record.provenance?.origin === 'admin_created' ? 'Reviewed catalog information' : 'MedBridge catalog',
+      recordId: record.recordId, sourceRecordId: record.sourceRecordId, label: record.provenance?.origin === 'admin_reference' ? 'MedBridge reference information' : record.provenance?.origin === 'provider_published' ? 'Published provider information' : record.provenance?.origin === 'admin_created' ? 'Reviewed catalog information' : 'MedBridge catalog',
       sourceKind: record.sourceKind, retrievedAt: new Date().toISOString() },
   };
 }

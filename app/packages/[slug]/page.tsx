@@ -56,7 +56,7 @@ export default async function PackageDetailPage({ params }: Props) {
           title={carePackage.name}
           intro={carePackage.description}
           facts={[
-            [hospital?.city, country?.name ?? carePackage.country].filter(Boolean).join(", "),
+            [carePackage.city ?? hospital?.city, country?.name ?? carePackage.country].filter(Boolean).join(", "),
           ]}
           actions={[
             {
@@ -84,10 +84,10 @@ export default async function PackageDetailPage({ params }: Props) {
                 )}
               </p>
             </DetailSection>
-            <DetailSection title="Estimated price">
+            <DetailSection title="Listed price">
               <div className="package-price-block">
                 <p className="package-price-block__amount">{packageDisplayPrice(carePackage)}</p>
-                <p className="package-price-block__source">{carePackage.provenance?.origin === "admin_created" ? "Published catalog estimate" : "Provider-listed estimate"} · {carePackage.currency ?? "USD"}</p>
+                <p className="package-price-block__source">{carePackage.priceType === "package_price" ? "Package price" : carePackage.priceType === "starting_price" ? "Starting price" : carePackage.priceType === "published_price" ? "Published price" : "Provider-listed estimate"} · {carePackage.currency ?? "USD"}{carePackage.provenance?.origin === "admin_reference" ? " · collected by MedBridge" : ""}</p>
                 <p className="package-price-block__duration">{carePackage.durationDays} listed days</p>
                 <p className="package-price-block__confirmation">Confirm the current quote, dates and eligibility with the provider.</p>
               </div>
@@ -149,7 +149,7 @@ export default async function PackageDetailPage({ params }: Props) {
               This listing is not a current quote, reservation or clinical
               recommendation. Additional costs may apply.
             </p>
-            <CatalogProvenance item={carePackage} />
+            <CatalogProvenance item={carePackage} kind="package" />
             <Link className="button button--primary" href="/help">
               Get support
             </Link>

@@ -2,6 +2,11 @@ import "server-only";
 import { z } from "zod";
 import { getPublicSupabaseClient } from "@/lib/supabase/server";
 import { packageServicesSchema } from "./package-services";
+export async function publishedReferenceClaims(kind: "hospital" | "doctor" | "package", id: string) {
+  const {data,error} = await getPublicSupabaseClient().rpc("public_reference_claims",{p_kind:kind,p_id:id});
+  if (error) throw new Error("Published field sources are unavailable.");
+  return z.array(z.object({section:z.string(),name:z.string(),field:z.string(),sourceName:z.string(),sourceUrl:z.string().nullable(),sourceType:z.string(),collectedAt:z.string(),reviewAfter:z.string().nullable(),status:z.string(),checkedAt:z.string(),freshness:z.enum(["fresh","needs_review","stale"])})).parse(data);
+}
 const review = z.object({
   field: z.string(),
   status: z.string(),
@@ -22,6 +27,7 @@ const profile = z.object({
         eligibilityNote: z.string().nullable(),
         quantity: z.union([z.number(), z.string()]).nullable(),
         facilityType: z.string().nullable(),
+        locationCity: z.string().nullable().optional(),
       }),
     )
     .optional(),

@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/types/database";
 import { getPublicSupabaseClient } from "@/lib/supabase/server";
 import { recordInputSchema } from "@/lib/portals/config";
+import { referenceOrganizationSchema, referenceSourceSchema, referenceClaimSchema, referenceReviewSchema } from "@/lib/portals/reference";
 import {
   checked,
   portalFailure,
@@ -36,6 +37,7 @@ const resources = {
   portal_settings: { search: "key", sort: "updated_at" },
   catalog_drafts: { search: "name", sort: "updated_at" },
   source_records: { search: "source_name", sort: "created_at" },
+  provider_reference_claims: { search: "field", sort: "created_at" },
   hospitals: { search: "name", sort: "updated_at" },
   doctors: { search: "name", sort: "updated_at" },
   packages: { search: "name", sort: "updated_at" },
@@ -54,6 +56,7 @@ const resources = {
   >
 >;
 const orgTables = new Set([
+  "provider_reference_claims",
   "provider_records",
   "provider_revisions",
   "provider_submissions",
@@ -67,6 +70,7 @@ const orgTables = new Set([
   "audit_events",
 ]);
 const adminOnly = new Set([
+  "provider_reference_claims",
   "portal_settings",
   "catalog_drafts",
   "source_records",
@@ -442,7 +446,7 @@ export async function GET(request: NextRequest) {
       : spec.sort;
     let query = readDb
       .from(table)
-      .select(table === "cities" ? "*,country:countries(name)" : table === "hospitals" ? publicHospitalFields : table === "doctors" ? publicDoctorFields : "*", {
+      .select(table === "provider_reference_claims" ? "*,source:source_records(source_name,source_url,source_type,retrieved_at,review_after)" : table === "cities" ? "*,country:countries(name)" : table === "hospitals" ? publicHospitalFields : table === "doctors" ? publicDoctorFields : "*", {
         count: "exact",
       });
     const org = params.get("organizationId");
@@ -450,6 +454,8 @@ export async function GET(request: NextRequest) {
       query = query.eq("organization_id", z.uuid().parse(org));
     if (table === "organizations" && org)
       query = query.eq("id", z.uuid().parse(org));
+    if (table === "organizations" && params.get("origin")) query = query.eq("onboarding_origin", z.enum(["admin_reference", "provider_submitted", "synthetic_qa"]).parse(params.get("origin")));
+    if (table === "source_records" && params.get("reference") === "true") query = query.eq("source_kind", "external").not("source_type", "is", null);
     if (params.get("id"))
       query = query.eq(
         table === "portal_accounts" ? "user_id" : "id",
@@ -459,12 +465,14 @@ export async function GET(request: NextRequest) {
       params.get("recordId") &&
       [
         "provider_revisions",
+        "provider_reference_claims",
         "provider_field_reviews",
         "provider_section_reviews",
         "provider_submission_items",
       ].includes(table)
     )
       query = query.eq("record_id", z.uuid().parse(params.get("recordId")));
+    if (params.get("revision") && table === "provider_reference_claims") query = query.eq("revision", z.coerce.number().int().positive().parse(params.get("revision")));
     if (
       params.get("submissionId") &&
       ["provider_submission_items", "provider_section_reviews"].includes(table)
@@ -621,6 +629,10 @@ const commandSchema = z
       ...supportActions,
       ...publicationActions,
       ...catalogActions,
+      "create_reference_organization",
+      "create_reference_source",
+      "attach_reference_claim",
+      "review_reference_claims",
     ]),
     input: z.record(z.string(), z.unknown()),
   })
@@ -631,6 +643,10 @@ export async function POST(request: NextRequest) {
     if (Number(request.headers.get("content-length") ?? 0) > 100000)
       throw new PortalError(413, "This change is too large.");
     const body = commandSchema.parse(await request.json());
+    if (body.action === "create_reference_organization") body.input=referenceOrganizationSchema.parse(body.input);
+    if (body.action === "create_reference_source") body.input=referenceSourceSchema.parse(body.input);
+    if (body.action === "attach_reference_claim") body.input=referenceClaimSchema.parse(body.input);
+    if (body.action === "review_reference_claims") body.input=referenceReviewSchema.parse(body.input);
     if (body.action === "create_case" && body.input.consent !== true)
       throw new PortalError(
         400,
@@ -639,7 +655,7 @@ export async function POST(request: NextRequest) {
     if (body.action === "save_record") recordInputSchema.parse(body.input);
     if (JSON.stringify(body.input).length > 60000)
       throw new PortalError(413, "This change is too large.");
-    const rpc = ["review_section", "open_submission"].includes(body.action)
+    const rpc = ["create_reference_organization", "create_reference_source", "attach_reference_claim", "review_reference_claims"].includes(body.action) ? "portal_reference_command" : ["review_section", "open_submission"].includes(body.action)
       ? "portal_review_command"
       : (supportActions as readonly string[]).includes(body.action)
         ? "support_command"

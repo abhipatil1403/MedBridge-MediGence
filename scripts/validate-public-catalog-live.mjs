@@ -14,7 +14,7 @@ for(const [table,column] of [['hospitals','verified_by'],['hospitals','verificat
  assert.ok((await client.from(table).select(column)).error,`${table}.${column} must remain private`);
  console.log(`PASS ${++passed}: private ${table}.${column} denied`);
 }
-for(const table of ['provider_documents','provider_revisions','provider_section_reviews','provider_field_reviews','audit_events']) {
+for(const table of ['provider_documents','provider_revisions','provider_section_reviews','provider_field_reviews','provider_reference_claims','audit_events']) {
  const {data,error}=await client.from(table).select('id').limit(1);
  assert.ok(error || data.length===0,`${table} must remain private`);
  console.log(`PASS ${++passed}: private ${table} denied`);
@@ -24,5 +24,10 @@ for(const [name,args] of [['search_catalog_candidates',{p_terms:''}],['public_pr
  assert.equal(error,null,name);
  if(process.env.MEDBRIDGE_EXPECT_EMPTY_CATALOG==='1') assert.deepEqual(data,[],name);
  console.log(`PASS ${++passed}: ${name} shares the public boundary`);
+}
+for(const [name,args] of [['public_reference_locations',{}]]){
+ const {data,error}=await client.rpc(name,args);assert.equal(error,null,name);
+ assert.ok(Array.isArray(data));assert.ok(data.every(row=>!Object.hasOwn(row,'evidence_summary')&&!Object.hasOwn(row,'reviewed_by')));
+ console.log(`PASS ${++passed}: ${name} excludes private evidence and operators`);
 }
 console.log(`Public catalog live: ${passed} read-only gates passed.`);

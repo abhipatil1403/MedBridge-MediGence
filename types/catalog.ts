@@ -1,9 +1,9 @@
 export type CatalogKind = "treatments" | "hospitals" | "doctors" | "packages" | "countries" | "services";
-export type ConsultationMode = "video" | "in-person" | "both";
+export type ConsultationMode = "video" | "in-person" | "both" | "not_confirmed";
 
 export interface CatalogRecord {
   readonly provenance?: {
-    readonly origin: "provider_published" | "admin_created";
+    readonly origin: "provider_published" | "admin_created" | "admin_reference";
     readonly sourceName: string;
     readonly sourceUrl: string | null;
     readonly checkedAt: string | null;
@@ -39,6 +39,11 @@ export interface Treatment extends CatalogRecord {
 }
 
 export interface Hospital extends CatalogRecord {
+  readonly treatmentCountries?: Readonly<Record<string, readonly string[]>>;
+  readonly specialtyCountries?: Readonly<Record<string, readonly string[]>>;
+  readonly locationCountries?: readonly string[];
+  readonly treatmentCities?: Readonly<Record<string, readonly string[]>>;
+  readonly specialtyCities?: Readonly<Record<string, readonly string[]>>;
   readonly locationCities?: readonly string[];
   readonly city: string;
   readonly country: string;
@@ -70,6 +75,8 @@ export interface Country extends CatalogRecord {
 }
 
 export interface Package extends CatalogRecord {
+  readonly priceType?: string;
+  readonly city?: string;
   readonly serviceDetails?: import("@/lib/catalog/package-services").PackageServices;
   readonly currency?: string;
   readonly listedPrice?: number;

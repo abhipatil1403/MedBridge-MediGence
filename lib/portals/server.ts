@@ -13,6 +13,11 @@ export class PortalError extends Error {
   }
 }
 const messages: Record<string, string> = {
+  PORTAL_REFERENCE_SOURCE_REQUIRED: "Choose a public HTTPS source, source category and actual collection time for this claim.",
+  PORTAL_REFERENCE_CLAIMS_REQUIRED: "Attach supporting sources to every populated field before submission. Reviews must use the attached source URL.",
+  PORTAL_REFERENCE_REVIEW_REQUIRED: "Review every sourced field and resolve missing, stale or conflicting evidence before approval or publication.",
+  PORTAL_REFERENCE_LOCATION_REQUIRED: "Choose the exact sourced location for this offering. Other branches do not inherit its availability.",
+  PORTAL_REFERENCE_INDEPENDENT_EVIDENCE: "Accreditation verification requires independent issuer, regulator or government evidence.",
   PORTAL_SECTIONS_UNRESOLVED:
     "An administrator must approve every frozen section, with accepted current evidence, before approving or publishing this submission.",
   PORTAL_CONFLICT:

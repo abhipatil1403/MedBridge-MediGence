@@ -20,6 +20,7 @@ import type { Portal, PortalContext, Row } from "@/lib/portals/config";
 import { label } from "@/lib/portals/config";
 
 export type PortalState = {
+  referenceMode?: boolean;
   portal: Portal;
   context: PortalContext;
   organizationId: string;

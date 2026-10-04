@@ -36,6 +36,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { publicUrl } from "@/lib/portals/public-url";
+import { ReferenceWorkspace } from "./reference-data";
 const catalogs = [
   "hospitals",
   "doctors",
@@ -47,6 +48,7 @@ const catalogs = [
   "services",
 ];
 export function AdminContent({ section }: { section: string }) {
+  if (section === "reference-data") return <ReferenceWorkspace />;
   if (catalogs.includes(section))
     return (
       <CatalogWorkspace
@@ -235,7 +237,7 @@ export function Providers() {
       {org && (
         <Modal title={String(org.name)} onClose={() => setOrg(undefined)}>
           <PortalStateContext.Provider
-            value={{ ...state, organizationId: String(org.id) }}
+            value={{ ...state, organizationId: String(org.id), referenceMode: org.onboarding_origin === "admin_reference" }}
           >
             {portal === "admin" ? (
               <>

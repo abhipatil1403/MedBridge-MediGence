@@ -124,6 +124,15 @@ describe('compound intent orchestration', () => {
     const h = harness(); const response = await h.send(compoundRegression);
     expect((await h.send(compoundRegression, response.conversationId)).tasks).toEqual([]);
   });
+  it('reuses legacy packages with an explicitly unset optional branch city', async () => {
+    const data = { ...snapshot, packages: [{ ...pkg, city: undefined }] };
+    const repository = { ...tools.repository, loadSnapshot: async () => data, listPackages: async () => data.packages };
+    const search = new SearchService(repository);
+    const h = harness(unavailable, { ...tools, repository, search: (q,type,filters) => search.search({q,type,...filters,sort:'relevance'}) });
+    const first = await h.send(compoundRegression);
+    expect(first.findings.some(f=>f.kind==='packages')).toBe(true);
+    expect((await h.send(compoundRegression,first.conversationId)).tasks).toEqual([]);
+  });
   it('refreshes cached facts and invalidates a changed hospital association', async () => {
     let current = snapshot;
     const repository = { ...tools.repository, loadSnapshot: async () => current, listPackages: async () => current.packages, listHospitals: async () => current.hospitals };

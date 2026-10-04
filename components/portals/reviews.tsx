@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { ReferenceClaims } from "./reference-claims";
 import { label, type Row } from "@/lib/portals/config";
 import {
   Action,
@@ -479,6 +480,7 @@ export function SubmissionDetail({
                 <Documents
                   organizationId={String(data.submission.organization_id)}
                 />
+                <ReferenceClaims key={`${selected.id}:${selected.revision}`} row={selected} submissionId={id} onSectionApproved={()=>setSelected(undefined)}/>
                 <ResourceTable
                   resource="provider_revisions"
                   params={{ recordId: String(selected.id) }}

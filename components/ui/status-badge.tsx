@@ -1,5 +1,6 @@
 const states: Record<string, { label: string; mark: string; tone: string }> = {
   verified: { label: 'Verified', mark: '✓', tone: 'success' },
+  approved: { label: 'Reviewed', mark: '✓', tone: 'neutral' },
   completed: { label: 'Complete', mark: '✓', tone: 'success' },
   reused: { label: 'Saved result', mark: '✓', tone: 'success' },
   current: { label: 'Current', mark: '✓', tone: 'success' },
@@ -24,6 +25,7 @@ const states: Record<string, { label: string; mark: string; tone: string }> = {
 };
 export function statusLabel(status: string) { return states[status]?.label ?? 'In progress'; }
 const explanations: Record<string, string> = {
+  approved: 'Approved for publication after source review. Independent clinical quality or accreditation verification is not established.',
   verified: 'Supported by the collected source statements. This does not establish clinical quality or suitability.',
   partial: 'Some requested fields have supporting evidence; others remain unresolved.',
   conflicting: 'Collected values disagree. Review all statements before relying on this field.',

@@ -125,7 +125,7 @@ export default async function DoctorDetailPage({ params }: Props) {
             </DetailSection>
             <DetailSection title="Consultation">
               <p>
-                Provider-listed mode: {doctor.consultationMode}. Appointment
+                Consultation mode: {doctor.consultationMode === "not_confirmed" ? "Not confirmed in published information" : doctor.consultationMode}. Appointment
                 availability requires confirmation.
               </p>
             </DetailSection>
@@ -136,7 +136,7 @@ export default async function DoctorDetailPage({ params }: Props) {
               Ask support to coordinate an authorized request. No appointment is
               booked from this page.
             </p>
-            <CatalogProvenance item={doctor} />
+            <CatalogProvenance item={doctor} kind="doctor" />
             <Link className="button button--primary" href="/help">
               Get support
             </Link>

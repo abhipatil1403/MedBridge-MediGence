@@ -189,6 +189,11 @@ try {
     sourceKind: "synthetic",
   });
   orgs.push(org.id);
+  for (const [actor,portal] of [["provider","provider"],["support","support"]]) {
+    const denied=await fetch(`${origin}/api/portals?portal=${portal}`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${actors[actor].session.access_token}`},body:JSON.stringify({action:"create_reference_organization",input:{name:"Unauthorized reference attempt",providerType:"hospital"}})});
+    check(denied.status===403,`${actor} cannot create admin reference data`);
+    check((await api(actor,portal,"provider_reference_claims",{})).status===403,`${actor} cannot read private reference evidence`);
+  }
   const otherOrg = await command("other", "provider", "create_organization", {
     name: `QA ONLY Other Organization ${stamp}`,
     providerType: "clinic",
@@ -196,7 +201,7 @@ try {
   });
   orgs.push(otherOrg.id);
   const city = db(
-    await admin.from("cities").select("id").eq("source_kind", "synthetic").eq("slug", "mumbai").single(),
+    await admin.from("cities").select("id").eq("slug", "mumbai").single(),
   );
   const specialty = db(await admin.from("specialties").select("id").eq("source_kind", "synthetic").limit(1))[0];
   const treatment = db(

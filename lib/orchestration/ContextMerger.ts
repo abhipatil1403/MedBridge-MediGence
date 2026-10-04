@@ -25,6 +25,7 @@ export function associatePackages(findings: Finding[], snapshot: CatalogSnapshot
     if (finding.kind !== 'packages') return finding;
     const pkg = snapshot.packages.find((p) => p.recordId === finding.provenance.recordId && p.slug === finding.slug);
     const hospital = pkg && snapshot.hospitals.find((h) => h.slug === pkg.hospitalSlug);
-    return hospital ? { ...finding, facts: { ...finding.facts, hospitalId: hospital.recordId, hospitalSlug: hospital.slug, hospitalName: hospital.name, city: hospital.city } } : finding;
+    const city = pkg?.city ?? (pkg?.provenance?.origin === 'admin_reference' ? undefined : hospital?.city);
+    return hospital ? { ...finding, facts: { ...finding.facts, hospitalId: hospital.recordId, hospitalSlug: hospital.slug, hospitalName: hospital.name, ...(city ? {city} : {}) } } : finding;
   });
 }

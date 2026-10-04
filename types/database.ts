@@ -837,7 +837,7 @@ export type Database = {
           home_city_id: string | null;
           experience_years: number | null;
           languages: string[];
-          consultation_mode: string;
+          consultation_mode: string | null;
           qualifications_note: string;
           verification_status: Database["public"]["Enums"]["provider_verification_status"];
           verification_source: string | null;
@@ -859,7 +859,7 @@ export type Database = {
           home_city_id?: string | null;
           experience_years?: number | null;
           languages?: string[];
-          consultation_mode: string;
+          consultation_mode?: string | null;
           qualifications_note?: string;
           verification_status?: Database["public"]["Enums"]["provider_verification_status"];
           verification_source?: string | null;
@@ -881,7 +881,7 @@ export type Database = {
           home_city_id?: string | null;
           experience_years?: number | null;
           languages?: string[];
-          consultation_mode?: string;
+          consultation_mode?: string | null;
           qualifications_note?: string;
           verification_status?: Database["public"]["Enums"]["provider_verification_status"];
           verification_source?: string | null;
@@ -1277,6 +1277,7 @@ export type Database = {
           created_by: string;
           created_at: string;
           updated_at: string;
+          onboarding_origin: string;
         };
         Insert: {
           id?: string;
@@ -1289,6 +1290,7 @@ export type Database = {
           created_by: string;
           created_at?: string;
           updated_at?: string;
+          onboarding_origin?: string;
         };
         Update: {
           id?: string;
@@ -1301,6 +1303,7 @@ export type Database = {
           created_by?: string;
           created_at?: string;
           updated_at?: string;
+          onboarding_origin?: string;
         };
         Relationships: [];
       };
@@ -1364,6 +1367,7 @@ export type Database = {
           created_at: string;
           updated_at: string;
           publication_status: string;
+          city_id: string | null;
         };
         Insert: {
           id?: string;
@@ -1388,6 +1392,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           publication_status?: string;
+          city_id?: string | null;
         };
         Update: {
           id?: string;
@@ -1412,6 +1417,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           publication_status?: string;
+          city_id?: string | null;
         };
         Relationships: [];
       };
@@ -1754,6 +1760,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      provider_reference_claims: {
+        Row: {
+          id: string;
+          record_id: string;
+          revision: number;
+          organization_id: string;
+          field: string;
+          supported_value: Json;
+          source_record_id: string;
+          evidence_summary: string;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          record_id: string;
+          revision: number;
+          organization_id: string;
+          field: string;
+          supported_value: Json;
+          source_record_id: string;
+          evidence_summary: string;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          record_id?: string;
+          revision?: number;
+          organization_id?: string;
+          field?: string;
+          supported_value?: Json;
+          source_record_id?: string;
+          evidence_summary?: string;
+          created_by?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       provider_revisions: {
         Row: {
           record_id: string;
@@ -1932,6 +1977,8 @@ export type Database = {
           verified_by: string | null;
           notes: string | null;
           created_at: string;
+          source_type: string | null;
+          review_after: string | null;
         };
         Insert: {
           id?: string;
@@ -1948,6 +1995,8 @@ export type Database = {
           verified_by?: string | null;
           notes?: string | null;
           created_at?: string;
+          source_type?: string | null;
+          review_after?: string | null;
         };
         Update: {
           id?: string;
@@ -1964,6 +2013,8 @@ export type Database = {
           verified_by?: string | null;
           notes?: string | null;
           created_at?: string;
+          source_type?: string | null;
+          review_after?: string | null;
         };
         Relationships: [];
       };
@@ -2439,6 +2490,9 @@ export type Database = {
       support_command: { Args: { p_action: string; p_input?: Json }; Returns: Json };
       portal_publication_command: { Args: { p_action: string; p_input: Json }; Returns: Json };
       portal_catalog_command: { Args: { p_action: string; p_input: Json }; Returns: Json };
+      portal_reference_command: { Args: { p_action: string; p_input: Json }; Returns: Json };
+      public_reference_claims: { Args: { p_kind: string; p_id: string }; Returns: Json };
+      public_reference_locations: { Args: Record<string, never>; Returns: Json };
       portal_case_context: { Args: { p_case_id: string }; Returns: Json };
       portal_users: { Args: { p_search?: string }; Returns: Json };
       portal_analytics: { Args: Record<string, never>; Returns: Json };

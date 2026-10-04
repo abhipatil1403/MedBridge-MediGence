@@ -1,6 +1,8 @@
 import type { CatalogSnapshot, CatalogRecord, Package } from '@/types/catalog';
 import type { Finding } from '@/lib/agents/schemas';
 import { normalize } from '@/lib/discovery/normalize';
+import { hospitalCities, hospitalCountries } from '@/lib/catalog/location-scope';
+import type { Hospital } from '@/types/catalog';
 import { attributeEvidence } from './RequirementEvidence';
 import { packageAttributes, resultRequirementEvaluationSchema, type Requirement, type RequirementEvaluation } from './RequirementTypes';
 
@@ -68,11 +70,14 @@ export const RequirementEvaluator = {
         return result(slug === requirement.value ? 'exact' : typeof slug === 'string' ? 'not_met' : 'unknown', 'Evaluated against the explicitly requested hospital and catalog hospital link.', typeof slug === 'string' ? [slug] : [], ['hospitalSlug']);
       }
       if (type === 'location') {
-        const city = finding.kind === 'packages' ? hospital?.city : item.city;
+        const city = finding.kind === 'packages' ? item.city ?? (record.provenance?.origin === 'admin_reference' ? undefined : hospital?.city) : item.city;
         const country = finding.kind === 'countries' ? record.slug : item.country;
         const places = requirement.places ?? [];
-        const cities = finding.kind === 'hospitals' && Array.isArray(item.locationCities) ? [city, ...item.locationCities].filter((value): value is string => typeof value === 'string') : typeof city === 'string' ? [city] : [];
-        const matches = places.some((place) => place.type === 'city' ? cities.some((value) => normalize(value) === normalize(place.value)) : normalize(String(country ?? '')) === normalize(place.value));
+        const requestedProcedure = requirements.find(value => value.type === 'procedure' && value.matchType === 'exact')?.value;
+        const requestedSpecialty = requirements.find(value => value.type === 'specialty')?.value;
+        const cities = finding.kind === 'hospitals' ? hospitalCities(record as Hospital, requestedProcedure, requestedSpecialty) : typeof city === 'string' ? [city] : [];
+        const countries = finding.kind === 'hospitals' ? hospitalCountries(record as Hospital,requestedProcedure,requestedSpecialty) : typeof country === 'string' ? [country] : [];
+        const matches = places.some((place) => (place.type === 'city' ? cities : countries).some(value=>normalize(value)===normalize(place.value)));
         const known = places.some((place) => Boolean(place.type === 'city' ? city : country));
         return result(matches ? 'exact' : known ? 'not_met' : 'unknown', matches ? 'The catalog location matches a requested destination.' : known ? 'The catalog location differs from the requested destinations.' : 'The catalog does not specify the requested location field.', [...cities, country].filter((v): v is string => typeof v === 'string'), finding.kind === 'packages' ? ['hospitalSlug', 'hospitals.city', 'country'] : ['city', 'locationCities', 'country']);
       }

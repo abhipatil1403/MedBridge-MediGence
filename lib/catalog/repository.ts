@@ -72,6 +72,7 @@ const loadSnapshot = cache(async () => {
     packageDetailsQuery,
     hospitalDetailsQuery,
     provenanceQuery,
+    referenceLocationsQuery,
   ] = await Promise.all([
     db.from("countries").select("*"),
     db.from("cities").select("*"),
@@ -93,15 +94,18 @@ const loadSnapshot = cache(async () => {
     db.rpc("public_provider_package_details", {}),
     db.rpc("public_provider_hospital_details", {}),
     db.rpc("public_catalog_provenance", {}),
+    db.rpc("public_reference_locations", {}),
   ]);
   const countryRows = rows(countryQuery.data, countryQuery.error, "countries");
   if (provenanceQuery.error) throw new Error("Published catalog provenance is unavailable.");
   const provenance = z.array(z.object({
-    id: z.string(), origin: z.enum(["provider_published", "admin_created"]),
+    id: z.string(), origin: z.enum(["provider_published", "admin_created", "admin_reference"]),
     sourceName: z.string(), sourceUrl: z.string().nullable(),
     checkedAt: z.string().nullable(), verification: z.string(),
   })).parse(provenanceQuery.data);
   const provenanceById = new Map(provenance.map(({ id, ...source }) => [id, source]));
+  if (referenceLocationsQuery.error) throw new Error("Published reference locations are unavailable.");
+  const referenceLocations = z.array(z.object({hospitalId:z.string(),kind:z.string(),canonicalId:z.string().nullable(),city:z.string(),country:z.string(),recordId:z.string()})).parse(referenceLocationsQuery.data);
   const cityRows = rows(cityQuery.data, cityQuery.error, "cities");
   const specialtyRows = rows(
     specialtyQuery.data,
@@ -293,6 +297,13 @@ const loadSnapshot = cache(async () => {
       demo: item.source_kind === "synthetic",
       sourceKind: sourceKind(item.source_kind),
       city: city.name,
+      ...(provenanceById.get(item.id)?.origin === "admin_reference" ? {
+        locationCountries: [...new Set(referenceLocations.filter(location=>location.hospitalId===item.id).flatMap(location=>countryRows.filter(country=>country.name===location.country).map(country=>country.slug)))],
+        treatmentCountries: Object.fromEntries(treatmentRows.map(treatment => [treatment.slug, referenceLocations.filter(location => location.hospitalId === item.id && location.kind === "treatment" && location.canonicalId === treatment.id).flatMap(location=>countryRows.filter(country=>country.name===location.country).map(country=>country.slug))])),
+        specialtyCountries: Object.fromEntries(specialtyRows.map(specialty => [specialty.name, referenceLocations.filter(location => location.hospitalId === item.id && location.kind === "specialty" && location.canonicalId === specialty.id).flatMap(location=>countryRows.filter(country=>country.name===location.country).map(country=>country.slug))])),
+        treatmentCities: Object.fromEntries(treatmentRows.map(treatment => [treatment.slug, referenceLocations.filter(location => location.hospitalId === item.id && location.kind === "treatment" && location.canonicalId === treatment.id).map(location=>location.city)])),
+        specialtyCities: Object.fromEntries(specialtyRows.map(specialty => [specialty.name, referenceLocations.filter(location => location.hospitalId === item.id && location.kind === "specialty" && location.canonicalId === specialty.id).map(location=>location.city)])),
+      } : {}),
       locationCities: hospitalDetailsById
         .get(item.id)
         ?.locations.map((location) => location.city)
@@ -384,9 +395,9 @@ const loadSnapshot = cache(async () => {
       languages: item.languages,
       consultationMode:
         item.consultation_mode === "video" ||
-        item.consultation_mode === "in-person"
+        item.consultation_mode === "in-person" || item.consultation_mode === "both"
           ? item.consultation_mode
-          : "both",
+          : "not_confirmed",
       treatmentSlugs: doctorTreatmentRows
         .filter(
           (link) =>
@@ -424,6 +435,7 @@ const loadSnapshot = cache(async () => {
         treatmentById.get(item.treatment_id),
         "package treatment",
       ).slug,
+      city: referenceLocations.find(location => location.kind === "package" && location.canonicalId === item.id)?.city,
       hospitalSlug: item.hospital_id
         ? required(hospitalById.get(item.hospital_id), "package hospital").slug
         : "",
@@ -436,6 +448,7 @@ const loadSnapshot = cache(async () => {
       serviceDetails: detailsById.get(item.id),
       currency: item.currency.trim(),
       listedPrice: item.estimated_min,
+      priceType: item.price_type,
       samplePriceUsd: item.currency.trim() === "USD" ? item.estimated_min : 0,
       inclusions: inclusionRows
         .filter((link) => link.package_id === item.id)

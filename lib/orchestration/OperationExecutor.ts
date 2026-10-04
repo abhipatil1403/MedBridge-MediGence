@@ -15,6 +15,8 @@ import { associatePackages, compoundContext } from './ContextMerger';
 import { compoundRequestSchema, type CompoundRequest, type OperationType } from './CompoundRequest';
 import { HospitalMatchingAgent, needsLinkedPackages, hospitalMatchSummary } from '@/lib/agents/HospitalMatchingAgent';
 import { planOperations } from './OperationPlanner';
+import { hospitalMatchesCity, hospitalMatchesCountry } from '@/lib/catalog/location-scope';
+import type { Hospital } from '@/types/catalog';
 
 type Search = { step: AgentPlan['steps'][number]; task: CarePlanTask; operation: OperationType; place: string };
 type Results = Array<{ tool: string; input?: string; taskId?: string; result: ToolResult }>;
@@ -69,11 +71,11 @@ export async function prepareCompoundExecution(input: { content: string; request
       && t.findings.every((f) => snapshot[target].some((r) => {
         if (r.recordId !== f.provenance.recordId || r.slug !== f.slug) return false;
         const linkedHospital = 'hospitalSlug' in r ? snapshot.hospitals.find((h) => h.slug === r.hospitalSlug) : undefined;
-        const city = 'city' in r ? r.city : linkedHospital?.city;
+        const city = ('city' in r ? r.city : undefined) ?? (r.provenance?.origin === 'admin_reference' ? undefined : linkedHospital?.city);
         return (!args.hospital || ('hospitalSlug' in r ? r.hospitalSlug : r.slug) === args.hospital)
           && (!args.treatment || ('treatmentSlug' in r ? r.treatmentSlug === args.treatment : 'treatmentSlugs' in r && r.treatmentSlugs.includes(args.treatment)))
-          && (!args.city || normalize(city ?? '') === normalize(args.city))
-          && (!args.country || 'country' in r && r.country === args.country)
+          && (target === 'hospitals' ? hospitalMatchesCity(r as Hospital,args.city,args.treatment,args.specialty) : !args.city || normalize(city ?? '') === normalize(args.city))
+          && (target === 'hospitals' ? hospitalMatchesCountry(r as Hospital,args.country,args.treatment,args.specialty) : !args.country || 'country' in r && r.country === args.country)
           && (!args.specialty || 'specialty' in r && normalize(r.specialty) === normalize(args.specialty)
             || 'specialties' in r && r.specialties.some((value) => normalize(value) === normalize(args.specialty!))
             || 'treatmentSlug' in r && snapshot.treatments.some((t) => t.slug === r.treatmentSlug && normalize(t.specialty) === normalize(args.specialty!)));

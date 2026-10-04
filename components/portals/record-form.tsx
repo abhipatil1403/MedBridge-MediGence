@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { ReferenceClaims } from "./reference-claims";
 import {
   fields,
   label,
@@ -175,13 +176,14 @@ export function RecordForm({
   row?: Row;
   onClose: () => void;
 }) {
-  const { organizationId, command } = usePortal();
+  const { organizationId, command, referenceMode } = usePortal();
+  const formFields: Field[] = referenceMode ? [...fields[kind], ...(!["organization", "location"].includes(kind) ? [{key:"locationId",label:"Exact sourced location",type:"select" as const,catalog:"provider_records",catalogParams:{kind:"location"},help:"This offering applies only to the selected branch. Create another separately sourced record for another branch."}] : []), ...(kind === "package" ? [{key:"priceType",label:"Documented pricing type",type:"select" as const,options:["estimate","package_price","starting_price","published_price"],help:"Choose only the terminology supported by the source."}] : [])] : fields[kind];
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const defaultValues: FormValues = {
     name: String(row?.name ?? ""),
     values: Object.fromEntries(
-      fields[kind].map((field) => {
+      formFields.map((field) => {
         const entry = row?.data?.[field.key];
         return [
           field.key,
@@ -215,8 +217,9 @@ export function RecordForm({
   const save = form.handleSubmit(async (values) => {
     setError("");
     const data: Record<string, unknown> = { ...row?.data };
-    for (const field of fields[kind]) {
+    for (const field of formFields) {
       const value = values.values[field.key];
+      if (referenceMode && ((field.type === "checkbox" && value === false && row?.data?.[field.key] === undefined && !form.getFieldState(`values.${field.key}`).isDirty) || (Array.isArray(value) && !value.length))) {delete data[field.key];continue;}
       if (value === "" || value === undefined) {
         delete data[field.key];
         continue;
@@ -265,6 +268,7 @@ export function RecordForm({
         Save a private draft now. Required fields and evidence are checked when
         you submit.
       </p>
+      {referenceMode && <p className="portal-muted">Enter only facts the source explicitly supports. Leave missing contact information, consultation mode and service inclusions blank. Attach field sources after saving; edits create a new revision that requires fresh source associations.</p>}
       <form onSubmit={save} className="portal-form">
         <label className="portal-field">
           <span>
@@ -282,7 +286,7 @@ export function RecordForm({
           )}
         </label>
         <div className="portal-form-grid">
-          {fields[kind].map((field) => (
+          {formFields.map((field) => (
             <FieldControl
               key={field.key}
               field={field}
@@ -325,7 +329,7 @@ export function RecordDetails({
   onClose: () => void;
   onEdit: (row: Row) => void;
 }) {
-  const { organizationId, portal } = usePortal();
+  const { organizationId, portal, referenceMode } = usePortal();
   const [history, setHistory] = useState<Row>();
   return (
     <Modal title={String(row.name)} onClose={onClose}>
@@ -352,6 +356,7 @@ export function RecordDetails({
           </div>
         ))}
       </dl>
+      {referenceMode && <ReferenceClaims row={row}/>}
       <div className="portal-actions">
         {!["submitted", "under_review", "archived"].includes(
           String(row.status),

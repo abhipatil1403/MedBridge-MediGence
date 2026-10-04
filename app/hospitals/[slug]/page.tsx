@@ -16,6 +16,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { publishedProviderProfile } from "@/lib/catalog/provider-profile";
 import { packagePrice } from "@/lib/catalog/pricing";
 import { CatalogProvenance } from "@/components/catalog-provenance";
+import { fieldLabel } from "@/lib/catalog/field-label";
 
 type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -53,7 +54,7 @@ export default async function HospitalDetailPage({ params }: Props) {
         />
         {hospital.demo && <DemoNotice />}
         <DetailHero
-          type="PUBLISHED PROVIDER"
+          type={hospital.provenance?.origin === "admin_reference" ? "MEDBRIDGE REFERENCE" : "PUBLISHED PROVIDER"}
           title={hospital.name}
           intro={hospital.description}
           facts={[
@@ -93,7 +94,7 @@ export default async function HospitalDetailPage({ params }: Props) {
                 <dl className="fact-list">
                   {profile.fieldReviews.map((field) => (
                     <div key={field.field}>
-                      <dt>{field.field}</dt>
+                      <dt>{fieldLabel(field.field)}</dt>
                       <dd>
                         <StatusBadge status={field.status} />
                         {field.sourceUrl && (
@@ -141,6 +142,7 @@ export default async function HospitalDetailPage({ params }: Props) {
                   .map((item) => (
                     <article key={`${item.kind}:${item.name}`}>
                       <h3>{item.department || item.name}</h3>
+                      {item.locationCity && <p>Documented location: {item.locationCity}</p>}
                       <p>
                         {item.description ||
                           "Provider-specific information not provided."}
@@ -174,6 +176,7 @@ export default async function HospitalDetailPage({ params }: Props) {
                   <article key={item.name}>
                     <h3>{item.name}</h3>
                     <p>{item.description || "Description not provided."}</p>
+                    {item.locationCity && <p>Documented location: {item.locationCity}</p>}
                     <p>
                       Availability:{" "}
                       {item.availability?.replaceAll("_", " ") ||
@@ -263,10 +266,10 @@ export default async function HospitalDetailPage({ params }: Props) {
             <p className="eyebrow">PUBLISHED SNAPSHOT</p>
             <h2>Confirm your next step</h2>
             <p>
-              Prices and provider-submitted services require current
+              Prices and documented services require current
               confirmation. No booking or payment is processed here.
             </p>
-            <CatalogProvenance item={hospital} />
+            <CatalogProvenance item={hospital} kind="hospital" />
             <Link
               className="text-link"
               href={`/assistant?q=${encodeURIComponent(`Verify ${hospital.name}`)}`}

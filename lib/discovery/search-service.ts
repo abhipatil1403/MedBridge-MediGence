@@ -1,4 +1,5 @@
 import { catalogRepository } from "@/lib/catalog/repository";
+import { hospitalMatchesCity, hospitalMatchesCountry } from "@/lib/catalog/location-scope";
 import type {
   CatalogKind,
   CatalogRepository,
@@ -146,8 +147,8 @@ export function searchHospitals(
   const city = filters.city || parsed.entities.city;
   const results = catalog.hospitals.filter(
     (item) =>
-      (!country || item.country === country) &&
-      (!city || [item.city, ...(item.locationCities ?? [])].some((location) => normalize(location) === normalize(city))) &&
+      hospitalMatchesCountry(item, country, filters.treatment || parsed.entities.procedure, filters.specialty || (!parsed.entities.procedure ? parsed.entities.specialty : undefined)) &&
+      hospitalMatchesCity(item, city, filters.treatment || parsed.entities.procedure, filters.specialty || (!parsed.entities.procedure ? parsed.entities.specialty : undefined)) &&
       (!filters.hospital || item.slug === filters.hospital) &&
       (!(
         filters.specialty ||
@@ -265,11 +266,11 @@ export function searchPackages(
             t.specialty === (filters.specialty || parsed.entities.specialty),
         )) &&
       (!city ||
-        catalog.hospitals.some(
+        (item.city ? normalize(item.city) === normalize(city) : item.provenance?.origin !== "admin_reference" && catalog.hospitals.some(
           (hospital) =>
             hospital.slug === item.hospitalSlug &&
             normalize(hospital.city) === normalize(city),
-        )) &&
+        ))) &&
       (!filters.budget ||
         !Number.isFinite(item.samplePriceUsd) ||
         item.samplePriceUsd <= 0 ||
