@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { providerSections, type Row } from "@/lib/portals/config";
 import { CommandForm } from "./command-form";
 import { ErrorPanel, Loading, Panel, PortalStateContext, ResourceTable, date, usePortal, useResource } from "./core";
@@ -15,9 +15,8 @@ export function ReferenceWorkspace() {
   const currentOrganization = data?.rows.find(row => row.id === selected);
   // Commands refresh read models. Keep this selected workspace mounted while
   // its organization list reloads so a frozen review dialog keeps its state.
-  useEffect(() => {
-    if (!loading) setSelectedOrganization(currentOrganization);
-  }, [currentOrganization, loading]);
+  if (!loading && selectedOrganization !== currentOrganization)
+    setSelectedOrganization(currentOrganization);
   const org = currentOrganization ?? (loading && selectedOrganization?.id === selected ? selectedOrganization : undefined);
   return <>
     <ReferenceStarter onSelect={id=>{setSelected(id);setSection("profile");}}/>
