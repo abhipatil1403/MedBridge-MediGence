@@ -14,7 +14,7 @@ for(const [table,column] of [['hospitals','verified_by'],['hospitals','verificat
  assert.ok((await client.from(table).select(column)).error,`${table}.${column} must remain private`);
  console.log(`PASS ${++passed}: private ${table}.${column} denied`);
 }
-for(const table of ['provider_documents','provider_revisions','provider_section_reviews','provider_field_reviews','provider_reference_claims','audit_events']) {
+for(const table of ['provider_documents','provider_revisions','provider_section_reviews','provider_field_reviews','provider_reference_claims','source_records','audit_events']) {
  const {data,error}=await client.from(table).select('id').limit(1);
  assert.ok(error || data.length===0,`${table} must remain private`);
  console.log(`PASS ${++passed}: private ${table} denied`);

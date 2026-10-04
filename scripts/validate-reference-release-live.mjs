@@ -11,12 +11,13 @@ function checked(result){assert.equal(result.error,null);return result.data;}
 const counts={countries:1,cities:5,specialties:3,treatments:2,hospitals:5,doctors:5,packages:0,price_estimates:0};
 const catalog={};
 for(const [table,count] of Object.entries(counts)){
-  const fields=table==='hospitals'?'id,name,slug,source_kind,city_id,verification_status':table==='doctors'?'id,name,slug,source_kind,hospital_id,consultation_mode,experience_years,verification_status':'id,source_kind';
+  const fields=table==='hospitals'?'id,name,slug,source_kind,city_id,verification_status':table==='doctors'?'id,name,slug,source_kind,consultation_mode,experience_years,verification_status':'id,source_kind';
   catalog[table]=checked(await db.from(table).select(fields));
   assert.equal(catalog[table].length,count,table);assert.ok(catalog[table].every(row=>row.source_kind==='external'),table+' real references only');
   console.log(`PASS ${table}: ${count} sourced published records`);
 }
-assert.ok(catalog.doctors.every(row=>row.consultation_mode===null&&row.experience_years===null&&catalog.hospitals.some(h=>h.id===row.hospital_id)),'unknown doctor facts and exact hospital relationship');
+const doctorLinks=checked(await db.from('hospital_doctors').select('doctor_id,hospital_id'));
+assert.ok(catalog.doctors.every(row=>row.consultation_mode===null&&row.experience_years===null&&doctorLinks.some(link=>link.doctor_id===row.id&&catalog.hospitals.some(h=>h.id===link.hospital_id))),'unknown doctor facts and exact hospital relationship');
 assert.ok([...catalog.hospitals,...catalog.doctors].every(row=>row.verification_status!=='verified'),'publication must not invent clinical verification');
 const provenance=checked(await db.rpc('public_catalog_provenance',{}));
 const entityIds=new Set([...catalog.hospitals,...catalog.doctors].map(row=>row.id));
@@ -30,10 +31,11 @@ for(const hospital of catalog.hospitals){
   const profile=checked(await db.rpc('public_provider_profile',{p_hospital_id:hospital.id}));
   assert.equal(profile.accreditations.length,0);assert.equal(profile.internationalServices.length,0);
   const response=await fetch(`${origin}/hospitals/${hospital.slug}`);assert.equal(response.status,200);
+  assert.ok((await response.text()).includes(hospital.name),hospital.name+' rendered content, not only an HTTP 200 stream');
   console.log(`PASS ${hospital.name}: ${sources.length} public sourced claims and canonical page`);
 }
 assert.equal(claims,146,'complete starter field coverage');
-for(const doctor of catalog.doctors){const response=await fetch(`${origin}/doctors/${doctor.slug}`);assert.equal(response.status,200);}
+for(const doctor of catalog.doctors){const response=await fetch(`${origin}/doctors/${doctor.slug}`);assert.equal(response.status,200);assert.ok((await response.text()).includes(doctor.name),doctor.name+' rendered content');}
 console.log('PASS 146 sourced claims; five canonical doctor pages; unknown prices, packages and verification preserved');
 
 if(process.env.MEDBRIDGE_REFERENCE_ASSISTANT_LIVE==='1'){
