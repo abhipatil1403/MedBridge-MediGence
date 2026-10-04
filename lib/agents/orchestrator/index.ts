@@ -98,11 +98,13 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
       }}));
     }
     const draft = active?.context.patientCase;
+    const catalogGapQuestion = !draft && active?.findings.some(f => f.kind === 'hospitals')
+      && /^what information is missing[?.!]*$/i.test(request.content.trim());
     const hospitalGoal = /\b(?:find|search|look for)\b.*\bhospitals?\b|\bfind\b.*\bhospital\b/i.test(request.content);
     const continueCase = Boolean(draft && /^continue(?: with (?:my|this) case)?[.!]?$/i.test(request.content.trim()));
     const wantsHandoff = Boolean(draft && (hospitalGoal || continueCase && draft.pendingCoordinationRequest));
     const newFacts = extractCase(request.content, draft).some((i) => i.field !== 'requestedGoal');
-    if ((caseIntakeIntent(request.content, draft) || wantsHandoff) && (!wantsHandoff || newFacts
+    if (!catalogGapQuestion && (caseIntakeIntent(request.content, draft) || wantsHandoff) && (!wantsHandoff || newFacts
       || draft!.reviewPresentedRevision !== draft!.revision || caseFields.some((f) => draft![f].some((i) => i.status === 'conflicting')))) {
       if (!hasPlanningSchema) throw new AgentError('PLANNING_MIGRATION_MISSING', 'Case intake needs the existing care-plan migration before it can save information.');
       const intakeSnapshot = hospitalGoal ? await loadDiscoverySnapshot(context.tools?.repository ?? defaultToolDependencies.repository) : undefined;

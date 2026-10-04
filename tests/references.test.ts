@@ -26,6 +26,33 @@ function extendedHarness(options: { twoPackages?: boolean } = {}) {
 }
 
 describe('conversational reference detection and resolution', () => {
+  it('answers catalog information gaps without starting case intake after an empty package clarification', async () => {
+    const h=extendedHarness();h.data.packages=[];
+    const first=await h.send('Find knee replacement hospitals in Mumbai.');
+    await h.send('Show me its packages.',first.conversationId);
+    await h.send('Tell me more about the second package.',first.conversationId);
+    const answer=await h.send('What information is missing?',first.conversationId);
+    expect(answer.status).toBe('completed');
+    expect(answer.findings[0].slug).toBe(hospital.slug);
+    expect(answer.summary).toContain('No published packages or package prices');
+    expect(answer.summary).not.toContain('No case information');
+    expect(answer.patientCase).toBeUndefined();
+  });
+  it('distinguishes a hospital doctor relationship from hospital details', () => {
+    expect(ReferenceDetector.detect('Show me doctors associated with this hospital.')).toMatchObject({entityType:'hospital',operation:'doctors'});
+    expect(ReferenceDetector.detect('Show me its doctors.')).toMatchObject({entityType:'hospital',operation:'doctors'});
+  });
+  it('queries only hospital affiliations without inheriting unsupported procedure criteria', async () => {
+    const h=extendedHarness();
+    const first=await h.send('Find knee replacement hospitals in Mumbai.');
+    const answer=await h.send('Show me doctors associated with this hospital.',first.conversationId);
+    expect(answer.tasks.map(task=>task.tool)).toEqual(['search_doctors']);
+    expect(answer.findings.length).toBe(2);
+    expect(answer.findings.every(row=>row.kind==='doctors')).toBe(true);
+    expect(answer.findings.some(row=>row.title==='Demo Cardiologist')).toBe(true);
+    expect(h.search.mock.calls.at(-1)?.[2]).toMatchObject({hospital:hospital.slug});
+    expect(h.search.mock.calls.at(-1)?.[2]?.treatment).toBeUndefined();
+  });
   it.each(['the first one', 'the second one', 'the third one', 'the last one', 'this hospital', 'that hospital', 'this doctor', 'that package',
     'the Mumbai one', 'the Pune one', 'the Turkey one', 'the cheaper one', 'the more expensive one', 'the longer package', 'the shorter package',
     'the package you showed me', 'the hospital you mentioned', 'tell me more about that', 'tell me more about the second hospital', 'How much is that?', 'Does that hospital have a package?'])('detects %s', (text) => {

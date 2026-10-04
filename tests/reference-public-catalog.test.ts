@@ -34,6 +34,8 @@ describe.skipIf(!enabled)("real anonymous sourced starter catalog",()=>{
       expect(response.findings.filter(row=>row.kind==="packages")).toEqual([]);
       if(content.includes("Find a hospital in Pune"))expect(response.findings.some(row=>row.title.includes("Deenanath"))).toBe(true);
       if(content.includes("Compare Mumbai"))expect(response.comparison?.sides.map(side=>side.option.value)).toEqual(["Mumbai","Pune"]);
+      if(content.includes("Show me doctors")){expect(response.findings.length).toBeGreaterThan(0);expect(response.findings.every(row=>row.kind==="doctors")).toBe(true);expect(response.findings.some(row=>row.title.includes("Hemant Wakankar"))).toBe(true);}
+      if(content.includes("What information")){expect(response.summary).toContain("No published packages or package prices");expect(response.patientCase).toBeUndefined();}
     }
   },60000);
 });

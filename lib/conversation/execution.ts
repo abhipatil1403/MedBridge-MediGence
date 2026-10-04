@@ -19,6 +19,9 @@ const lists = { hospital: 'hospitals', package: 'packages', doctor: 'doctors', t
 export async function prepareReferenceExecution(input: { content: string; conversationId: string; recent: ConversationMessage[]; active?: CarePlan;
   snapshot: CatalogSnapshot; store: PlanningStore; lease: string }): Promise<NonNullable<RuntimeContext['execution']> | undefined> {
   let query = ReferenceDetector.detect(input.content);
+  const catalogGapQuestion = !input.active?.context.patientCase && input.active?.findings.some(f => f.kind === 'hospitals')
+    && /^what information is missing[?.!]*$/i.test(input.content.trim());
+  if (catalogGapQuestion) query = { entityType: 'hospital', operation: 'details' };
   if (query?.entityType === 'case') return undefined; // handled by CaseIntakeAgent
   const responses = persistedResponses(input.recent, input.conversationId);
   const latest = responses.at(-1);
@@ -56,7 +59,7 @@ export async function prepareReferenceExecution(input: { content: string; conver
     && (!query!.location || [group.location, ...group.references.flatMap((item) => [item.city, item.country, item.location])]
       .some((place) => place && normalize(place.replaceAll('-', ' ')) === normalize(query!.location!))));
   // Never fall back because an ordinal is out of range or a current group is empty.
-  let current = pending?.context?.conversationId === input.conversationId ? pending.context : contexts[0] && relevant(contexts[0]) ? contexts[0] : undefined;
+  let current = pending?.context?.conversationId === input.conversationId && relevant(pending.context) ? pending.context : contexts[0] && relevant(contexts[0]) ? contexts[0] : undefined;
   if (!current && input.active?.context.referenceContext && relevant(input.active.context.referenceContext)) current = input.active.context.referenceContext;
   if (!current && input.active && input.active.status !== 'cancelled') {
     const plan = planReferenceContext(input.active, requestedType); if (relevant(plan)) current = plan;
@@ -72,7 +75,7 @@ export async function prepareReferenceExecution(input: { content: string; conver
   const reference = resolution.reference;
   if (reference?.sourceKind === 'external_source') {
     const research = responses.find(r => r.runId === reference.sourceRunId)?.research;
-    const findings = research?.findings.filter(f => f.entity.id === reference.entityId && (query!.operation !== 'packages' || ['package_information', 'published_pricing', 'accommodation'].includes(f.field)));
+    const findings = research?.findings.filter(f => f.entity.id === reference.entityId && query!.operation !== 'doctors' && (query!.operation !== 'packages' || ['package_information', 'published_pricing', 'accommodation'].includes(f.field)));
     if (research && findings?.length) {
       const selected = { ...research, findings, conflicts: research.conflicts.filter(c => c.entityId === reference.entityId),
         missingInformation: research.missingInformation.filter(m => m.startsWith(`${reference.displayName}:`)) };
@@ -90,9 +93,9 @@ export async function prepareReferenceExecution(input: { content: string; conver
     reason: 'This service has no supported detail tool. Please open its catalog page or specify another result.' };
   const chosen = resolution.reference;
   const steps: NonNullable<RuntimeContext['execution']>['plan']['steps'] = chosen ? [{
-    tool: query.operation === 'packages' ? 'search_packages' : `get_${chosen.entityType}` as ToolName,
-    objective: query.operation === 'packages' ? `Find packages associated with ${chosen.displayName}`.slice(0, 160) : `Read ${chosen.displayName}`.slice(0, 160),
-    input: JSON.stringify(query.operation === 'packages' ? { query: `Packages for ${chosen.displayName}`.slice(0, 240), hospital: chosen.slug,
+    tool: query.operation === 'doctors' ? 'search_doctors' : query.operation === 'packages' ? 'search_packages' : `get_${chosen.entityType}` as ToolName,
+    objective: query.operation === 'doctors' ? `Find published doctors associated with ${chosen.displayName}`.slice(0, 160) : query.operation === 'packages' ? `Find packages associated with ${chosen.displayName}`.slice(0, 160) : `Read ${chosen.displayName}`.slice(0, 160),
+    input: JSON.stringify(query.operation === 'doctors' ? { query: 'Doctors', hospital: chosen.slug } : query.operation === 'packages' ? { query: `Packages for ${chosen.displayName}`.slice(0, 240), hospital: chosen.slug,
       treatment: input.active?.context.treatmentSlug, budget: !input.active?.context.compoundRequest?.operations.some((op) => op.type === 'discover_hospitals') && input.active?.context.budget?.currency === 'USD' && !input.active.context.requirements?.some((r) => (packageAttributes as readonly string[]).includes(r.type)) ? input.active.context.budget.amount : undefined } : { slug: chosen.slug }),
   }] : [];
   const plan = { agent: 'discovery' as const, understanding: chosen ? `You are referring to ${chosen.displayName}.`.slice(0, 400) : 'I need to identify the result you mean.',
@@ -114,7 +117,7 @@ export async function prepareReferenceExecution(input: { content: string; conver
       const findings = evaluateFindings(response.findings.map((finding) => chosen && finding.provenance.recordId === chosen.entityId ? { ...finding,
         matchType: chosen.matchType, matchReason: `Previously shown ${chosen.matchType} catalog result; resolving a reference does not establish medical suitability.` } : finding), input.active?.context.requirements ?? [], input.snapshot);
       let finalResolution = resolution;
-      if (chosen && query.operation !== 'packages' && !findings.some((finding) => finding.provenance.recordId === chosen.entityId))
+      if (chosen && !['packages','doctors'].includes(query.operation) && !findings.some((finding) => finding.provenance.recordId === chosen.entityId))
         finalResolution = { ...resolution, status: 'unresolved', reference: undefined, reason: 'The previously shown record could not be retrieved. Please try again or choose another result.' };
       const question = finalResolution.status === 'resolved' ? null : finalResolution.reason.slice(0, 300);
       const clarification: ReferenceClarification | undefined = question ? {
@@ -144,15 +147,24 @@ export async function prepareReferenceExecution(input: { content: string; conver
       return { ...response, pendingClarification: clarification, findings, discovery: undefined, plan: input.active, referenceResolution: finalResolution,
         status: question ? 'awaiting_user_input' : response.status, type: question ? 'clarification' : 'result', question,
         summary: question ? resolution.reason : response.status === 'failed' ? 'I could not retrieve that referenced record. Please try again.'
-          : !findings.length ? query.operation === 'packages' ? 'No matching published packages are associated with that hospital and the current plan criteria.' : finalResolution.reason
-            : referenceSummary(chosen!, findings, query.operation, query.attribute),
+          : !findings.length ? query.operation === 'doctors' ? 'No published doctor affiliations are available for that hospital.' : query.operation === 'packages' ? 'No matching published packages are associated with that hospital and the current plan criteria.' : finalResolution.reason
+            : catalogGapQuestion ? catalogGapSummary(findings, input.snapshot) : referenceSummary(chosen!, findings, query.operation, query.attribute),
         nextSteps: question ? ['Specify the result type, location or name.'] : ['Review the sourced catalog details. A clinician must assess medical suitability.'],
       } as AgentResponse;
     } };
 }
 
+function catalogGapSummary(findings: AgentResponse['findings'], snapshot: CatalogSnapshot) {
+  const hospital = findings[0];
+  const gaps = [...new Set(findings.flatMap(f => f.requirementEvaluation?.evaluations ?? [])
+    .filter(e => ['unknown','incomplete','not_met'].includes(e.status)).map(e => e.label))];
+  const packages = snapshot.packages.filter(p => p.hospitalSlug === hospital.slug);
+  return `${hospital.title}: ${gaps.length ? `information still needed for ${gaps.join(', ')}.` : 'No unresolved requested criteria were identified in the returned record.'} ${packages.length ? 'Check each published package for its documented inclusions and price.' : 'No published packages or package prices are linked to this hospital; accommodation inclusions cannot be confirmed.'} Current availability and medical suitability still require confirmation.`.slice(0,1600);
+}
+
 function referenceSummary(reference: EntityReference, findings: AgentResponse['findings'], operation: string, attribute?: string) {
   const item = findings[0];
+  if (operation === 'doctors') return `I found ${findings.length} published doctor affiliation${findings.length === 1 ? '' : 's'} for ${reference.displayName}. Hospital affiliation does not establish procedure expertise, consultation mode or current availability.`;
   if (operation === 'packages') return `I found ${findings.length} catalog package${findings.length === 1 ? '' : 's'} associated with ${reference.displayName}. Listed sample prices are not provider quotes.`;
   const price = item.facts.listedPrice??item.facts.samplePriceUsd;
   const budget = item.requirementEvaluation?.evaluations.find((e) => e.type === 'budget');

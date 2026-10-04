@@ -22,7 +22,7 @@ export type ReferenceContext = z.infer<typeof referenceContextSchema>;
 export const referenceQuerySchema = z.object({ sourceKind: z.enum(['medbridge_catalog', 'external_source']).optional(), ordinal: z.union([z.number().int().positive().max(100), z.literal('last')]).optional(),
   entityType: referenceEntityTypeSchema.optional(), location: z.string().optional(),
   attribute: z.enum(['cheaper', 'expensive', 'longer', 'shorter']).optional(),
-  operation: z.enum(['details', 'packages', 'price']),
+  operation: z.enum(['details', 'packages', 'doctors', 'price']),
 }).strict();
 export type ReferenceQuery = z.infer<typeof referenceQuerySchema>;
 export const referenceResolutionSchema = z.object({ status: z.enum(['resolved', 'ambiguous', 'unresolved']),

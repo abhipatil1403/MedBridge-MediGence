@@ -19,6 +19,7 @@ export const ReferenceDetector = {
     const ordinalMatch = /\b(?:the )?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|\d+(?:st|nd|rd|th))\s+(?:(?:external|researched) )?(?:one|item|result|hospital|doctor|package|treatment|provider)s?\b/.exec(text);
     const location = /\bthe\s+([a-z]+(?:\s+[a-z]+){0,3}?)\s+(?:one|result)\b/.exec(text)?.[1];
     const relation = /\b(?:its|their|that hospital(?:'s|s)?|this hospital(?:'s|s)?)\s+(?:have\s+(?:a\s+)?)?packages?\b|\bdoes (?:that|this|the) hospital have (?:a )?package\b/.test(text);
+    const doctorRelation = /\bdoctors?\b.*\b(?:this|that|the|shown|selected) hospital\b|\b(?:its|their|this hospital(?:'s)?|that hospital(?:'s)?)\s+doctors?\b/.test(text);
     const attribute = /\b(?:cheaper|less expensive|lowest (?:price|cost))\b/.test(text) ? 'cheaper'
       : /\b(?:more expensive|highest (?:price|cost))\b/.test(text) ? 'expensive'
         : /\blonger\b/.test(text) ? 'longer' : /\bshorter\b/.test(text) ? 'shorter' : undefined;
@@ -26,7 +27,7 @@ export const ReferenceDetector = {
     const inclusionQuestion = /\b(?:does|do|is)\b.*\b(?:include|included|provide|cover)\b/.test(text);
     const detail = inclusionQuestion || /\b(?:tell me|more about|details?|how much|you (?:showed|mentioned))\b/.test(text);
     const typedDemonstrative = demonstrative && /\b(?:hospital|provider|doctor|package|treatment)s?\b/.test(text);
-    if (!ordinalMatch && !relation && !(attribute && /\b(?:which|one|package)\b/.test(text))
+    if (!ordinalMatch && !relation && !doctorRelation && !(attribute && /\b(?:which|one|package)\b/.test(text))
       && !typedDemonstrative && !/^(?:this|that|this one|that one)$/.test(text)
       && !/\b(?:what about|show me|tell me more about) (?:this|that|the other) one\b/.test(text)
       && !(detail && (demonstrative || location || inclusionQuestion && /\bit\b/.test(text) || /\bthe (?:hospital|doctor|package|treatment|provider)\b/.test(text)))) return undefined;
@@ -34,8 +35,8 @@ export const ReferenceDetector = {
       : /\bpackages?\b/.test(text) ? 'package' : /\btreatments?\b/.test(text) ? 'treatment' : undefined;
     const word = ordinalMatch?.[1];
     const ordinal = word === 'last' ? 'last' : word ? ordinalWords.includes(word) ? ordinalWords.indexOf(word) + 1 : parseInt(word, 10) : undefined;
-    return referenceQuerySchema.parse({ sourceKind: /\b(?:external|researched)\b/.test(text) ? 'external_source' : undefined, ordinal, entityType: relation ? 'hospital' : entityType ?? (inclusionQuestion ? 'package' : undefined),
+    return referenceQuerySchema.parse({ sourceKind: /\b(?:external|researched)\b/.test(text) ? 'external_source' : undefined, ordinal, entityType: relation || doctorRelation ? 'hospital' : entityType ?? (inclusionQuestion ? 'package' : undefined),
       location: location && !ordinalWords.includes(location) && !['last', 'cheaper', 'more expensive', 'longer', 'shorter'].includes(location) ? location : undefined,
-      attribute, operation: relation ? 'packages' : /\bhow much\b/.test(text) ? 'price' : 'details' });
+      attribute, operation: doctorRelation ? 'doctors' : relation ? 'packages' : /\bhow much\b/.test(text) ? 'price' : 'details' });
   },
 };

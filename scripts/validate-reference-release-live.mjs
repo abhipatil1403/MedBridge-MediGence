@@ -56,6 +56,8 @@ if(process.env.MEDBRIDGE_REFERENCE_ASSISTANT_LIVE==='1'){
       assert.equal((result.findings??[]).filter(row=>row.kind==='packages').length,0,'no invented packages');
       if(content.startsWith('Find knee'))assert.ok(result.findings.some(row=>row.title.includes('Kokilaben')));
       if(content.startsWith('Find a hospital in Pune'))assert.ok(result.findings.some(row=>row.title.includes('Deenanath')));
+      if(content.startsWith('Show me doctors'))assert.ok(result.findings.length>0&&result.findings.every(row=>row.kind==='doctors')&&result.findings.some(row=>row.title.includes('Hemant Wakankar')),'return published hospital affiliations, not the hospital detail');
+      if(content.startsWith('What information'))assert.ok(result.summary.includes('No published packages or package prices')&&!result.patientCase,'explain catalog gaps without inventing case intake');
       console.log(JSON.stringify({turn:content,status:result.status,agent:result.agent,findings:result.findings?.map(row=>row.title),summary:result.summary}));
     }
     console.log('PASS ten production assistant turns using live configuration and published canonical references');
