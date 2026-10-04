@@ -11,7 +11,8 @@ import {
 } from "@/components/detail-parts";
 import { getPackageDetail } from "@/lib/catalog/detail-service";
 import { detailMetadata } from "@/lib/seo";
-import { packagePrice } from "@/lib/catalog/pricing";
+import { packageDisplayPrice } from "@/lib/catalog/pricing";
+import { CatalogProvenance } from "@/components/catalog-provenance";
 import { publishedRecordProfile } from "@/lib/catalog/provider-profile";
 import { packageServiceNames } from "@/lib/catalog/package-services";
 
@@ -55,9 +56,7 @@ export default async function PackageDetailPage({ params }: Props) {
           title={carePackage.name}
           intro={carePackage.description}
           facts={[
-            country?.name ?? carePackage.country,
-            `${carePackage.durationDays} listed days`,
-            `${packagePrice(carePackage)} · provider-listed estimate`,
+            [hospital?.city, country?.name ?? carePackage.country].filter(Boolean).join(", "),
           ]}
           actions={[
             {
@@ -85,43 +84,43 @@ export default async function PackageDetailPage({ params }: Props) {
                 )}
               </p>
             </DetailSection>
-            <DetailSection title="Estimated price and duration">
-              <p className="sample-price">
-                {packagePrice(carePackage)}{" "}
-                <small>provider-listed estimate</small>
-              </p>
-              <p>
-                {carePackage.durationDays} listed days. Confirm the current
-                quote, dates and eligibility with the provider.
-              </p>
+            <DetailSection title="Estimated price">
+              <div className="package-price-block">
+                <p className="package-price-block__amount">{packageDisplayPrice(carePackage)}</p>
+                <p className="package-price-block__source">{carePackage.provenance?.origin === "admin_created" ? "Published catalog estimate" : "Provider-listed estimate"} · {carePackage.currency ?? "USD"}</p>
+                <p className="package-price-block__duration">{carePackage.durationDays} listed days</p>
+                <p className="package-price-block__confirmation">Confirm the current quote, dates and eligibility with the provider.</p>
+              </div>
             </DetailSection>
-            <DetailSection title="Inclusions">
+            <DetailSection title="What's included">
+              {!carePackage.inclusions.length && <p>Not provided in published package information.</p>}
               <ul>
                 {carePackage.inclusions.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
             </DetailSection>
-            <DetailSection title="Exclusions">
+            <DetailSection title="What's excluded">
+              {!carePackage.exclusions.length && <p>Not provided in published package information.</p>}
               <ul>
                 {carePackage.exclusions.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
             </DetailSection>
-            <DetailSection title="Validity and terms">
+            {(profile?.validFrom || profile?.validUntil || profile?.terms || profile?.notes) && <DetailSection title="Validity and terms">
               <p>
                 {profile?.validFrom ?? "Start date not provided"} →{" "}
                 {profile?.validUntil ?? "End date not provided"}
               </p>
               <p>{profile?.terms ?? "Confirm terms with the provider."}</p>
               {profile?.notes && <p>{profile.notes}</p>}
-            </DetailSection>
+            </DetailSection>}
             <DetailSection title="Package services">
               <dl className="fact-list">
                 {Object.entries(packageServiceNames).map(([key, name]) => {
                   const service =
-                    profile?.serviceDetails?.[
+                    carePackage.serviceDetails?.[
                       key as keyof typeof packageServiceNames
                     ];
                   return (
@@ -141,6 +140,7 @@ export default async function PackageDetailPage({ params }: Props) {
                   );
                 })}
               </dl>
+              <p className="muted">Accommodation and transport are not inferred from hospital stay or other services. Confirm any limits with the provider.</p>
             </DetailSection>
           </div>
           <aside className="detail-aside">
@@ -149,6 +149,7 @@ export default async function PackageDetailPage({ params }: Props) {
               This listing is not a current quote, reservation or clinical
               recommendation. Additional costs may apply.
             </p>
+            <CatalogProvenance item={carePackage} />
             <Link className="button button--primary" href="/help">
               Get support
             </Link>

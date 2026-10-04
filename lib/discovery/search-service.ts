@@ -157,9 +157,16 @@ export function searchHospitals(
           filters.specialty || parsed.entities.specialty!,
         )) &&
       (!filters.accreditation ||
-        (filters.accreditation === "sample"
-          ? item.sampleAccreditation === "Sample credential listed"
-          : item.sampleAccreditation === "No sample credential")) &&
+        (item.demo
+          ? (filters.accreditation === "sample"
+            ? item.sampleAccreditation === "Sample credential listed"
+            : item.sampleAccreditation === "No sample credential")
+          : (filters.accreditation === "sample") ===
+            Boolean(item.sampleAccreditation.trim() && ![
+              "No current accreditation evidence published",
+              "Provider-submitted credentials require current evidence confirmation",
+              "No credential listed",
+            ].includes(item.sampleAccreditation)))) &&
       (!(filters.treatment || parsed.entities.procedure) ||
         item.treatmentSlugs.includes(
           filters.treatment || parsed.entities.procedure!,

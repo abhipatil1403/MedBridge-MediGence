@@ -7,12 +7,12 @@ insert into auth.users(id) values
 
 set role anon;
 do $$ begin
-  if (select count(*) from public.treatments) <> 20 then raise exception 'Anonymous treatment read failed'; end if;
-  if (select count(*) from public.hospitals) <> 15 then raise exception 'Anonymous hospital read failed'; end if;
-  if (select count(*) from public.doctors) <> 31 then raise exception 'Anonymous doctor read failed'; end if;
-  if (select count(*) from public.packages) <> 15 then raise exception 'Anonymous package read failed'; end if;
-  if (select count(*) from public.healthcare_services) <> 10 then raise exception 'Anonymous service read failed'; end if;
-  if (select count(*) from public.search_catalog_candidates('knee', 'knee-replacement')) = 0 then raise exception 'Anonymous search failed'; end if;
+  if (select count(*) from public.treatments) <> 0 then raise exception 'QA treatment leaked'; end if;
+  if (select count(*) from public.hospitals) <> 0 then raise exception 'QA hospital leaked'; end if;
+  if (select count(*) from public.doctors) <> 0 then raise exception 'QA doctor leaked'; end if;
+  if (select count(*) from public.packages) <> 0 then raise exception 'QA package leaked'; end if;
+  if (select count(*) from public.healthcare_services) <> 0 then raise exception 'QA service leaked'; end if;
+  if (select count(*) from public.search_catalog_candidates('knee', 'knee-replacement')) <> 0 then raise exception 'QA search leaked'; end if;
   if has_table_privilege('anon', 'public.cases', 'SELECT') then raise exception 'Anonymous case privilege exists'; end if;
 end $$;
 reset role;

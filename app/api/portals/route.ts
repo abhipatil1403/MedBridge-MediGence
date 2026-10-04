@@ -442,7 +442,7 @@ export async function GET(request: NextRequest) {
       : spec.sort;
     let query = readDb
       .from(table)
-      .select(table === "cities" ? "*,country:countries(name)" : "*", {
+      .select(table === "cities" ? "*,country:countries(name)" : table === "hospitals" ? publicHospitalFields : table === "doctors" ? publicDoctorFields : "*", {
         count: "exact",
       });
     const org = params.get("organizationId");
@@ -660,3 +660,4 @@ export async function POST(request: NextRequest) {
     return portalFailure(error);
   }
 }
+import { publicHospitalFields, publicDoctorFields } from "@/lib/catalog/public-fields";

@@ -25,7 +25,7 @@ export async function CatalogDirectory({
     packages:
       "Look at the estimate together with inclusions and exclusions. Listed estimates are not current provider quotes.",
   };
-  const onlySynthetic = results.sections[type].every(({ item }) => item.demo);
+  const onlySynthetic = results.sections[type].length > 0 && results.sections[type].every(({ item }) => item.demo);
   const categories = [
     ...new Set(results.sections.treatments.map(({ item }) => item.specialty)),
   ];
@@ -66,9 +66,8 @@ export async function CatalogDirectory({
             <DemoNotice compact />
           ) : (
             <p className="muted">
-              Check each listing�s source and evidence. Synthetic examples are
-              labeled; published information may still need provider
-              confirmation.
+              Listings use reviewed, published information. Check their sources
+              and confirm current details with the provider.
             </p>
           )}
         </div>
@@ -76,6 +75,13 @@ export async function CatalogDirectory({
           Refine your options →
         </a>
       </div>
+      {results.sections[type].length === 0 && (
+        <section className="catalog-empty" aria-label="No published listings">
+          <h2>No published {type} are available yet.</h2>
+          <p>Try another location or treatment as reviewed listings become available.</p>
+          <a className="text-link" href="/help">Get coordination support →</a>
+        </section>
+      )}
       {type === "treatments" ? (
         <div className="treatment-categories">
           {categories.map((category, index) => (

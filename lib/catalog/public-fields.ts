@@ -1,0 +1,3 @@
+// Keep SELECT * from accidentally requesting server-only verification columns.
+export const publicHospitalFields = "id,slug,name,city_id,description,aliases,bed_count,infrastructure,verification_status,verification_date,last_verified_at,source_kind,publication_status,source_record_id,created_at,updated_at" as const;
+export const publicDoctorFields = "id,slug,name,description,aliases,home_city_id,experience_years,languages,consultation_mode,qualifications_note,verification_status,verification_date,last_verified_at,source_kind,publication_status,source_record_id,created_at,updated_at" as const;

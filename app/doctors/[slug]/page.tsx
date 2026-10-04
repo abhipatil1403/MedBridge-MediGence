@@ -14,6 +14,7 @@ import { getDoctorDetail } from "@/lib/catalog/detail-service";
 import { detailMetadata } from "@/lib/seo";
 import Image from "next/image";
 import { publishedRecordProfile } from "@/lib/catalog/provider-profile";
+import { CatalogProvenance } from "@/components/catalog-provenance";
 
 type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -64,9 +65,8 @@ export default async function DoctorDetailPage({ params }: Props) {
           title={doctor.name}
           intro={doctor.description}
           facts={[
-            doctor.specialty,
-            `${doctor.city}, ${country?.name ?? doctor.country}`,
-            "Provider-submitted profile",
+            doctor.specialty || "Specialty not provided",
+            [doctor.city, country?.name ?? doctor.country].filter(Boolean).join(", ") || "Location not provided",
           ]}
           actions={[
             {
@@ -80,15 +80,16 @@ export default async function DoctorDetailPage({ params }: Props) {
           <div>
             <DetailSection title="Specialty and hospital">
               <p>
-                {profile?.professionalTitle ?? "Professional title not provided"}
-                {" · "}{doctor.specialty}{" · "}
-                {profile?.department ?? "Department not provided"}
+                {profile?.professionalTitle || "Professional title not provided"}
+                {" · "}{doctor.specialty || "Specialty not provided"}{" · "}
+                {profile?.department || "Department not provided"}
               </p>
               {hospital && (
                 <Link href={`/hospitals/${hospital.slug}`}>
                   {hospital.name}
                 </Link>
               )}
+              {!hospital && <p>Hospital affiliation not provided in published information.</p>}
             </DetailSection>
             <DetailSection title="Experience and credentials">
               <p>
@@ -114,6 +115,7 @@ export default async function DoctorDetailPage({ params }: Props) {
               </ul>
             </DetailSection>
             <DetailSection title="Procedures">
+              {!treatments.length && <p>Not provided in published information.</p>}
               <DetailLinks
                 items={treatments.map((item) => ({
                   label: item.name,
@@ -134,6 +136,7 @@ export default async function DoctorDetailPage({ params }: Props) {
               Ask support to coordinate an authorized request. No appointment is
               booked from this page.
             </p>
+            <CatalogProvenance item={doctor} />
             <Link className="button button--primary" href="/help">
               Get support
             </Link>

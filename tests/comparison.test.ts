@@ -54,7 +54,7 @@ describe('ComparisonAgent normalization, orchestration and sourced output', () =
     expect(() => assistantResponseSchema.parse(result)).not.toThrow(); expect(h.outputs[0].comparison?.id).toBe(result.comparison?.id);
     expect(h.taskLinks).toHaveLength(5); expect(h.runLinks).toEqual([result.plan!.id]);
     const html = renderToStaticMarkup(createElement(ComparisonResults, { comparison: result.comparison! }));
-    expect(html).toContain('<table>'); expect(html).toContain('Not available in current catalog'); expect(html).toContain('USD 5,500');
+    expect(html).toContain('<table>'); expect(html).toContain('Not provided in published information.'); expect(html).toContain('USD 5,500');
     expect(html).toContain('Demo data'); expect(html).toContain('Retrieved'); expect(html).toContain('/packages/knee-package');
     const invalid = structuredClone(result.comparison!); invalid.sides.reverse(); expect(comparisonSchema.safeParse(invalid).success).toBe(false);
   });

@@ -4,3 +4,10 @@ export function packagePrice(
 ) {
   return `${item.currency ?? "USD"} ${(item.listedPrice ?? item.samplePriceUsd).toLocaleString("en-US")}`;
 }
+export function packageDisplayPrice(item: Pick<Package, "samplePriceUsd" | "listedPrice" | "currency">) {
+  const currency = item.currency ?? "USD";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency", currency,
+    maximumFractionDigits: 2, minimumFractionDigits: 0,
+  }).format(item.listedPrice ?? item.samplePriceUsd);
+}

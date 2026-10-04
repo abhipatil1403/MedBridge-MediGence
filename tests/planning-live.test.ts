@@ -2,6 +2,10 @@ import { expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/supabase/server', async () => {
+  const { getIsolatedFixtureClient } = await import('./fixtures/live-catalog-client');
+  return { getPublicSupabaseClient: getIsolatedFixtureClient };
+});
 import { orchestrate } from '@/lib/agents/orchestrator';
 import { configuredProvider } from '@/lib/agents/cloudflare-provider';
 import { createAdminClient, createUserClient, SupabaseAgentStore, SupabaseCaseAccess } from '@/lib/agents/persistence';

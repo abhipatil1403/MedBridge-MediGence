@@ -57,6 +57,13 @@ async function api(actor, portal, resource, params = {}, input) {
   const data = await response.json();
   return { status: response.status, data };
 }
+async function hiddenPage(path, fixtureName) {
+  const response = await fetch(`${origin}${path}`);
+  const html = await response.text();
+  // Next.js can stream its shell before notFound resolves; the final rendered
+  // outcome must be the noindex not-found page and contain no fixture content.
+  return (response.status === 404 || (html.includes('PAGE NOT FOUND') && html.includes('noindex'))) && !html.includes(fixtureName);
+}
 async function command(actor, portal, action, input) {
   const result = await api(actor, portal, "", {}, { action, input });
   assert.equal(result.status, 200, `${action}: ${JSON.stringify(result.data)}`);
@@ -189,11 +196,11 @@ try {
   });
   orgs.push(otherOrg.id);
   const city = db(
-    await anon.from("cities").select("id").eq("slug", "mumbai").single(),
+    await admin.from("cities").select("id").eq("source_kind", "synthetic").eq("slug", "mumbai").single(),
   );
-  const specialty = db(await anon.from("specialties").select("id").limit(1))[0];
+  const specialty = db(await admin.from("specialties").select("id").eq("source_kind", "synthetic").limit(1))[0];
   const treatment = db(
-    await anon.from("treatments").select("id,name").limit(1),
+    await admin.from("treatments").select("id,name").eq("source_kind", "synthetic").limit(1),
   )[0];
   const records = [];
   for (const [kind, name, data] of [
@@ -503,78 +510,30 @@ try {
       .eq("id", org.id)
       .single(),
   ).hospital_id;
-  check(
-    db(await anon.from("hospitals").select("id").eq("id", hospital)).length ===
-      1,
-    "Approved frozen hospital snapshot becomes public",
-  );
-  const publicPackage = db(
-    await anon
-      .from("packages")
-      .select("id,slug,currency,estimated_min")
-      .eq("name", `QA ONLY Package ${stamp}`),
-  )[0];
-  check(
-    publicPackage.currency === "INR" && publicPackage.estimated_min === 25000,
-    "Public package preserves original currency and price",
-  );
-  const details = db(
-    await anon.rpc("public_provider_record", {
-      p_kind: "package",
-      p_id: publicPackage.id,
-    }),
-  );
-  check(
-    details.serviceDetails.accommodation.status === "not_confirmed" &&
-      details.serviceDetails.transfer.status === "included",
-    "Published package service states preserve unconfirmed accommodation and explicit transfers",
-  );
-  const publicProfile = db(
-    await anon.rpc("public_provider_profile", { p_hospital_id: hospital }),
-  );
-  check(
-    publicProfile.accreditations.some(
-      (row) => row.name === accreditation.name,
-    ) && !JSON.stringify(publicProfile).includes(document.id),
-    "Published accreditation shows accepted metadata without private document references",
-  );
-  const profileHtml = await (
-    await fetch(
-      `${origin}/hospitals/${db(await anon.from("hospitals").select("slug").eq("id", hospital).single()).slug}`,
-    )
-  ).text();
-  check(
-    profileHtml.includes("Departments and provider information") &&
-      profileHtml.includes(accreditation.name),
-    "Public hospital renders canonical published sections and accreditation",
-  );
-  const packageHtml = await (
-    await fetch(`${origin}/packages/${publicPackage.slug}`)
-  ).text();
-  check(
-    packageHtml.includes("Not confirmed in published package information.") &&
-      packageHtml.includes("Synthetic airport transfer test information."),
-    "Public package renders explicit service information and missing accommodation",
-  );
-  const publicDoctor = db(
-    await anon.from("doctors").select("slug").eq("name", doctor.name).single(),
-  );
-  const doctorHtml = await (
-    await fetch(`${origin}/doctors/${publicDoctor.slug}`)
-  ).text();
-  check(
-    doctorHtml.includes("Revised synthetic doctor biography.") &&
-      doctorHtml.includes("Professional title not provided") &&
-      !doctorHtml.includes("Clarify the supplied doctor biography."),
-    "Public doctor renders the published biography and missing fields without private review comments",
-  );
-  const search = db(
-    await anon.rpc("search_catalog_candidates", { p_terms: org.name }),
-  );
-  check(
-    search.some((row) => row.kind === "hospitals"),
-    "Existing discovery search reads newly published provider",
-  );
+  // Hosted fixtures remain synthetic even after private publication. Positive
+  // public publication is exercised only in validate-production-catalog.sql.
+  check(db(await anon.from("hospitals").select("id").eq("id", hospital)).length === 0,
+    "Published synthetic hospital remains excluded from the production catalog");
+  const publicPackage = db(await admin.from("packages").select("id,slug,currency,estimated_min").eq("name", `QA ONLY Package ${stamp}`).single());
+  check(publicPackage.currency === "INR" && publicPackage.estimated_min === 25000,
+    "Private QA projection preserves original currency and price");
+  const details = db(await anon.rpc("public_provider_record", {p_kind:"package", p_id:publicPackage.id}));
+  check(!details || Object.keys(details).length === 0,
+    "Public package helper excludes synthetic service evidence");
+  const publicProfile = db(await anon.rpc("public_provider_profile", {p_hospital_id:hospital}));
+  check(!publicProfile || Object.keys(publicProfile).length === 0,
+    "Public profile excludes QA accreditation and private evidence");
+  const hospitalSlug = db(await admin.from("hospitals").select("slug").eq("id", hospital).single()).slug;
+  check(await hiddenPage(`/hospitals/${hospitalSlug}`, org.name),
+    "Direct QA hospital URL renders a noindex not-found page without QA content");
+  check(await hiddenPage(`/packages/${publicPackage.slug}`, `QA ONLY Package ${stamp}`),
+    "Direct QA package URL renders a noindex not-found page without QA content");
+  const publicDoctor = db(await admin.from("doctors").select("slug").eq("name", doctor.name).single());
+  check(await hiddenPage(`/doctors/${publicDoctor.slug}`, doctor.name),
+    "Direct QA doctor URL renders a noindex not-found page without QA content");
+  const search = db(await anon.rpc("search_catalog_candidates", {p_terms:org.name}));
+  check(!search.some(row => row.id === hospital || row.id === publicPackage.id),
+    "Public search excludes the privately published QA organization");
   const current = (
     await api("provider", "provider", "provider_records", { id: profile.id })
   ).data.rows[0];
@@ -587,9 +546,9 @@ try {
     data: current.data,
   });
   check(
-    db(await anon.from("hospitals").select("name").eq("id", hospital).single())
+    db(await admin.from("hospitals").select("name").eq("id", hospital).single())
       .name === org.name,
-    "Later private draft cannot alter published snapshot",
+    "Later private draft cannot alter the immutable QA publication snapshot",
   );
   const preview = await api("provider", "provider", "published_preview", {
     organizationId: org.id,
@@ -886,8 +845,8 @@ try {
   });
   check(
     db(await anon.from("hospitals").select("id").eq("id", hospital)).length ===
-      1,
-    "Reactivation restores the existing published snapshot",
+      0,
+    "Reactivation does not make synthetic publication public",
   );
   const assistant = await fetch(`${origin}/api/assistant`, {
     method: "POST",
@@ -900,13 +859,9 @@ try {
     }),
   });
   const answer = await assistant.json();
-  check(
-    assistant.status === 200 &&
-      answer.findings?.some(
-        (finding) => finding.provenance?.recordId === hospital,
-      ),
-    `Existing live assistant discovers the newly published provider: ${JSON.stringify({ status: assistant.status, error: answer.error, code: answer.code, summary: answer.summary, findings: answer.findings?.map((item) => ({ title: item.title, id: item.provenance?.recordId })) })}`,
-  );
+  const excludesQa = (result) => !JSON.stringify({findings:result.findings,comparison:result.comparison}).includes(hospital) && !JSON.stringify({findings:result.findings,comparison:result.comparison}).includes(publicPackage.id) && !JSON.stringify({findings:result.findings,comparison:result.comparison}).includes(org.name);
+  check(assistant.status === 200 && excludesQa(answer),
+    `Live Discovery excludes private QA findings (HTTP ${assistant.status}, error ${answer.code ?? "none"})`);
   async function assistantTurn(content) {
     const response = await fetch(`${origin}/api/assistant`, {
       method: "POST",
@@ -927,43 +882,11 @@ try {
   const packageAnswer = await assistantTurn(
     `Show me ${treatment.name} packages in Mumbai.`,
   );
-  check(
-    packageAnswer.findings?.some(
-      (finding) =>
-        finding.provenance?.recordId === publicPackage.id &&
-        finding.facts.transferStatus === "included" &&
-        finding.facts.accommodationStatus === "not confirmed",
-    ),
-    "Existing Package search consumes the governed package and its service facts",
-  );
-  const requirementAnswer = await assistantTurn(
-    `Show me ${treatment.name} packages in Mumbai with accommodation and airport transfer.`,
-  );
-  const packageRequirement = requirementAnswer.findings?.find(
-    (finding) => finding.provenance?.recordId === publicPackage.id,
-  )?.requirementEvaluation;
-  check(
-    packageRequirement?.evaluations.some(
-      (item) => item.type === "accommodation" && item.status === "unknown",
-    ) &&
-      packageRequirement?.evaluations.some(
-        (item) => item.type === "airport_transfer" && item.status === "exact",
-      ),
-    "Requirement matching uses explicit published evidence without inferring accommodation",
-  );
-  const comparisonAnswer = await assistantTurn(
-    `Compare hospitals for ${treatment.name} in Mumbai and Pune.`,
-  );
-  check(
-    comparisonAnswer.comparison?.sides.some((side) =>
-      side.groups.some((group) =>
-        group.findings.some(
-          (finding) => finding.provenance.recordId === hospital,
-        ),
-      ),
-    ) && comparisonAnswer.status === "completed",
-    "Existing Comparison uses the newly published hospital in its canonical results",
-  );
+  check(excludesQa(packageAnswer), "Package search excludes synthetic package facts");
+  const requirementAnswer = await assistantTurn(`Show me ${treatment.name} packages in Mumbai with accommodation and airport transfer.`);
+  check(excludesQa(requirementAnswer), "Requirement matching does not consume synthetic evidence");
+  const comparisonAnswer = await assistantTurn(`Compare hospitals for ${treatment.name} in Mumbai and Pune.`);
+  check(excludesQa(comparisonAnswer), "Comparison excludes the synthetic hospital and package");
   const workflowAudit = (
     await api("admin", "admin", "audit_events", {
       organizationId: org.id,
@@ -999,14 +922,15 @@ try {
     },
   );
   const verificationResult = await verification.json();
-  assert.equal(verification.status, 200, JSON.stringify(verificationResult));
+  assert.equal(verification.status, 400, JSON.stringify(verificationResult));
+  assert.match(verificationResult.error, /Publish the reviewed provider/);
   check(
     (
       await api("support", "support", "portal_verification_checks", {
         organizationId: org.id,
       })
-    ).data.total > 0,
-    "Assigned reviewer can read history from the existing verification tool",
+    ).data.total === 0,
+    "Hidden QA provider cannot create misleading catalog verification history",
   );
   check(
     (

@@ -393,3 +393,12 @@ summary {min-height:44px;padding-block:10px;cursor:pointer;font-size:14px;font-w
 .treatment-category>h2 {font-family:var(--font-editorial);font-size:28px;font-weight:400;padding-top:32px;}
 .treatment-category .result-sections {margin-top:0;}
 @media(max-width:768px) {.treatment-category{grid-template-columns:1fr;gap:0;}.treatment-category>h2{padding:0;margin:0;}.treatment-categories{gap:32px;}}
+.package-price-block { display: grid; gap: .55rem; max-width: 36rem; }
+.package-price-block p { margin: 0; }
+.detail-page--package .package-price-block__amount { font-size: clamp(2rem, 5vw, 3rem); font-weight: 600; line-height: 1.15; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.package-price-block__source { color: var(--muted-foreground, #56636b); font-size: .85rem; line-height: 1.6; letter-spacing: normal; }
+.package-price-block__duration { font-size: 1rem; line-height: 1.6; }
+.package-price-block__confirmation { font-size: .9rem; line-height: 1.7; padding-top: .5rem; color: var(--muted-foreground, #56636b); }
+.catalog-empty { padding: 2rem 0 3rem; max-width: 40rem; }
+.catalog-empty h2 { font-size: clamp(1.3rem, 3vw, 1.8rem); }
+.catalog-provenance { padding-top: 1rem; font-size: .8rem; line-height: 1.7; overflow-wrap: anywhere; }

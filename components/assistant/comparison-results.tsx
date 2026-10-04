@@ -19,7 +19,7 @@ function Values({ findings, field }: { findings: Finding[]; field: string }) {
     {field !== 'name' && (supporting ? <details><summary>View {field}</summary><p>{valueLabel(finding)}</p></details> : <span>{valueLabel(finding)}</span>)}
     {field === 'name' && <details><summary>Source</summary><small>{finding.provenance.sourceKind === 'synthetic' ? 'Demo data · Synthetic sample' : finding.provenance.label}
       {' · '}{finding.matchType} · Record {finding.provenance.recordId.slice(0, 8)} · Retrieved {new Date(finding.provenance.retrievedAt).toLocaleDateString()}</small></details>}
-  </li>)}</ul> : <span>Not available in current catalog</span>;
+  </li>)}</ul> : <span>Not provided in published information.</span>;
 }
 function Match({ group }: { group: PlanningResultGroup }) {
   const label = group.status === 'blocked' ? 'Search incomplete' : group.matchType === 'none' ? 'No matching options' : group.matchType === 'related' ? 'Related options' : group.findings.some(f => f.requirementEvaluation && f.requirementEvaluation.overallStatus !== 'fully_satisfies') ? 'Review requested criteria' : `${group.findings.length} matching ${group.findings.length === 1 ? 'option' : 'options'}`;

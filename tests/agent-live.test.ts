@@ -2,6 +2,10 @@ import { expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/supabase/server', async () => {
+  const { getIsolatedFixtureClient } = await import('./fixtures/live-catalog-client');
+  return { getPublicSupabaseClient: getIsolatedFixtureClient };
+});
 
 import { CloudflareProvider } from '@/lib/agents/cloudflare-provider';
 import { runAgent } from '@/lib/agents/runtime';
@@ -33,7 +37,7 @@ class LiveStore implements AgentStore {
   async finishRun() { /* inspected via response */ }
 }
 
-it.skipIf(!ready)('reads a real package through the approved tool', async () => {
+it.skipIf(!ready)('reads an isolated fixture package through the approved tool', async () => {
   const result = await executeTool('search_packages', { query: 'knee replacement India' }, {
     agent: 'discovery', userId: id(3), caseAccess: { readContext: async () => ({}), readDocumentMetadata: async () => [] },
   });
@@ -41,7 +45,7 @@ it.skipIf(!ready)('reads a real package through the approved tool', async () => 
   expect(() => toolResultSchema.parse(result)).not.toThrow();
 }, 30000);
 
-it.skipIf(!ready)('reads real Mumbai hospitals through the approved tool', async () => {
+it.skipIf(!ready)('reads isolated Mumbai fixtures through the approved tool', async () => {
   const result = await executeTool('search_hospitals', { query: 'knee replacement', city: 'mumbai', treatment: 'knee-replacement', verification: 'demo' }, {
     agent: 'discovery', userId: id(3), caseAccess: { readContext: async () => ({}), readDocumentMetadata: async () => [] },
   });
@@ -71,7 +75,7 @@ it.skipIf(!ready)('Cloudflare plans real Supabase hospital and package searches'
   expect(response.findings.every((finding) => finding.provenance.sourceKind === 'synthetic')).toBe(true);
 }, 180000);
 
-it.skipIf(!ready)('Cloudflare chooses doctor search over the real Supabase catalog', async () => {
+it.skipIf(!ready)('Cloudflare chooses doctor search over the isolated fixture catalog', async () => {
   const store = new LiveStore();
   const response = await runAgent({ content: 'I need a cardiologist in India.' }, {
     userId: id(3), store, provider: new CloudflareProvider(),
@@ -157,7 +161,7 @@ const discoveryScenarios = [
   { query: 'Find hospitals in Pune', status: 'completed', tools: ['search_hospitals'], kinds: [] },
 ] as const;
 
-it.skipIf(!discoveryLiveReady)('loads one remote catalog interpretation', async () => {
+it.skipIf(!discoveryLiveReady)('loads one isolated fixture interpretation', async () => {
   const route = await discoveryRoute('I need a heart doctor in Mumbai', catalogRepository);
   expect(route?.normalized.entities).toMatchObject({ specialty: 'Cardiology', city: 'Mumbai' });
 }, 60000);

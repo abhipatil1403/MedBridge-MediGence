@@ -4,6 +4,8 @@ create temporary table qg(k text primary key,id uuid default gen_random_uuid());
 insert into qg(k) values('provider'),('admin'),('patient');
 insert into auth.users(id,email) select id,'governance-'||k||'@qa.invalid' from qg;
 insert into public.staff_roles(user_id,role) select id,'super_admin' from qg where k='admin';
+\ir pg-catalog-reference-fixtures.sql
+select pg_temp.qa_publish_references((select id from qg where k='admin'));
 grant all on qg to authenticated;grant select on qg to anon;
 create function pg_temp.qg_assert(ok boolean,msg text) returns void language plpgsql as $$begin if ok is distinct from true then raise exception 'FAIL: %',msg;end if;end;$$;
 create function pg_temp.qg_denied(stmt text,expected text) returns void language plpgsql as $$begin begin execute stmt;exception when others then if position(expected in sqlerrm)>0 then return;end if;raise;end;raise exception 'FAIL: unexpected permission: %',stmt;end;$$;

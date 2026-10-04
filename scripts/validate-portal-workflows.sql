@@ -4,6 +4,8 @@ create temporary table qa_ids(k text primary key,id uuid default gen_random_uuid
 insert into qa_ids(k) values('provider'),('patient'),('support'),('other_support'),('admin');
 insert into auth.users(id,email) select id,'workflow-'||k||'@qa.invalid' from qa_ids;
 insert into public.staff_roles(user_id,role) select id,case when k='admin' then 'super_admin' else 'support_agent' end from qa_ids where k in ('admin','support','other_support');
+\ir pg-catalog-reference-fixtures.sql
+select pg_temp.qa_publish_references((select id from qa_ids where k='admin'));
 grant all on qa_ids to authenticated;
 create function pg_temp.check_qa(ok boolean,label text) returns void language plpgsql as $$begin if ok is distinct from true then raise exception 'FAIL: %',label;end if;end;$$;
 create function pg_temp.denied_qa(stmt text,expected text) returns void language plpgsql as $$begin begin execute stmt;exception when others then if position(expected in sqlerrm)>0 then return;end if;raise;end;raise exception 'FAIL: unexpectedly allowed: %',stmt;end;$$;
@@ -66,9 +68,10 @@ select pg_temp.check_qa((select count(*)=0 from public.portal_verification_check
 reset role;
 grant select on qa_ids to anon;
 set local role anon;
-select pg_temp.check_qa(exists(select 1 from public.hospitals where id=(select id from qa_ids where k='hospital') and name='QA ONLY Workflow Hospital'),'published hospital visible, draft does not leak');
-select pg_temp.check_qa(exists(select 1 from public.packages where name='QA ONLY Package' and currency='INR' and estimated_min=25000),'package currency preserved');
-select pg_temp.check_qa(exists(select 1 from public.search_catalog_candidates('QA ONLY Workflow Hospital') where kind='hospitals'),'existing AI search consumes publication');
+select pg_temp.check_qa(not exists(select 1 from public.hospitals where id=(select id from qa_ids where k='hospital')),'published QA hospital excluded even with a newer draft');
+select pg_temp.check_qa(not exists(select 1 from public.packages where name='QA ONLY Package'),'published QA package excluded');
+select pg_temp.check_qa(not exists(select 1 from public.search_catalog_candidates('QA ONLY Workflow Hospital') where kind='hospitals'),'AI search excludes published QA');
+select pg_temp.check_qa(public.public_provider_profile((select id from qa_ids where k='hospital'))='{}','QA public projection is empty');
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub',(select id::text from qa_ids where k='patient'),true);

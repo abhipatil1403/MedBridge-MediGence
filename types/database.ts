@@ -573,6 +573,8 @@ export type Database = {
           created_at: string;
           updated_at: string;
           publication_status: string;
+          source_kind: string;
+          source_record_id: string | null;
         };
         Insert: {
           id?: string;
@@ -583,6 +585,8 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           publication_status?: string;
+          source_kind?: string;
+          source_record_id?: string | null;
         };
         Update: {
           id?: string;
@@ -593,6 +597,8 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           publication_status?: string;
+          source_kind?: string;
+          source_record_id?: string | null;
         };
         Relationships: [];
       };
@@ -2440,6 +2446,7 @@ export type Database = {
       public_provider_image: { Args: { p_doctor_id: string }; Returns: Json };
       public_provider_record: { Args: { p_kind: string; p_id: string }; Returns: Json };
       public_provider_package_details: { Args: Record<string, never>; Returns: Json };
+      public_catalog_provenance: { Args: Record<string, never>; Returns: Json };
       portal_team: { Args: { p_organization_id: string }; Returns: Json };
       portal_staff_directory: { Args: Record<string, never>; Returns: Json };
       record_portal_verification: { Args: { p_actor: string; p_organization_id: string; p_provider_id: string; p_report: Json }; Returns: string };

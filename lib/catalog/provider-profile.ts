@@ -57,6 +57,7 @@ const profile = z.object({
         name: z.string(),
         description: z.string().nullable(),
         languages: z.array(z.string()).nullable(),
+        availability: z.string().nullable().optional(),
       }),
     )
     .optional(),

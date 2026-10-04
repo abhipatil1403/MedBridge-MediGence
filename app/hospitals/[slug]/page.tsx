@@ -15,6 +15,7 @@ import { detailMetadata } from "@/lib/seo";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { publishedProviderProfile } from "@/lib/catalog/provider-profile";
 import { packagePrice } from "@/lib/catalog/pricing";
+import { CatalogProvenance } from "@/components/catalog-provenance";
 
 type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -57,7 +58,7 @@ export default async function HospitalDetailPage({ params }: Props) {
           intro={hospital.description}
           facts={[
             `${hospital.city}, ${country?.name ?? hospital.country}`,
-            "Provider-submitted information · reviewed for publication",
+            "Reviewed for publication · confirm current details",
           ]}
           actions={[
             {
@@ -120,6 +121,7 @@ export default async function HospitalDetailPage({ params }: Props) {
               )}
             </DetailSection>
             <DetailSection title="Specialties">
+              {!hospital.specialties.length && <p>Not provided in published information.</p>}
               <ul className="tag-list">
                 {hospital.specialties.map((item) => (
                   <li key={item}>{item}</li>
@@ -156,6 +158,7 @@ export default async function HospitalDetailPage({ params }: Props) {
               )}
             </DetailSection>
             <DetailSection title="Treatments">
+              {!treatments.length && <p>No treatments have been published.</p>}
               <DetailLinks
                 items={treatments.map((item) => ({
                   label: item.name,
@@ -164,6 +167,7 @@ export default async function HospitalDetailPage({ params }: Props) {
               />
             </DetailSection>
             <DetailSection title="Facilities">
+              {!profile?.sections?.some(item => item.kind === "facility") && !hospital.infrastructure.length && <p>Not provided in published information.</p>}
               {profile?.sections
                 ?.filter((item) => item.kind === "facility")
                 .map((item) => (
@@ -177,11 +181,11 @@ export default async function HospitalDetailPage({ params }: Props) {
                     </p>
                   </article>
                 ))}
-              <ul className="plain-list">
+              {!profile?.sections?.some(item => item.kind === "facility") && <ul className="plain-list">
                 {hospital.infrastructure.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
-              </ul>
+              </ul>}
             </DetailSection>
             <DetailSection title="Accreditations">
               {profile?.accreditations?.length ? (
@@ -189,6 +193,7 @@ export default async function HospitalDetailPage({ params }: Props) {
                   {profile.accreditations.map((item) => (
                     <li key={item.name}>
                       {item.name} · {item.body}
+                      {" · Current evidence reviewed"}
                       {item.expiresOn ? ` · expires ${item.expiresOn}` : ""}
                     </li>
                   ))}
@@ -197,16 +202,18 @@ export default async function HospitalDetailPage({ params }: Props) {
                 <p>No current accreditation evidence is published.</p>
               )}
             </DetailSection>
-            <DetailSection title="International patient services">
+            {!!profile?.internationalServices?.length && <DetailSection title="International patient services">
               {profile?.internationalServices?.map((item) => (
                 <article key={item.name}>
                   <h3>{item.name}</h3>
-                  <p>{item.description}</p>
-                  <p>{item.languages?.join(", ")}</p>
+                  {item.description && <p>{item.description}</p>}
+                  {!!item.languages?.length && <p>{item.languages.join(", ")}</p>}
+                  <p>Availability: {item.availability?.replaceAll("_", " ") || "Not provided"}</p>
                 </article>
               ))}
-            </DetailSection>
+            </DetailSection>}
             <DetailSection id="doctors" title="Doctors">
+              {!doctors.length && <p>No associated doctors have been published.</p>}
               <DetailLinks
                 items={doctors.map((item) => ({
                   label: item.name,
@@ -216,6 +223,7 @@ export default async function HospitalDetailPage({ params }: Props) {
               />
             </DetailSection>
             <DetailSection title="Packages">
+              {!packages.length && <p>No associated packages have been published.</p>}
               <DetailLinks
                 items={packages.map((item) => ({
                   label: item.name,
@@ -258,6 +266,7 @@ export default async function HospitalDetailPage({ params }: Props) {
               Prices and provider-submitted services require current
               confirmation. No booking or payment is processed here.
             </p>
+            <CatalogProvenance item={hospital} />
             <Link
               className="text-link"
               href={`/assistant?q=${encodeURIComponent(`Verify ${hospital.name}`)}`}

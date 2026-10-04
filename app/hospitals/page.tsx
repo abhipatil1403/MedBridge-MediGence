@@ -5,14 +5,14 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Find hospitals",
   description:
-    "Browse published provider profiles and clearly labeled synthetic examples.",
+    "Browse reviewed, published provider profiles by location and specialty.",
 };
 export default function HospitalsPage() {
   return (
     <CatalogDirectory
       type="hospitals"
       title="Find hospitals"
-      description="Explore provider profiles by location, specialty and treatment. Check each listing�s source and evidence."
+      description="Explore published provider profiles by location, specialty and treatment. Check each listing's source and evidence."
     />
   );
 }

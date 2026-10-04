@@ -26,6 +26,8 @@ const messages: Record<string, string> = {
     "Add a treatment, description, price, currency and duration before submitting.",
   PORTAL_EVIDENCE_REQUIRED:
     "Approved, current evidence is required for this action.",
+  PORTAL_PUBLIC_REFERENCE_REQUIRED:
+    "An administrator must source, review and publish the selected location, specialty and treatment in the reference catalog before this provider can be published.",
   PORTAL_EVIDENCE_EXPIRED:
     "This evidence has expired. Upload current evidence.",
   PORTAL_REVIEW_UNRESOLVED:

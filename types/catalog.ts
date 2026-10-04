@@ -2,6 +2,13 @@ export type CatalogKind = "treatments" | "hospitals" | "doctors" | "packages" | 
 export type ConsultationMode = "video" | "in-person" | "both";
 
 export interface CatalogRecord {
+  readonly provenance?: {
+    readonly origin: "provider_published" | "admin_created";
+    readonly sourceName: string;
+    readonly sourceUrl: string | null;
+    readonly checkedAt: string | null;
+    readonly verification: string;
+  };
   readonly recordId: string;
   readonly sourceRecordId: string | null;
   readonly slug: string;

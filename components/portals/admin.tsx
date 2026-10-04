@@ -581,7 +581,7 @@ function CatalogForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const newFields =
-    !row && !["cities"].includes(entity)
+    !row || ["countries", "cities", "specialties", "treatments", "healthcare_services"].includes(entity)
       ? [
           {
             key: "source_kind",
@@ -595,16 +595,14 @@ function CatalogForm({
     ...catalogFields[entity],
     { key: "aliases", label: "Search aliases", type: "list" as const },
     ...newFields,
-    ...(entity !== "cities"
-      ? [
+    ...[
           {
             key: "source_record_id",
             label: "Traceable source record",
             type: "select" as const,
             catalog: "source_records",
           },
-        ]
-      : []),
+        ],
   ];
   const form = useForm<{
     name: string;

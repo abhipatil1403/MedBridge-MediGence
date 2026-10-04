@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Discover care options",
-  description: "Explore MedBridge sample treatments, providers, packages, destinations and services with working search and filters.",
+  description: "Explore published treatments, providers, packages, destinations and services with working search and filters.",
 };
 
 export default async function DiscoverPage() {

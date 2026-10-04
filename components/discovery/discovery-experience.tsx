@@ -43,14 +43,14 @@ function FilterControls({ facets, type, params, update, clear }: {
   if (type !== "services") fields.push(field("country", "Country", facets.countries.map((item) => ({ value: item.slug, label: item.name }))));
   if (type === "hospitals") {
     fields.push(field("city", "City", facets.cities.map((name) => ({ value: name, label: name }))));
-    fields.push(field("accreditation", "Accreditation field", [{ value: "sample", label: "Sample credential listed" }, { value: "none", label: "No sample credential" }]));
+    fields.push(field("accreditation", "Accreditation field", [{ value: "sample", label: "Credential information listed" }, { value: "none", label: "No credential information listed" }]));
   }
   if (type === "doctors") {
     fields.push(field("hospital", "Hospital", facets.hospitals.map((item) => ({ value: item.slug, label: item.name }))));
     fields.push(field("mode", "Consultation mode", [{ value: "video", label: "Video" }, { value: "in-person", label: "In person" }]));
   }
   if (["hospitals", "treatments", "packages"].includes(type)) fields.push(field("treatment", "Treatment", facets.treatments.map((item) => ({ value: item.slug, label: item.name }))));
-  if (type === "packages") fields.push(field("budget", "Sample budget (USD)", [5000, 10000, 20000, 40000].map((amount) => ({ value: String(amount), label: `Up to $${amount.toLocaleString()}` }))));
+  if (type === "packages") fields.push(field("budget", "Listed USD budget", [5000, 10000, 20000, 40000].map((amount) => ({ value: String(amount), label: `Up to $${amount.toLocaleString()}` }))));
   return <div className="filter-controls"><div className="filter-controls__title"><strong>Refine results</strong><button type="button" onClick={clear}>Clear filters</button></div>{fields.length ? fields : <p>No additional filters for this category.</p>}</div>;
 }
 
@@ -127,29 +127,29 @@ export function DiscoveryExperience({ facets }: { facets: Facets }) {
 
   const sortOptions: { value: SortOption; label: string }[] = [
     { value: "relevance", label: "Relevance" }, { value: "name", label: "Name A–Z" },
-    ...(type === "doctors" ? [{ value: "experience" as const, label: "Sample experience" }] : []),
-    ...(type === "packages" || type === "treatments" ? [{ value: "price" as const, label: "Sample price: low to high" }] : []),
+    ...(type === "doctors" ? [{ value: "experience" as const, label: "Listed experience" }] : []),
+    ...(type === "packages" || type === "treatments" ? [{ value: "price" as const, label: "Listed USD price: low to high" }] : []),
     ...(type === "hospitals" || type === "doctors" ? [{ value: "location" as const, label: "Location A–Z" }] : []),
   ];
 
   return <main id="main-content" tabIndex={-1} className="discover-page">
     <div className="container discover-page__intro">
       <PageHeader eyebrow="EXPLORE" title="What are you looking for?" description="Start with a treatment, place or question. Explore the information, then bring the next step into your workspace."><SearchBox key={query} initialQuery={query} label="Search healthcare options" buttonLabel="Explore" /></PageHeader>
-      <DemoNotice compact />
+      {results && Object.values(results.sections).some(entries => entries.some(({item}) => item.demo)) && <DemoNotice compact />}
     </div>
     <div className="container discover-page__body">
       <nav className="result-tabs" aria-label="Result type">{tabs.map((tab) => <button key={tab.key} type="button" aria-current={type === tab.key ? "page" : undefined} onClick={() => changeType(tab.key)}>{tab.label}</button>)}</nav>
       <div className="discover-toolbar">
-        <div><button ref={filterButton} className="mobile-filter-button" type="button" onClick={() => setFilterOpen(true)}><SlidersHorizontal size={17} aria-hidden="true" /> Filters</button><span role="status">{loading ? "Searching…" : error ? "Search unavailable" : `${results?.total ?? 0} sample results`}</span></div>
+        <div><button ref={filterButton} className="mobile-filter-button" type="button" onClick={() => setFilterOpen(true)}><SlidersHorizontal size={17} aria-hidden="true" /> Filters</button><span role="status">{loading ? "Searching…" : error ? "Search unavailable" : `${results?.total ?? 0} published results`}</span></div>
         <label>Sort by <select value={params.get("sort") ?? "relevance"} onChange={(event) => update("sort", event.target.value)}>{sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
       </div>
       <div className="discover-layout">
         <aside className="discover-sidebar" aria-label="Search filters"><FilterControls facets={facets} type={type} params={params} update={update} clear={clear} /></aside>
         <div className="discover-results">
           {results && <div className="search-context" aria-label="Understood search">{results.understanding.entities.procedure && <span>{facets.treatments.find((item) => item.slug === results.understanding.entities.procedure)?.name}</span>}{results.understanding.entities.city && <span>{results.understanding.entities.city}</span>}{results.understanding.entities.country && <span>{facets.countries.find((item) => item.slug === results.understanding.entities.country)?.name}</span>}{results.filters.budget && <span>Budget ≤ USD {results.filters.budget.toLocaleString()}</span>}{query && <Link className="text-link" href={`/assistant?q=${encodeURIComponent(query)}`}>Continue in Care Workspace →</Link>}</div>}
-          {loading && <div className="result-state" role="status" aria-live="polite"><h2>Finding relevant options…</h2><p>Checking the sample catalog and current filters.</p><div className="result-skeleton" /><div className="result-skeleton" /><div className="result-skeleton" /></div>}
+          {loading && <div className="result-state" role="status" aria-live="polite"><h2>Finding relevant options…</h2><p>Checking published catalog information and current filters.</p><div className="result-skeleton" /><div className="result-skeleton" /><div className="result-skeleton" /></div>}
           {!loading && error && <div className="result-state result-state--error" role="alert"><h2>We couldn’t load these results.</h2><p>{error}</p><button className="button button--primary button--default" type="button" onClick={resetError}>{error.includes("invalid") ? "Reset filters and try again" : "Retry search"}</button></div>}
-          {!loading && !error && results?.total === 0 && <div className="result-state"><h2>No exact matches found.</h2><p>Your search is still in the field above. Try a broader term or clear the filters.</p><button className="button button--outline button--default" type="button" onClick={clear}>Try a broader search</button><div className="result-state__suggested"><span>Try:</span><Link href="/discover?q=knee%20replacement">Knee replacement</Link><Link href="/discover?q=second%20opinion">Second opinion</Link><Link href="/discover?q=hospitals%20in%20India">Hospitals in India</Link></div></div>}
+          {!loading && !error && results?.total === 0 && <div className="result-state"><h2>No published listings match this search yet.</h2><p>Your search is still in the field above. Try another location or treatment, or ask support for help.</p><button className="button button--outline button--default" type="button" onClick={clear}>Try a broader search</button><div className="result-state__suggested"><Link href="/help">Get coordination support</Link></div></div>}
           {!loading && !error && results && results.total > 0 && <ResultSections results={results} />}
         </div>
       </div>

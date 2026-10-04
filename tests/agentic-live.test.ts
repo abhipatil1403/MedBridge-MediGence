@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { expect, it, vi } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/supabase/server', async () => {
+  const { getIsolatedFixtureClient } = await import('./fixtures/live-catalog-client');
+  return { getPublicSupabaseClient: getIsolatedFixtureClient };
+});
 import { orchestrate } from '@/lib/agents/orchestrator';
 import { SupabasePlanningStore } from '@/lib/agents/treatment-planning/store';
 import type { LLMProvider } from '@/lib/ai/contracts';
@@ -78,19 +82,20 @@ it.skipIf(!ready)('persists real execution records, reloads owner activity, enfo
       planningStore: new SupabasePlanningStore(admin, owner.db) };
     const first = await orchestrate({ conversationId: referenceConversation,
       content: "Find knee replacement hospitals in Mumbai under $6,000, check their packages, tell me what's missing, and compare them." }, base);
-    expect(first.findings.some(f => f.provenance.recordId.startsWith('cddb10ae'))).toBe(true);
-    expect(first.findings.some(f => f.provenance.recordId.startsWith('1ec68b66'))).toBe(true);
+    expect(first.findings.some(f => f.provenance.recordId === hospital.recordId)).toBe(true);
+    const selectedPackage = (await catalogRepository.listPackages()).find(item => item.hospitalSlug === hospital.slug && item.treatmentSlug === 'knee-replacement')!;
+    expect(first.findings.some(f => f.provenance.recordId === selectedPackage.recordId)).toBe(true);
     const before = provider.generateStructured.mock.calls.length;
     const invalid = await orchestrate({ conversationId: referenceConversation, content: 'Tell me more about the second one.' }, base);
     expect(invalid.pendingClarification?.query.entityType).toBe('hospital');
     const fresh = { ...base, planningStore: new SupabasePlanningStore(admin, owner.db), store: new SupabaseAgentStore(admin, owner.db) };
     const corrected = await orchestrate({ conversationId: referenceConversation, content: 'first one then' }, fresh);
-    expect(corrected.referenceResolution?.reference?.entityId.startsWith('cddb10ae')).toBe(true);
+    expect(corrected.referenceResolution?.reference?.entityId).toBe(hospital.recordId);
     const yes = await orchestrate({ conversationId: referenceConversation, content: 'yes' }, fresh);
     expect(yes.tasks).toEqual([]); expect(yes.question).toBeTruthy(); expect(yes.pendingClarification).toBeDefined();
     expect((await fresh.planningStore.load(referenceConversation, owner.id))?.context.pendingClarification?.id).toBe(yes.pendingClarification?.id);
     const packages = await orchestrate({ conversationId: referenceConversation, content: 'Show me its packages.' }, fresh);
-    expect(packages.findings.some(f => f.provenance.recordId.startsWith('1ec68b66'))).toBe(true);
+    expect(packages.findings.some(f => f.provenance.recordId === selectedPackage.recordId)).toBe(true);
     expect(provider.generateStructured).toHaveBeenCalledTimes(before);
     expect(await new SupabasePlanningStore(admin, other.db).load(referenceConversation, other.id)).toBeUndefined();
     const records = await admin.from('agent_outputs').select('content').eq('run_id', yes.runId);

@@ -17,6 +17,7 @@ import type {
 import type { ParsedQuery } from "@/types/discovery";
 import { packageServicesSchema } from "./package-services";
 import { normalize } from "@/lib/discovery/normalize";
+import { publicHospitalFields, publicDoctorFields } from "./public-fields";
 
 const faqSchema = z.array(
   z.object({ question: z.string(), answer: z.string() }),
@@ -70,16 +71,17 @@ const loadSnapshot = cache(async () => {
     priceQuery,
     packageDetailsQuery,
     hospitalDetailsQuery,
+    provenanceQuery,
   ] = await Promise.all([
     db.from("countries").select("*"),
     db.from("cities").select("*"),
     db.from("specialties").select("*"),
     db.from("treatments").select("*"),
     db.from("treatment_countries").select("*"),
-    db.from("hospitals").select("*"),
+    db.from("hospitals").select(publicHospitalFields),
     db.from("hospital_specialties").select("*"),
     db.from("hospital_treatments").select("*"),
-    db.from("doctors").select("*"),
+    db.from("doctors").select(publicDoctorFields),
     db.from("doctor_specialties").select("*"),
     db.from("doctor_treatments").select("*"),
     db.from("hospital_doctors").select("*"),
@@ -90,8 +92,16 @@ const loadSnapshot = cache(async () => {
     db.from("price_estimates").select("*"),
     db.rpc("public_provider_package_details", {}),
     db.rpc("public_provider_hospital_details", {}),
+    db.rpc("public_catalog_provenance", {}),
   ]);
   const countryRows = rows(countryQuery.data, countryQuery.error, "countries");
+  if (provenanceQuery.error) throw new Error("Published catalog provenance is unavailable.");
+  const provenance = z.array(z.object({
+    id: z.string(), origin: z.enum(["provider_published", "admin_created"]),
+    sourceName: z.string(), sourceUrl: z.string().nullable(),
+    checkedAt: z.string().nullable(), verification: z.string(),
+  })).parse(provenanceQuery.data);
+  const provenanceById = new Map(provenance.map(({ id, ...source }) => [id, source]));
   const cityRows = rows(cityQuery.data, cityQuery.error, "cities");
   const specialtyRows = rows(
     specialtyQuery.data,
@@ -154,8 +164,8 @@ const loadSnapshot = cache(async () => {
     .array(
       z.object({
         id: z.string(),
-        accreditations: z.array(z.object({ name: z.string() })),
-        locations: z.array(z.object({ city: z.string().nullable() })),
+        accreditations: z.array(z.object({ name: z.string() })).nullable().transform(value => value ?? []),
+        locations: z.array(z.object({ city: z.string().nullable() })).nullable().transform(value => value ?? []),
       }),
     )
     .parse(hospitalDetailsQuery.data);
@@ -256,16 +266,18 @@ const loadSnapshot = cache(async () => {
       sampleBaseCostUsd: treatmentPrices.length
         ? Math.min(...treatmentPrices.map((price) => price.estimated_min))
         : 0,
-      countries: treatmentCountryRows
-        .filter(
-          (link) =>
-            link.treatment_id === item.id && countryById.has(link.country_id),
-        )
-        .map(
-          (link) =>
-            required(countryById.get(link.country_id), "treatment country")
-              .slug,
-        ),
+      // Published hospital offerings also establish a canonical country link.
+      // Seed-only treatment_countries rows are deliberately hidden by public RLS.
+      countries: [...new Set([
+        ...treatmentCountryRows
+          .filter((link) => link.treatment_id === item.id && countryById.has(link.country_id))
+          .map((link) => required(countryById.get(link.country_id), "treatment country").slug),
+        ...hospitalTreatmentRows
+          .filter((link) => link.treatment_id === item.id && hospitalById.has(link.hospital_id))
+          .map((link) => cityById.get(hospitalById.get(link.hospital_id)!.city_id)?.country_id)
+          .filter((id): id is string => Boolean(id && countryById.has(id)))
+          .map((id) => required(countryById.get(id), "offering country").slug),
+      ])],
       faqs: faqSchema.parse(item.faqs),
     };
   });
@@ -316,7 +328,7 @@ const loadSnapshot = cache(async () => {
             .accreditations.map((entry) => entry.name)
             .join("; ") || "No current accreditation evidence published"
         : item.source_kind === "synthetic"
-          ? (item.accreditation_note ?? "No credential listed")
+          ? "No credential listed"
           : "Provider-submitted credentials require current evidence confirmation",
       verification:
         item.source_kind === "synthetic"
@@ -389,7 +401,7 @@ const loadSnapshot = cache(async () => {
         item.source_kind === "synthetic"
           ? "Demo — unverified"
           : item.verification_status,
-      qualifications: [item.qualifications_note],
+      qualifications: [item.qualifications_note.trim()].filter(Boolean),
     };
   });
   const packages: Package[] = packageRows
@@ -452,12 +464,12 @@ const loadSnapshot = cache(async () => {
     steps: item.steps,
   }));
   return {
-    treatments,
-    hospitals,
-    doctors,
-    packages,
-    countries,
-    services,
+    treatments: treatments.map(item => ({ ...item, provenance: provenanceById.get(item.recordId) })),
+    hospitals: hospitals.map(item => ({ ...item, provenance: provenanceById.get(item.recordId) })),
+    doctors: doctors.map(item => ({ ...item, provenance: provenanceById.get(item.recordId) })),
+    packages: packages.map(item => ({ ...item, provenance: provenanceById.get(item.recordId) })),
+    countries: countries.map(item => ({ ...item, provenance: provenanceById.get(item.recordId) })),
+    services: services.map(item => ({ ...item, provenance: provenanceById.get(item.recordId) })),
     estimates,
   };
 });
