@@ -22,7 +22,7 @@ import { verificationReportSchema } from "@/lib/verification/schemas";
 
 export function Submissions({ organizationId }: { organizationId?: string }) {
   const [selected, setSelected] = useState<Row>();
-  const { portal } = usePortal();
+  const { portal, referenceMode } = usePortal();
   const [checkedRows, setCheckedRows] = useState<Record<string, Row>>({});
   const [bulk, setBulk] = useState(false);
   return (
@@ -60,7 +60,7 @@ export function Submissions({ organizationId }: { organizationId?: string }) {
             label: "Submission",
             render: (row) => String(row.id).slice(0, 8),
           },
-          { key: "message", label: "Provider response" },
+          { key: "message", label: referenceMode ? "Reference review note" : "Provider response" },
           { key: "organizationName", label: "Organization" },
           { key: "providerName", label: "Provider" },
           { key: "reviewerName", label: "Reviewer" },
@@ -116,7 +116,7 @@ export function Submissions({ organizationId }: { organizationId?: string }) {
           onClose={() => setSelected(undefined)}
         />
       )}{" "}
-      {portal === "provider" && organizationId && (
+      {(portal === "provider" || portal === "admin" && referenceMode) && organizationId && (
         <Panel title="Submit current draft changes">
           <p>
             All eligible draft and revised sections are frozen into one
