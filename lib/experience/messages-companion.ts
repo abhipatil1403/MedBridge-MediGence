@@ -1,5 +1,6 @@
 /** Interface copy only; provider names, source statements and prices remain canonical. */
 export const companionMessages:Record<string,readonly [string,string]>={
+ 'Ask AI':['AI से पूछें','AI ला विचारा'],
  'Price within currency':['मुद्रा के भीतर मूल्य','चलनानुसार किंमत'],
  'Prices are ordered within each listed currency. Amounts in different currencies are not directly comparable.':['मूल्य प्रत्येक सूचीबद्ध मुद्रा में क्रम से दिखते हैं। अलग मुद्राओं की राशियों की सीधी तुलना नहीं की जा सकती।','किमती प्रत्येक नमूद चलनात क्रमाने दाखवल्या आहेत. वेगवेगळ्या चलनांतील रकमा थेट तुलनीय नाहीत.'],
  'published option':['प्रकाशित विकल्प','प्रकाशित पर्याय'],

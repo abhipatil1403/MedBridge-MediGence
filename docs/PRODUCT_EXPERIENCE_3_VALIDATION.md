@@ -50,7 +50,7 @@ Patient “Get help” presents requests, status and messages using the existing
 
 ## 12. Logo
 
-The supplied file was moved unchanged from the repository root to `public/brand/medbridge-logo.webp` (330,618 bytes, 1315 × 1197, original transparency). A shared `MedBridgeLogo` renders its actual proportions in the header/footer, navigation drawers, page headings, assistant, account and portal surfaces. Metadata uses the same WebP for icon/shortcut. The previous drawn mark and SVG favicon were removed. Dark surfaces use a light backing without recoloring the asset.
+The supplied file was moved unchanged from the repository root to `public/brand/medbridge-logo.webp` (330,618 bytes, 1315 × 1197, original transparency). The original MEDBRIDGE name is restored beside the supplied logo in desktop/mobile headers and the navigation drawer. A shared `MedBridgeLogo` renders its actual proportions in the header/footer, navigation drawers, page headings, assistant, account and portal surfaces. Metadata uses the same WebP for icon/shortcut. The previous drawn mark and SVG favicon were removed. Dark surfaces use a light backing without recoloring the asset.
 
 ## 13. Loading and architecture
 
@@ -86,7 +86,7 @@ Single-column hero and AI input, compact capability rows, purpose-specific resul
 
 ## 16. Accessibility and localization
 
-Semantic landmarks/headings, labelled controls, keyboard disclosures, visible focus, reduced motion and native dialog focus behavior remain. The account drawer was checked for Escape, focus return and current section. Both Hindi and Marathi checks report zero untranslated messages across all 1351 declared interface messages. Provider names, sourced facts, prices and assistant content are not replaced by interface translations. Browser console/hydration checks and final locale/mobile checks are recorded with release artifacts. The signed-in browser refresh regression kept one user message; a subsequent ordinal follow-up returned the real Executive – A package.
+Semantic landmarks/headings, labelled controls, keyboard disclosures, visible focus, reduced motion and native dialog focus behavior remain. The account drawer was checked for Escape, focus return and current section. Both Hindi and Marathi checks report zero untranslated messages across all 1352 declared interface messages. Provider names, sourced facts, prices and assistant content are not replaced by interface translations. Browser console/hydration checks and final locale/mobile checks are recorded with release artifacts. The signed-in browser refresh regression kept one user message; a subsequent ordinal follow-up returned the real Executive – A package.
 
 ## 17. Regression checks
 

@@ -4,6 +4,9 @@
 .medbridge-logo--compact { width:40px; }
 .medbridge-logo--on-dark { background:var(--background,#faf9f5); padding:7px; border-radius:12px; width:72px; }
 .brand { min-width:64px; width:auto; }
+.brand__name { font-size:15px; letter-spacing:.1em; }
+.header-workspace__compact { display:none; }
+@media(min-width:801px) and (max-width:1200px) { .site-header__inner { gap:14px; } .site-header .medbridge-logo { width:44px; } .brand__name { font-size:13px; } }
 .assistant-launcher .medbridge-logo { width:24px; background:#faf9f5; padding:2px; border-radius:5px; }
 .page-header .eyebrow { display:flex; align-items:center; gap:12px; }
 .companion-hero { display:grid; grid-template-columns:1fr 1.05fr; gap:clamp(32px,5vw,80px); align-items:center; padding-block:56px 64px; }
@@ -93,6 +96,7 @@
 @media(max-width:1100px) { .companion-hero { gap:32px; } .header-workspace { padding-inline:14px; } }
 @media(max-width:800px) { .header-workspace { display:inline-flex; margin-left:auto; } }
 @media(max-width:767px) {
+ .brand { gap:7px; } .brand__name { font-size:11px; letter-spacing:.06em; } .header-workspace__label { display:none; } .header-workspace__compact { display:inline; }
  .medbridge-logo { width:50px; } .medbridge-logo--compact { width:36px; }
  .site-header__inner { gap:6px; width:calc(100% - 24px); } .site-header .brand { min-width:36px; } .site-header .brand .medbridge-logo { width:36px; } .site-header .menu-toggle { flex:none; width:44px; height:44px; } .header-workspace { display:block!important; margin-left:auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.82rem; min-height:44px; padding:10px; } .header-workspace svg { display:none; }
  .companion-hero { grid-template-columns:1fr; gap:22px; padding-block:28px 32px; }
