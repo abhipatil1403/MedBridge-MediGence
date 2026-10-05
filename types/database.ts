@@ -1587,26 +1587,41 @@ export type Database = {
         Row: {
           id: string;
           display_name: string | null;
-          locale: string | null;
+          locale: string;
           timezone: string | null;
           created_at: string;
           updated_at: string;
+          currency: string;
+          phone: string;
+          country: string;
+          city: string;
+          preferences_updated_at: string | null;
         };
         Insert: {
           id: string;
           display_name?: string | null;
-          locale?: string | null;
+          locale?: string;
           timezone?: string | null;
           created_at?: string;
           updated_at?: string;
+          currency?: string;
+          phone?: string;
+          country?: string;
+          city?: string;
+          preferences_updated_at?: string | null;
         };
         Update: {
           id?: string;
           display_name?: string | null;
-          locale?: string | null;
+          locale?: string;
           timezone?: string | null;
           created_at?: string;
           updated_at?: string;
+          currency?: string;
+          phone?: string;
+          country?: string;
+          city?: string;
+          preferences_updated_at?: string | null;
         };
         Relationships: [];
       };
@@ -1958,6 +1973,225 @@ export type Database = {
           provider_type?: string;
           completed_at?: string;
           report?: Json;
+        };
+        Relationships: [];
+      };
+      recent_searches: {
+        Row: {
+          id: string;
+          owner_id: string;
+          query: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          query: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          query?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      recovery_documents: {
+        Row: {
+          id: string;
+          journey_id: string;
+          owner_id: string;
+          document_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          journey_id: string;
+          owner_id: string;
+          document_id: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          journey_id?: string;
+          owner_id?: string;
+          document_id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      recovery_events: {
+        Row: {
+          id: string;
+          journey_id: string;
+          owner_id: string;
+          title: string;
+          event_type: string;
+          occurred_at: string;
+          source: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          journey_id: string;
+          owner_id: string;
+          title: string;
+          event_type: string;
+          occurred_at?: string;
+          source?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          journey_id?: string;
+          owner_id?: string;
+          title?: string;
+          event_type?: string;
+          occurred_at?: string;
+          source?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      recovery_journeys: {
+        Row: {
+          id: string;
+          owner_id: string;
+          title: string;
+          hospital_id: string | null;
+          case_id: string | null;
+          stage: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          title: string;
+          hospital_id?: string | null;
+          case_id?: string | null;
+          stage?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          title?: string;
+          hospital_id?: string | null;
+          case_id?: string | null;
+          stage?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      recovery_support_links: {
+        Row: {
+          id: string;
+          journey_id: string;
+          owner_id: string;
+          support_case_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          journey_id: string;
+          owner_id: string;
+          support_case_id: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          journey_id?: string;
+          owner_id?: string;
+          support_case_id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      recovery_tasks: {
+        Row: {
+          id: string;
+          journey_id: string;
+          owner_id: string;
+          title: string;
+          status: string;
+          due_at: string | null;
+          source: string;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          journey_id: string;
+          owner_id: string;
+          title: string;
+          status?: string;
+          due_at?: string | null;
+          source?: string;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          journey_id?: string;
+          owner_id?: string;
+          title?: string;
+          status?: string;
+          due_at?: string | null;
+          source?: string;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      saved_items: {
+        Row: {
+          id: string;
+          owner_id: string;
+          kind: string;
+          hospital_id: string | null;
+          doctor_id: string | null;
+          package_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          kind: string;
+          hospital_id?: string | null;
+          doctor_id?: string | null;
+          package_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          kind?: string;
+          hospital_id?: string | null;
+          doctor_id?: string | null;
+          package_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -2471,6 +2705,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      experience_command: { Args: { p_action: string; p_input?: Json }; Returns: Json };
+      experience_guest_session: { Args: { p_action: string; p_hash: string; p_ip_hash?: string | null; p_lease?: string | null; p_state?: Json | null }; Returns: Json };
+      experience_import_visitor: { Args: { p_hash: string; p_lease: string; p_user: string }; Returns: string };
+      experience_rate_cache: { Args: { p_snapshot?: Json | null }; Returns: Json };
       search_catalog_candidates: {
         Args: { p_terms: string; p_treatment_slug?: string | null; p_specialty?: string | null; p_countries?: string[]; p_city?: string | null };
         Returns: { kind: string; slug: string }[];

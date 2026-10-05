@@ -1,5 +1,5 @@
-// Each snapshot owns its queue. Reads retain ordinary public RLS and failures;
-// limiting simultaneous statements avoids saturating the hosted database.
+// Reads retain ordinary public RLS and failures. Callers can share a queue
+// across snapshots to limit total concurrent statements in this process.
 export function catalogReadQueue(limit = 3) {
   let active = 0;
   const pending: Array<() => void> = [];
@@ -12,3 +12,4 @@ export function catalogReadQueue(limit = 3) {
     finally { active--; pending.shift()?.(); }
   };
 }
+export const publicCatalogRead = catalogReadQueue(3);

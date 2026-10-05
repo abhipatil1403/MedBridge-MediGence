@@ -1,3 +1,4 @@
+import { T } from '@/components/experience/translation';
 import { Suspense } from "react";
 import { DiscoveryExperience } from "@/components/discovery/discovery-experience";
 import { searchService } from "@/lib/discovery/search-service";
@@ -11,5 +12,5 @@ export const metadata = {
 
 export default async function DiscoverPage() {
   const facets = await searchService.facets();
-  return <Suspense fallback={<main id="main-content" tabIndex={-1} className="container state-page" role="status">Loading discovery…</main>}><DiscoveryExperience facets={facets} /></Suspense>;
+  return <Suspense fallback={<main id="main-content" tabIndex={-1} className="container state-page" role="status"><T>{"Loading discovery…"}</T></main>}><DiscoveryExperience facets={facets} /></Suspense>;
 }

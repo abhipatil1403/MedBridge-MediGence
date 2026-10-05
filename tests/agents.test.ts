@@ -98,7 +98,8 @@ const run = (content: string, selected: AgentPlan | object, extras: { caseId?: s
 
 describe('controlled agent tools', () => {
   it('registers all required tools with schemas', () => {
-    expect(Object.keys(toolSchemas)).toHaveLength(39);
+    expect(Object.keys(toolSchemas)).toHaveLength(40);
+    expect(agents.treatment_planning.allowedTools).toContain('get_recovery_context');
     expect(agents.discovery.allowedTools).not.toContain('create_case');
     expect(agents.comparison.allowedTools).toContain('compare_treatment_options');
     expect(toolRegistry.get_case_context.authorization).toBe('case_consent');

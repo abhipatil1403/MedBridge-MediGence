@@ -1,4 +1,5 @@
 "use client";
+import { T } from '@/components/experience/translation';
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -97,11 +98,11 @@ export function CommandForm({
       </div>
       {error && (
         <p role="alert" className="portal-field-error">
-          {error}
+          <T>{error}</T>
         </p>
       )}
       <button className="portal-button" disabled={busy}>
-        {busy ? "Saving…" : submit}
+        <T>{busy ? "Saving…" : submit}</T>
       </button>
     </form>
   );

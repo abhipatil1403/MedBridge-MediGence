@@ -1,4 +1,6 @@
+import { T } from '@/components/experience/translation';
 import type { Metadata } from "next";
+import { SaveButton } from '@/components/experience/saved';
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/breadcrumbs";
@@ -51,6 +53,7 @@ export default async function DoctorDetailPage({ params }: Props) {
           ]}
         />
         {doctor.demo && <DemoNotice compact />}
+        <div className="inline-actions"><SaveButton kind="doctor" recordId={doctor.recordId}/></div>
         {profile?.hasImage && (
           <Image
             src={`/api/providers/${doctor.recordId}/image`}
@@ -89,7 +92,7 @@ export default async function DoctorDetailPage({ params }: Props) {
                   {hospital.name}
                 </Link>
               )}
-              {!hospital && <p>Hospital affiliation not provided in published information.</p>}
+              {!hospital && <p><T>{"Hospital affiliation not provided in published information."}</T></p>}
             </DetailSection>
             <DetailSection title="Experience and credentials">
               <p>
@@ -100,14 +103,12 @@ export default async function DoctorDetailPage({ params }: Props) {
               {doctor.qualifications.map((item) => (
                 <p key={item}>{item}</p>
               ))}
-              {!doctor.qualifications.length && <p>Qualifications not provided</p>}
+              {!doctor.qualifications.length && <p><T>{"Qualifications not provided"}</T></p>}
               <p>
-                Publication review does not independently verify professional
-                registration or establish clinical suitability.
-              </p>
+                <T>{"Publication review does not independently verify professional registration or establish clinical suitability."}</T></p>
             </DetailSection>
             <DetailSection title="Languages">
-              {!doctor.languages.length && <p>Languages not provided</p>}
+              {!doctor.languages.length && <p><T>{"Languages not provided"}</T></p>}
               <ul>
                 {doctor.languages.map((item) => (
                   <li key={item}>{item}</li>
@@ -115,7 +116,7 @@ export default async function DoctorDetailPage({ params }: Props) {
               </ul>
             </DetailSection>
             <DetailSection title="Procedures">
-              {!treatments.length && <p>Not provided in published information.</p>}
+              {!treatments.length && <p><T>{"Not provided in published information."}</T></p>}
               <DetailLinks
                 items={treatments.map((item) => ({
                   label: item.name,
@@ -125,21 +126,16 @@ export default async function DoctorDetailPage({ params }: Props) {
             </DetailSection>
             <DetailSection title="Consultation">
               <p>
-                Consultation mode: {doctor.consultationMode === "not_confirmed" ? "Not confirmed in published information" : doctor.consultationMode}. Appointment
-                availability requires confirmation.
-              </p>
+                <T>{"Consultation mode:"}</T>{' '}{doctor.consultationMode === "not_confirmed" ? "Not confirmed in published information" : doctor.consultationMode}<T>{". Appointment availability requires confirmation."}</T></p>
             </DetailSection>
           </div>
           <aside className="detail-aside">
-            <h2>Coordinate a request</h2>
+            <h2><T>{"Coordinate a request"}</T></h2>
             <p>
-              Ask support to coordinate an authorized request. No appointment is
-              booked from this page.
-            </p>
+              <T>{"Ask support to coordinate an authorized request. No appointment is booked from this page."}</T></p>
             <CatalogProvenance item={doctor} kind="doctor" />
             <Link className="button button--primary" href="/help">
-              Get support
-            </Link>
+              <T>{"Get support"}</T></Link>
           </aside>
         </div>
       </main>
@@ -214,22 +210,20 @@ export default async function DoctorDetailPage({ params }: Props) {
               ) : (
                 doctor.hospitalName
               )}
-              . Affiliation is part of the synthetic catalog and is not
-              verified.
-            </p>
+              <T>{". Affiliation is part of the synthetic catalog and is not verified."}</T></p>
           </DetailSection>
           <DetailSection title="Experience and qualifications">
             <dl className="fact-list">
               <div>
-                <dt>Sample experience</dt>
-                <dd>{doctor.sampleExperienceYears} years (illustrative)</dd>
+                <dt><T>{"Sample experience"}</T></dt>
+                <dd>{doctor.sampleExperienceYears} <T>{"years (illustrative)"}</T></dd>
               </div>
               <div>
-                <dt>Qualifications</dt>
+                <dt><T>{"Qualifications"}</T></dt>
                 <dd>{doctor.qualifications[0]}</dd>
               </div>
               <div>
-                <dt>Verification</dt>
+                <dt><T>{"Verification"}</T></dt>
                 <dd>{doctor.verification}</dd>
               </div>
             </dl>
@@ -237,7 +231,7 @@ export default async function DoctorDetailPage({ params }: Props) {
           <DetailSection title="Languages">
             <ul className="tag-list">
               {doctor.languages.map((item) => (
-                <li key={item}>{item} (sample)</li>
+                <li key={item}>{item} <T>{"(sample)"}</T></li>
               ))}
             </ul>
           </DetailSection>
@@ -252,46 +246,35 @@ export default async function DoctorDetailPage({ params }: Props) {
           </DetailSection>
           <DetailSection title="Consultation">
             <p>
-              Sample consultation mode: {doctor.consultationMode}. No live
-              slots, prices, or booking availability are connected.
-            </p>
+              <T>{"Sample consultation mode:"}</T>{' '}{doctor.consultationMode}<T>{". No live slots, prices, or booking availability are connected."}</T></p>
             <Link className="text-link" href={`/consultation?doctor=${slug}`}>
-              Review consultation pathway →
-            </Link>
+              <T>{"Review consultation pathway →"}</T></Link>
           </DetailSection>
           <DetailSection title="Second opinion">
             <p>
-              A professional second opinion requires records, consent,
-              specialist assignment and review. This profile is a demo and is
-              not eligible to provide an opinion.
-            </p>
+              <T>{"A professional second opinion requires records, consent, specialist assignment and review. This profile is a demo and is not eligible to provide an opinion."}</T></p>
             <Link className="text-link" href={`/second-opinion?doctor=${slug}`}>
-              Explore second opinions →
-            </Link>
+              <T>{"Explore second opinions →"}</T></Link>
           </DetailSection>
           <DetailSection title="Frequently asked questions">
             <FaqList items={faq} />
           </DetailSection>
         </div>
         <aside className="detail-aside">
-          <p className="eyebrow">NEXT STEPS</p>
-          <h2>Explore a consultation</h2>
+          <p className="eyebrow"><T>{"NEXT STEPS"}</T></p>
+          <h2><T>{"Explore a consultation"}</T></h2>
           <p>
-            The consultation workflow explains what information and confirmation
-            a real appointment would require.
-          </p>
+            <T>{"The consultation workflow explains what information and confirmation a real appointment would require."}</T></p>
           <Link
             className="button button--primary button--default"
             href={`/consultation?doctor=${slug}`}
           >
-            Explore consultation
-          </Link>
+            <T>{"Explore consultation"}</T></Link>
           <Link
             className="button button--outline button--default"
             href={`/second-opinion?doctor=${slug}`}
           >
-            Request second opinion
-          </Link>
+            <T>{"Request second opinion"}</T></Link>
         </aside>
       </div>
     </main>

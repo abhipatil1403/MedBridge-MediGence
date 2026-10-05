@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SupabaseVerificationStore } from '@/lib/verification/store';
 import { defaultToolDependencies } from '@/lib/agents/tools';
 import { z } from 'zod';
+import { recoveryContext } from '@/lib/experience/recovery';
+import { coordinationSchema } from '@/lib/experience/coordination-schema';
 import { configuredProvider } from '@/lib/agents/cloudflare-provider';
 import { AgentError } from '@/lib/agents/errors';
 import { createAdminClient, createUserClient, isAgentConfigured, SupabaseAgentStore, SupabaseCaseAccess, verifyUser } from '@/lib/agents/persistence';
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
       store: new SupabaseAgentStore(admin, userDb),
       planningStore: new SupabasePlanningStore(admin, userDb),
       provider: configuredProvider(),
-      tools:{...defaultToolDependencies,verificationStore:new SupabaseVerificationStore(admin,userDb)},
+      tools:{...defaultToolDependencies,verificationStore:new SupabaseVerificationStore(admin,userDb),recoveryRead:async(id)=>{if(id!==user.id)throw new AgentError('TOOL_SCOPE_DENIED','This coordination context is unavailable.');return coordinationSchema.parse(await recoveryContext(userDb,user.id));}},
     });
     return NextResponse.json(response, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) { return errorResponse(error); }

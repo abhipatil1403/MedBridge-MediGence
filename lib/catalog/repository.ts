@@ -18,7 +18,7 @@ import type { ParsedQuery } from "@/types/discovery";
 import { packageServicesSchema } from "./package-services";
 import { normalize } from "@/lib/discovery/normalize";
 import { publicHospitalFields, publicDoctorFields } from "./public-fields";
-import { catalogReadQueue } from "./read-budget";
+import { publicCatalogRead } from "./read-budget";
 
 const faqSchema = z.array(
   z.object({ question: z.string(), answer: z.string() }),
@@ -52,7 +52,7 @@ function sourceKind(value: string): "synthetic" | "external" | "first_party" {
 
 const loadSnapshot = cache(async () => {
   const db = getPublicSupabaseClient();
-  const read = catalogReadQueue();
+  const read = publicCatalogRead;
   const [
     countryQuery,
     cityQuery,

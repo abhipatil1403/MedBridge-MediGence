@@ -1,4 +1,9 @@
 "use client";
+import { LocalNumber } from '@/components/experience/translation';
+
+import { Localized } from '@/components/experience/localized';
+
+import { T } from '@/components/experience/translation';
 import Link from "next/link";
 import { useState } from "react";
 import { label, sectionKind, type Row } from "@/lib/portals/config";
@@ -78,8 +83,8 @@ export function Dashboard() {
             .map(([key, value]) => (
               <article key={key}>
                 <span>{label(key.replace(/([A-Z])/g, " $1"))}</span>
-                <strong>{Number(value).toLocaleString()}</strong>
-                <small>From your authorized database records</small>
+                <strong><LocalNumber value={Number(value)}/></strong>
+                <small><T>{"From your authorized database records"}</T></small>
               </article>
             ))}
         </div>
@@ -118,17 +123,14 @@ export function Dashboard() {
           <Panel title="Review priorities">
             <div className="portal-actions">
               <Link className="portal-button" href="/admin/applications">
-                Review applications
-              </Link>
+                <T>{"Review applications"}</T></Link>
               <Link className="portal-button secondary" href="/admin/documents">
-                Review evidence
-              </Link>
+                <T>{"Review evidence"}</T></Link>
               <Link
                 className="portal-button secondary"
                 href="/admin/verification"
               >
-                Check verification issues
-              </Link>
+                <T>{"Check verification issues"}</T></Link>
             </div>
           </Panel>
           <Submissions />
@@ -215,7 +217,7 @@ function ListingAttention() {
           <>
             <dl className="portal-facts">
               <div>
-                <dt>Submission</dt>
+                <dt><T>{"Submission"}</T></dt>
                 <dd>
                   {data.submissionStatus ? (
                     <Status value={data.submissionStatus} />
@@ -225,7 +227,7 @@ function ListingAttention() {
                 </dd>
               </div>
               <div>
-                <dt>Publication</dt>
+                <dt><T>{"Publication"}</T></dt>
                 <dd>
                   {data.publishedRevision
                     ? `Revision ${data.publishedRevision} is published`
@@ -233,15 +235,15 @@ function ListingAttention() {
                 </dd>
               </div>
               <div>
-                <dt>Last submitted</dt>
+                <dt><T>{"Last submitted"}</T></dt>
                 <dd>{date(data.lastSubmitted)}</dd>
               </div>
               <div>
-                <dt>Last section review</dt>
+                <dt><T>{"Last section review"}</T></dt>
                 <dd>{date(data.lastReviewed)}</dd>
               </div>
               <div>
-                <dt>Latest factual verification check</dt>
+                <dt><T>{"Latest factual verification check"}</T></dt>
                 <dd>
                   {checks.loading ? (
                     "Loading check history…"
@@ -253,13 +255,13 @@ function ListingAttention() {
                     "No factual verification check recorded"
                   )}
                   {" · "}
-                  <Link href="/provider/verification">Review evidence</Link>
+                  <Link href="/provider/verification"><T>{"Review evidence"}</T></Link>
                 </dd>
               </div>
             </dl>
             {data.reviewComment && (
               <div className="portal-review-feedback">
-                <h3>Admin feedback</h3>
+                <h3><T>{"Admin feedback"}</T></h3>
                 <p>{data.reviewComment}</p>
               </div>
             )}
@@ -272,27 +274,23 @@ function ListingAttention() {
                 <Link
                   href={`/provider/${Object.keys(sectionKind).find((section) => sectionKind[section] === review.kind) ?? "submissions"}`}
                 >
-                  Continue this section
-                </Link>
+                  <T>{"Continue this section"}</T></Link>
                 <p className="portal-muted">
-                  Reviewed revision {review.revision}
-                  {review.currentRevision > review.revision
+                  <T>{"Reviewed revision"}</T>{' '}{review.revision}
+                  <T>{review.currentRevision > review.revision
                     ? " · draft revised; submit it for another review"
-                    : ""}
+                    : ""}</T>
                 </p>
               </article>
             ))}
             <div className="portal-actions">
               <Link href="/provider/documents">
-                {data.pendingDocuments} documents awaiting review ·{" "}
-                {data.documentsNeedingReplacement} need replacement
-              </Link>
+                {data.pendingDocuments} <T>{"documents awaiting review ·"}</T>{" "}
+                {data.documentsNeedingReplacement} <T>{"need replacement"}</T></Link>
               <Link href="/provider/packages">
-                {data.packagesAwaitingReview} packages awaiting review
-              </Link>
+                {data.packagesAwaitingReview} <T>{"packages awaiting review"}</T></Link>
               <Link className="portal-button" href="/provider/submissions">
-                Open submissions
-              </Link>
+                <T>{"Open submissions"}</T></Link>
             </div>
           </>
         )
@@ -353,9 +351,7 @@ function Onboarding({ compact = false }: { compact?: boolean }) {
         <>
           <div className="portal-progress-heading">
             <strong>
-              {Math.round((completed / total) * 100)}% required profile fields
-              complete
-            </strong>
+              {Math.round((completed / total) * 100)}<T>{"% required profile fields complete"}</T></strong>
             <span>
               {profile ? (
                 <Status value={profile.status} />
@@ -364,28 +360,25 @@ function Onboarding({ compact = false }: { compact?: boolean }) {
               )}
             </span>
           </div>
-          <progress
+          <Localized as="progress"
             value={completed}
             max={total}
             aria-label="Required profile completeness"
           />
           {listing?.missing.length ? (
             <p className="portal-review-feedback">
-              Required:{" "}
+              <T>{"Required:"}</T>{" "}
               {listing.missing
                 .map((key) => label(key.replace(/([A-Z])/g, " $1")))
                 .join(", ")}
-              . <Link href="/provider/profile">Complete profile</Link>
+              . <Link href="/provider/profile"><T>{"Complete profile"}</T></Link>
             </p>
           ) : (
             <p className="portal-muted">
-              All required profile fields are supplied.
-            </p>
+              <T>{"All required profile fields are supplied."}</T></p>
           )}
           <p className="portal-muted">
-            Optional sections can be added later. Each saved draft persists when
-            you leave and return.
-          </p>
+            <T>{"Optional sections can be added later. Each saved draft persists when you leave and return."}</T></p>
           <ol className={`portal-onboarding ${compact ? "compact" : ""}`}>
             {steps.map(([name, section], index) => (
               <li key={name} className={complete(name) ? "is-complete" : ""}>
@@ -393,7 +386,7 @@ function Onboarding({ compact = false }: { compact?: boolean }) {
                   <span>{complete(name) ? "✓" : index + 1}</span>
                   <strong>{name}</strong>
                   <small>
-                    {complete(name) ? "Saved / completed" : "Continue"}
+                    <T>{complete(name) ? "Saved / completed" : "Continue"}</T>
                   </small>
                 </Link>
               </li>
@@ -448,14 +441,12 @@ function Preview() {
           className={`portal-button ${mode === "draft" ? "" : "secondary"}`}
           onClick={() => void choose("draft")}
         >
-          Draft preview
-        </button>
+          <T>{"Draft preview"}</T></button>
         <button
           className={`portal-button ${mode === "published" ? "" : "secondary"}`}
           onClick={() => void choose("published")}
         >
-          Published snapshot
-        </button>
+          <T>{"Published snapshot"}</T></button>
       </div>
       {error || previewError ? (
         <ErrorPanel message={error || previewError} />
@@ -463,18 +454,16 @@ function Preview() {
         <Loading />
       ) : !profile ? (
         <Empty
-          title={
-            mode === "published"
+          title={mode === "published"
               ? "No published profile yet"
-              : "Save your organization profile to preview it"
-          }
+              : "Save your organization profile to preview it"}
         />
       ) : (
         <div className="portal-profile-preview">
           <p className="portal-eyebrow">
-            {mode === "published"
+            <T>{mode === "published"
               ? "PUBLISHED SNAPSHOT"
-              : "PRIVATE DRAFT PREVIEW · NOT PUBLIC"}
+              : "PRIVATE DRAFT PREVIEW · NOT PUBLIC"}</T>
           </p>
           <h2>{String(profile.name)}</h2>
           <p>{String(profile.data?.description ?? "Overview not provided.")}</p>
@@ -501,17 +490,16 @@ function Preview() {
                   <>
                     <strong>
                       {String(row.data?.currency ?? "")}{" "}
-                      {Number(row.data?.price ?? 0).toLocaleString()} ·{" "}
-                      {String(row.data?.durationDays ?? "—")} days
-                    </strong>
-                    <h4>Inclusions</h4>
+                      <LocalNumber value={Number(row.data?.price ?? 0)}/> ·{" "}
+                      {String(row.data?.durationDays ?? "—")} <T>{"days"}</T></strong>
+                    <h4><T>{"Inclusions"}</T></h4>
                     <ul>
                       {Array.isArray(row.data?.inclusions) &&
                         (row.data.inclusions as string[]).map((item) => (
                           <li key={item}>{item}</li>
                         ))}
                     </ul>
-                    <h4>Exclusions</h4>
+                    <h4><T>{"Exclusions"}</T></h4>
                     <ul>
                       {Array.isArray(row.data?.exclusions) &&
                         (row.data.exclusions as string[]).map((item) => (
@@ -602,9 +590,7 @@ function Team() {
         <>
           <Panel title="Invite a team member">
             <p>
-              Create an invitation, then share its link with the intended
-              teammate. They must sign in using the matching email address.
-            </p>
+              <T>{"Create an invitation, then share its link with the intended teammate. They must sign in using the matching email address."}</T></p>
             <CommandForm
               action="invite_member"
               input={{ organizationId }}
@@ -627,7 +613,7 @@ function Team() {
             />
             {inviteLink && (
               <label className="portal-field">
-                <span>Share this invitation link</span>
+                <span><T>{"Share this invitation link"}</T></span>
                 <input
                   readOnly
                   value={inviteLink}
@@ -670,8 +656,7 @@ function Team() {
                       confirm
                       danger
                     >
-                      Revoke
-                    </Action>
+                      <T>{"Revoke"}</T></Action>
                   ),
               },
             ]}
@@ -732,7 +717,7 @@ export function Notifications() {
                 action="mark_notification"
                 input={{ notificationId: row.id, read: !row.read_at }}
               >
-                {row.read_at ? "Mark unread" : "Mark read"}
+                <T>{row.read_at ? "Mark unread" : "Mark read"}</T>
               </Action>
             ),
           },
@@ -762,7 +747,7 @@ export function Notifications() {
               input={{ notificationId: selected.id, read: !selected.read_at }}
               onDone={() => setSelected(undefined)}
             >
-              {selected.read_at ? "Mark unread" : "Mark read"}
+              <T>{selected.read_at ? "Mark unread" : "Mark read"}</T>
             </Action>
           </Modal>
         ))}
@@ -796,20 +781,16 @@ export function Preferences({ provider = false }: { provider?: boolean }) {
       </Panel>
       <Panel title="Account & security">
         <p>
-          Signed in as <strong>{context.email}</strong>.
+          <T>{"Signed in as"}</T><strong>{context.email}</strong>.
         </p>
         <p>
-          Sign-in uses the existing MedBridge email confirmation flow. Team
-          permissions and staff roles are controlled by the database.
-        </p>
+          <T>{"Sign-in uses the existing MedBridge email confirmation flow. Team permissions and staff roles are controlled by the database."}</T></p>
         {provider && portal === "provider" && (
           <div className="portal-actions">
             <Link className="portal-button secondary" href="/provider/profile">
-              Organization settings
-            </Link>
+              <T>{"Organization settings"}</T></Link>
             <Link className="portal-button secondary" href="/provider/team">
-              Team access
-            </Link>
+              <T>{"Team access"}</T></Link>
           </div>
         )}
       </Panel>
@@ -824,9 +805,7 @@ export function CreateOrganization({
   return (
     <Panel title="Create your organization">
       <p>
-        Create a private workspace for a hospital, clinic or healthcare
-        organization you represent.
-      </p>
+        <T>{"Create a private workspace for a hospital, clinic or healthcare organization you represent."}</T></p>
       <CommandForm
         action="create_organization"
         fields={[

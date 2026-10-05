@@ -1,5 +1,8 @@
 "use client";
+import { LocalNumber } from '@/components/experience/translation';
+
 import { PageHeader } from "@/components/page-header";
+import { useTranslation } from '@/components/experience/translation';
 
 import { SlidersHorizontal, X } from "lucide-react";
 import Link from "next/link";
@@ -31,11 +34,12 @@ function FilterControls({ facets, type, params, update, clear }: {
   facets: Facets; type: ResultType; params: URLSearchParams;
   update: (key: string, value: string) => void; clear: () => void;
 }) {
+  const {t,number}=useTranslation();
   const field = (key: string, label: string, options: { value: string; label: string }[]) => <label className="filter-field" key={key}>
-    <span>{label}</span>
+    <span>{t(label)}</span>
     <select value={params.get(key) ?? ""} onChange={(event) => update(key, event.target.value)}>
-      <option value="">All {label.toLowerCase()}</option>
-      {options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+      <option value="">{t('All')} · {t(label)}</option>
+      {options.map((option) => <option value={option.value} key={option.value}>{['accreditation','mode'].includes(key)?t(option.label):option.label}</option>)}
     </select>
   </label>;
   const fields = [];
@@ -50,11 +54,12 @@ function FilterControls({ facets, type, params, update, clear }: {
     fields.push(field("mode", "Consultation mode", [{ value: "video", label: "Video" }, { value: "in-person", label: "In person" }]));
   }
   if (["hospitals", "treatments", "packages"].includes(type)) fields.push(field("treatment", "Treatment", facets.treatments.map((item) => ({ value: item.slug, label: item.name }))));
-  if (type === "packages") fields.push(field("budget", "Listed USD budget", [5000, 10000, 20000, 40000].map((amount) => ({ value: String(amount), label: `Up to $${amount.toLocaleString()}` }))));
-  return <div className="filter-controls"><div className="filter-controls__title"><strong>Refine results</strong><button type="button" onClick={clear}>Clear filters</button></div>{fields.length ? fields : <p>No additional filters for this category.</p>}</div>;
+  if (type === "packages") fields.push(field("budget", "Listed USD budget", [5000, 10000, 20000, 40000].map((amount) => ({ value: String(amount), label: `${t('Up to')} USD ${number(amount)}` }))));
+  return <div className="filter-controls"><div className="filter-controls__title"><strong>{t('Refine results')}</strong><button type="button" onClick={clear}>{t('Clear filters')}</button></div>{fields.length ? fields : <p>{t('No additional filters for this category.')}</p>}</div>;
 }
 
 export function DiscoveryExperience({ facets }: { facets: Facets }) {
+  const {t,number}=useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const serialized = searchParams.toString();
@@ -138,22 +143,22 @@ export function DiscoveryExperience({ facets }: { facets: Facets }) {
       {results && Object.values(results.sections).some(entries => entries.some(({item}) => item.demo)) && <DemoNotice compact />}
     </div>
     <div className="container discover-page__body">
-      <nav className="result-tabs" aria-label="Result type">{tabs.map((tab) => <button key={tab.key} type="button" aria-current={type === tab.key ? "page" : undefined} onClick={() => changeType(tab.key)}>{tab.label}</button>)}</nav>
+      <nav className="result-tabs" aria-label={t("Result type")}>{tabs.map((tab) => <button key={tab.key} type="button" aria-current={type === tab.key ? "page" : undefined} onClick={() => changeType(tab.key)}>{t(tab.label)}</button>)}</nav>
       <div className="discover-toolbar">
-        <div><button ref={filterButton} className="mobile-filter-button" type="button" onClick={() => setFilterOpen(true)}><SlidersHorizontal size={17} aria-hidden="true" /> Filters</button><span role="status">{loading ? "Searching…" : error ? "Search unavailable" : `${results?.total ?? 0} published results`}</span></div>
-        <label>Sort by <select value={params.get("sort") ?? "relevance"} onChange={(event) => update("sort", event.target.value)}>{sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        <div><button ref={filterButton} className="mobile-filter-button" type="button" onClick={() => setFilterOpen(true)}><SlidersHorizontal size={17} aria-hidden="true" /> {t("Filters")}</button><span role="status">{loading ? t("Searching…") : error ? t("Search unavailable") : `${number(results?.total ?? 0)} ${t("published results")}`}</span></div>
+        <label>{t("Sort by")} <select value={params.get("sort") ?? "relevance"} onChange={(event) => update("sort", event.target.value)}>{sortOptions.map((option) => <option key={option.value} value={option.value}>{t(option.label)}</option>)}</select></label>
       </div>
       <div className="discover-layout">
-        <aside className="discover-sidebar" aria-label="Search filters"><FilterControls facets={facets} type={type} params={params} update={update} clear={clear} /></aside>
+        <aside className="discover-sidebar" aria-label={t("Search filters")}><FilterControls facets={facets} type={type} params={params} update={update} clear={clear} /></aside>
         <div className="discover-results">
-          {results && <div className="search-context" aria-label="Understood search">{results.understanding.entities.procedure && <span>{facets.treatments.find((item) => item.slug === results.understanding.entities.procedure)?.name}</span>}{results.understanding.entities.city && <span>{results.understanding.entities.city}</span>}{results.understanding.entities.country && <span>{facets.countries.find((item) => item.slug === results.understanding.entities.country)?.name}</span>}{results.filters.budget && <span>Budget ≤ USD {results.filters.budget.toLocaleString()}</span>}{query && <Link className="text-link" href={`/assistant?q=${encodeURIComponent(query)}`}>Continue in Care Workspace →</Link>}</div>}
-          {loading && <div className="result-state" role="status" aria-live="polite"><h2>Finding relevant options…</h2><p>Checking published catalog information and current filters.</p><div className="result-skeleton" /><div className="result-skeleton" /><div className="result-skeleton" /></div>}
-          {!loading && error && <div className="result-state result-state--error" role="alert"><h2>We couldn’t load these results.</h2><p>{error}</p><button className="button button--primary button--default" type="button" onClick={resetError}>{error.includes("invalid") ? "Reset filters and try again" : "Retry search"}</button></div>}
-          {!loading && !error && results?.total === 0 && <div className="result-state"><h2>No published listings match this search yet.</h2><p>Your search is still in the field above. Try another location or treatment, or ask support for help.</p><button className="button button--outline button--default" type="button" onClick={clear}>Try a broader search</button><div className="result-state__suggested"><Link href="/help">Get coordination support</Link></div></div>}
+          {results && <div className="search-context" aria-label={t("Understood search")}>{results.understanding.entities.procedure && <span>{facets.treatments.find((item) => item.slug === results.understanding.entities.procedure)?.name}</span>}{results.understanding.entities.city && <span>{results.understanding.entities.city}</span>}{results.understanding.entities.country && <span>{facets.countries.find((item) => item.slug === results.understanding.entities.country)?.name}</span>}{results.filters.budget && <span>{t("Budget")} ≤ USD <LocalNumber value={results.filters.budget}/></span>}{query && <Link className="text-link" href={`/assistant?q=${encodeURIComponent(query)}`}>{t("Continue in Care Workspace →")}</Link>}</div>}
+          {loading && <div className="result-state" role="status" aria-live="polite"><h2>{t("Finding relevant options…")}</h2><p>{t("Checking published catalog information and current filters.")}</p><div className="result-skeleton" /><div className="result-skeleton" /><div className="result-skeleton" /></div>}
+          {!loading && error && <div className="result-state result-state--error" role="alert"><h2>{t("We couldn’t load these results.")}</h2><p>{t(error)}</p><button className="button button--primary button--default" type="button" onClick={resetError}>{t(error.includes("invalid") ? "Reset filters and try again" : "Retry search")}</button></div>}
+          {!loading && !error && results?.total === 0 && <div className="result-state"><h2>{t("No published listings match this search yet.")}</h2><p>{t("Your search is still in the field above. Try another location or treatment, or ask support for help.")}</p><button className="button button--outline button--default" type="button" onClick={clear}>{t("Try a broader search")}</button><div className="result-state__suggested"><Link href="/help">{t("Get coordination support")}</Link></div></div>}
           {!loading && !error && results && results.total > 0 && <ResultSections results={results} />}
         </div>
       </div>
     </div>
-    {filterOpen && <div className="filter-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setFilterOpen(false); }}><div ref={filterDialog} className="filter-drawer" role="dialog" aria-modal="true" aria-label="Search filters"><div className="filter-drawer__head"><strong>Filters</strong><button type="button" onClick={() => { setFilterOpen(false); filterButton.current?.focus(); }} aria-label="Close filters"><X size={21} /></button></div><FilterControls facets={facets} type={type} params={params} update={update} clear={clear} /><button className="button button--primary button--default filter-drawer__done" type="button" onClick={() => setFilterOpen(false)}>View results</button></div></div>}
+    {filterOpen && <div className="filter-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setFilterOpen(false); }}><div ref={filterDialog} className="filter-drawer" role="dialog" aria-modal="true" aria-label={t("Search filters")}><div className="filter-drawer__head"><strong>{t("Filters")}</strong><button type="button" onClick={() => { setFilterOpen(false); filterButton.current?.focus(); }} aria-label={t("Close filters")}><X size={21} /></button></div><FilterControls facets={facets} type={type} params={params} update={update} clear={clear} /><button className="button button--primary button--default filter-drawer__done" type="button" onClick={() => setFilterOpen(false)}>{t("View results")}</button></div></div>}
   </main>;
 }

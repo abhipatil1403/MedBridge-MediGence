@@ -1,3 +1,4 @@
+import { T } from '@/components/experience/translation';
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ReportPicker } from "@/components/discovery/report-picker";
@@ -10,7 +11,7 @@ export default async function SecondOpinionPage({ searchParams }: { searchParams
   const { doctor: slug } = await searchParams;
   const doctor = slug ? await getDoctorBySlug(slug) : undefined;
   return <ServiceLanding slug="second-opinion" title="A fresh perspective starts with your question." intro="Bring your question and the records that support it. A qualified professional provides the review." nextHref="/discover?q=second%20opinion" nextLabel="Explore relevant options">
-    {doctor && <p className="service-context">Selected sample profile: <Link href={`/doctors/${doctor.slug}`}>{doctor.name}</Link>. This clinician is synthetic and is not assigned to a case.</p>}
-    <div className="service-panel"><h2>Preparation here. Professional review with a clinician.</h2><p>MedBridge can organize a question and explicitly requested records. It does not diagnose or provide an opinion. A clinician must review and sign any final medical opinion.</p><ReportPicker /><Link className="text-link" href="/assistant?q=Help%20me%20organize%20documents%20for%20a%20second%20opinion">Organize requested documents in the workspace →</Link></div>
+    {doctor && <p className="service-context"><T>{"Selected sample profile:"}</T><Link href={`/doctors/${doctor.slug}`}>{doctor.name}</Link><T>{". This clinician is synthetic and is not assigned to a case."}</T></p>}
+    <div className="service-panel"><h2><T>{"Preparation here. Professional review with a clinician."}</T></h2><p><T>{"MedBridge can organize a question and explicitly requested records. It does not diagnose or provide an opinion. A clinician must review and sign any final medical opinion."}</T></p><ReportPicker /><Link className="text-link" href="/assistant?q=Help%20me%20organize%20documents%20for%20a%20second%20opinion"><T>{"Organize requested documents in the workspace →"}</T></Link></div>
   </ServiceLanding>;
 }

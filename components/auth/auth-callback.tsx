@@ -1,4 +1,6 @@
 'use client';
+
+import { T } from '@/components/experience/translation';
 import { PageHeader } from "@/components/page-header";
 
 import { useEffect, useRef } from 'react';
@@ -52,6 +54,6 @@ export function AuthCallback() {
 
   return <main id="main-content" tabIndex={-1} className="auth-page container"><section className="auth-card" role="status">
     <PageHeader eyebrow="MEDBRIDGE ACCOUNT" title="Checking your sign-in link" compact />
-    <p>Please wait while we finish signing you in.</p>
+    <p><T>{"Please wait while we finish signing you in."}</T></p>
   </section></main>;
 }

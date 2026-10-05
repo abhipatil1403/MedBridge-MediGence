@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { randomUUID } from 'node:crypto';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { renderToStaticMarkup } from './fixtures/render';
 vi.mock('server-only', () => ({}));
 import { harness, snapshot, tools, unavailable, userId } from './fixtures/comparison-harness';
 import { normalizeComparison } from '@/lib/agents/comparison/normalize';

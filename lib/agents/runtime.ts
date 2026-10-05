@@ -55,6 +55,7 @@ export interface ToolContextReferenceBoundary {
 }
 
 export function requestBoundary(content: string): 'clinical' | 'external' | undefined {
+  if (/\b(?:is|does|am)\b.*\b(?:recovery|healing|wound|pain)\b.*\b(?:normal|safe|infected|medical|okay|ok)\b|\b(?:how|what)\b.*\b(?:medication|medicine|dose)\b.*\b(?:take|stop|change)\b/i.test(content)) return 'clinical';
   if (/\b(?:is|would)\b.*\b(?:surgery|treatment|replacement)\b.*\b(?:necessary|appropriate|suitable)\b|\bdo I need (?:a |an )?(?:knee|hip) replacement\b|\bshould I\b.*\b(?:medication|medicine|dose|surgery|replacement)\b/i.test(content)) return 'clinical';
   if (clinicalPattern.test(content) || /\b(should i (?:have|undergo)|do i need (?:surgery|treatment)|best treatment|medically appropriate|what medication|(?:what|which|give me|tell me)\b.*\bdiagnosis|interpret\b.*\b(?:MRI|scan|imaging)|should i\b.*\b(?:take|stop|change)\b)\b/i.test(content)) return 'clinical';
   return externalPatterns.some(([pattern]) => pattern.test(content)) ? 'external' : undefined;

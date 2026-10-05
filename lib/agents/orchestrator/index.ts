@@ -37,7 +37,7 @@ function caseCoordinationText(content: string, snapshot: CatalogSnapshot, draft?
   return text;
 }
 
-export interface OrchestratorContext extends RuntimeContext { planningStore: PlanningStore }
+export interface OrchestratorContext extends RuntimeContext { planningStore: PlanningStore; prepareTurn?: (context:OrchestratorContext)=>Promise<void> }
 
 /** One authenticated turn, one selected workflow, one bounded runtime. No recursive agent calls. */
 export async function orchestrate(rawRequest: unknown, context: OrchestratorContext): Promise<AgentResponse> {
@@ -56,6 +56,7 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
     hasPlanningSchema = false;
   }
   try {
+    if(context.prepareTurn)await context.prepareTurn(context);
     const [active, recent] = await Promise.all([hasPlanningSchema ? context.planningStore.load(conversationId, context.userId) : undefined, context.planningStore.recentMessages(conversationId)]);
     context = { ...context, conversation: validatedConversationContext(conversationId, recent, active) };
     const boundary = requestBoundary(request.content);
@@ -87,6 +88,14 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
           return { ...response, type: response.status === 'awaiting_approval' ? 'progress' : 'result', plan: active };
         },
       } }));
+    }
+    if (/\b(?:my|me|I)\b/i.test(request.content)&&/\b(?:recovery|follow.up|saved (?:rehabilitation|providers)|discharge document|uploaded documents|documents?[^.!?]{0,30}uploaded|uploaded[^.!?]{0,30}documents?|contact[^.!?]{0,20}(?:my )?hospital)\b/i.test(request.content)) {
+      return validateResponse(await runAgent({...request,conversationId},{...context,execution:{
+        plan:{agent:'treatment_planning',understanding:'You requested your non-clinical recovery coordination context.',steps:[{objective:'Read your authorized recovery context',tool:'get_recovery_context',input:'{}'}],missingInformation:null},
+        diagnostics:{workflow:'recovery_coordination'},allowModelFollowUps:false,
+        synthesis:{summary:'Your owner-scoped coordination context is shown below. These are your recorded tasks and private document titles, not clinical instructions or confirmed appointments. Use Lifetime Recover to add a task, milestone or consented support request.',nextSteps:['Open Lifetime Recover to manage your coordination tasks.'],question:null},
+        finalize:async(response,results)=>({...response,coordination:results.find(r=>r.tool==='get_recovery_context')?.result.coordination}),
+      }}));
     }
     if (/\b(?:document coordination|document checklist|organize (?:my |the )?documents|upload (?:my |the )?(?:documents|files)|prepare (?:a |the )?document package)\b/i.test(request.content)) {
       return validateResponse(await runAgent({...request,conversationId},{...context,execution:{

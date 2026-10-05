@@ -1,3 +1,5 @@
+import { T } from '@/components/experience/translation';
+import { Localized } from '@/components/experience/localized';
 const states: Record<string, { label: string; mark: string; tone: string }> = {
   verified: { label: 'Verified', mark: '✓', tone: 'success' },
   approved: { label: 'Reviewed', mark: '✓', tone: 'neutral' },
@@ -42,5 +44,5 @@ const explanations: Record<string, string> = {
 };
 export function StatusBadge({ status }: { status: string }) {
   const state = states[status] ?? { label: 'In progress', mark: '○', tone: 'neutral' };
-  return <span className="status-badge" data-tone={state.tone} title={explanations[status] ?? state.label}><span aria-hidden="true">{state.mark}</span>{state.label}</span>;
+  return <Localized as="span" className="status-badge" data-tone={state.tone} title={explanations[status] ?? state.label}><span aria-hidden="true">{state.mark}</span><T>{state.label}</T></Localized>;
 }

@@ -1,4 +1,8 @@
 "use client";
+import { LocalNumber } from '@/components/experience/translation';
+
+
+import { T } from '@/components/experience/translation';
 import { useEffect, useRef, useState } from "react";
 import { ReferenceClaims } from "./reference-claims";
 import { label, type Row } from "@/lib/portals/config";
@@ -96,7 +100,7 @@ export function Submissions({ organizationId }: { organizationId?: string }) {
               disabled={!Object.keys(checkedRows).length}
               onClick={() => setBulk(true)}
             >
-              Review selected ({Object.keys(checkedRows).length})
+              <T>{"Review selected ("}</T>{Object.keys(checkedRows).length})
             </button>
           )
         }
@@ -119,10 +123,7 @@ export function Submissions({ organizationId }: { organizationId?: string }) {
       {(portal === "provider" || portal === "admin" && referenceMode) && organizationId && (
         <Panel title="Submit current draft changes">
           <p>
-            All eligible draft and revised sections are frozen into one
-            submission. Published versions remain visible until approved
-            replacements are published.
-          </p>
+            <T>{"All eligible draft and revised sections are frozen into one submission. Published versions remain visible until approved replacements are published."}</T></p>
           <CommandForm
             action="submit"
             input={{ organizationId }}
@@ -154,9 +155,7 @@ function BulkReview({ rows, onClose }: { rows: Row[]; onClose: () => void }) {
       onClose={onClose}
     >
       <p>
-        Each submission is checked and audited independently. Open its frozen
-        snapshot and evidence before approving it.
-      </p>
+        <T>{"Each submission is checked and audited independently. Open its frozen snapshot and evidence before approving it."}</T></p>
       <form
         className="portal-form"
         onSubmit={async (event) => {
@@ -189,26 +188,26 @@ function BulkReview({ rows, onClose }: { rows: Row[]; onClose: () => void }) {
         }}
       >
         <label className="portal-field">
-          <span>Action</span>
+          <span><T>{"Action"}</T></span>
           <select
             value={action}
             onChange={(event) => setAction(event.target.value)}
           >
-            <option value="approved">Approve</option>
-            <option value="changes_requested">Request changes</option>
-            <option value="rejected">Reject</option>
-            <option value="assign">Assign reviewer</option>
+            <option value="approved"><T>{"Approve"}</T></option>
+            <option value="changes_requested"><T>{"Request changes"}</T></option>
+            <option value="rejected"><T>{"Reject"}</T></option>
+            <option value="assign"><T>{"Assign reviewer"}</T></option>
           </select>
         </label>
         {action === "assign" ? (
           <label className="portal-field">
-            <span>Reviewer</span>
+            <span><T>{"Reviewer"}</T></span>
             <select
               required
               value={reviewer}
               onChange={(event) => setReviewer(event.target.value)}
             >
-              <option value="">Select reviewer</option>
+              <option value=""><T>{"Select reviewer"}</T></option>
               {data?.rows.map((row) => (
                 <option key={row.id} value={row.id}>
                   {String(row.name)}
@@ -218,7 +217,7 @@ function BulkReview({ rows, onClose }: { rows: Row[]; onClose: () => void }) {
           </label>
         ) : (
           <label className="portal-field">
-            <span>Review reason</span>
+            <span><T>{"Review reason"}</T></span>
             <textarea
               required={action !== "approved"}
               minLength={action !== "approved" ? 5 : undefined}
@@ -228,7 +227,7 @@ function BulkReview({ rows, onClose }: { rows: Row[]; onClose: () => void }) {
           </label>
         )}
         <button className="portal-button" disabled={busy || Boolean(result)}>
-          {busy ? "Saving decisions…" : "Confirm selected actions"}
+          <T>{busy ? "Saving decisions…" : "Confirm selected actions"}</T>
         </button>
         {result && <p role="status">{result}</p>}
       </form>
@@ -280,7 +279,7 @@ export function SubmissionDetail({
             <p>{String(data.submission.message ?? "No provider message.")}</p>
             {data.submission.review_message && (
               <div className="portal-review-feedback">
-                <h3>Review feedback</h3>
+                <h3><T>{"Review feedback"}</T></h3>
                 <p>{String(data.submission.review_message)}</p>
               </div>
             )}
@@ -292,7 +291,7 @@ export function SubmissionDetail({
                     <Status value={record.kind} />
                   </header>
                   <p>
-                    Frozen revision {snapshot.revision} · current revision{" "}
+                    <T>{"Frozen revision"}</T>{' '}{snapshot.revision} <T>{"· current revision"}</T>{" "}
                     {record.revision}
                   </p>
                   <Status
@@ -309,10 +308,10 @@ export function SubmissionDetail({
                       <div className="portal-review-feedback" key={review.id}>
                         <p>{String(review.comment || "No section comment.")}</p>
                         {Boolean(review.reason) && (
-                          <p>Reason: {String(review.reason)}</p>
+                          <p><T>{"Reason:"}</T>{' '}{String(review.reason)}</p>
                         )}
                         <small>
-                          Reviewed {date(review.created_at)} · revision{" "}
+                          <T>{"Reviewed"}</T>{' '}{date(review.created_at)} <T>{"· revision"}</T>{" "}
                           {String(review.revision)}
                         </small>
                       </div>
@@ -336,8 +335,7 @@ export function SubmissionDetail({
                         setSelected({ ...record, ...snapshot, id: record.id })
                       }
                     >
-                      Review section & evidence
-                    </button>
+                      <T>{"Review section & evidence"}</T></button>
                   )}
                 </article>
               ))}
@@ -348,10 +346,7 @@ export function SubmissionDetail({
               ) && (
                 <Panel title="Review decision">
                   <p>
-                    Record each section decision first. Request changes here to
-                    unlock drafts for the provider. Only an administrator can
-                    approve after every section is approved.
-                  </p>
+                    <T>{"Record each section decision first. Request changes here to unlock drafts for the provider. Only an administrator can approve after every section is approved."}</T></p>
                   <CommandForm
                     action="review_submission"
                     input={{ submissionId: id }}
@@ -400,8 +395,7 @@ export function SubmissionDetail({
                     input={{ submissionId: id }}
                     confirm
                   >
-                    Publish approved submission
-                  </Action>
+                    <T>{"Publish approved submission"}</T></Action>
                 )}
               </>
             )}
@@ -493,7 +487,7 @@ export function SubmissionDetail({
                       label: "Snapshot",
                       render: (row) => (
                         <details>
-                          <summary>View saved fields</summary>
+                          <summary><T>{"View saved fields"}</T></summary>
                           <dl className="portal-facts">
                             {Object.entries(row.data ?? {}).map(
                               ([key, value]) => (
@@ -514,10 +508,7 @@ export function SubmissionDetail({
                   ]}
                 />
                 <p>
-                  Publication approval and factual verification are separate
-                  decisions. Mark a field verified only after checking current
-                  authoritative evidence.
-                </p>
+                  <T>{"Publication approval and factual verification are separate decisions. Mark a field verified only after checking current authoritative evidence."}</T></p>
                 <CommandForm
                   action="review_field"
                   input={{ submissionId: id, recordId: selected.id }}
@@ -598,8 +589,7 @@ const verificationColumns = [
     render: (row: Row) =>
       row.source_url ? (
         <a href={String(row.source_url)} target="_blank" rel="noreferrer">
-          Authoritative source
-        </a>
+          <T>{"Authoritative source"}</T></a>
       ) : (
         "Document / reviewer evidence"
       ),
@@ -626,10 +616,7 @@ export function Verification({ organizationId }: { organizationId?: string }) {
     <>
       <Panel title="Evidence and verification">
         <p>
-          Field reviews are recorded against an immutable revision. “Approved”
-          means reviewed for publication. “Verified” requires checked evidence.
-          Synthetic records remain synthetic.
-        </p>
+          <T>{"Field reviews are recorded against an immutable revision. “Approved” means reviewed for publication. “Verified” requires checked evidence. Synthetic records remain synthetic."}</T></p>
         {organizationId && ["admin", "support"].includes(portal) && (
           <button
             className="portal-button"
@@ -663,7 +650,7 @@ export function Verification({ organizationId }: { organizationId?: string }) {
               }
             }}
           >
-            {busy ? "Checking factual evidence…" : "Run Provider Verification"}
+            <T>{busy ? "Checking factual evidence…" : "Run Provider Verification"}</T>
           </button>
         )}
         {error && (
@@ -718,7 +705,7 @@ export function Verification({ organizationId }: { organizationId?: string }) {
               disabled
             />
           ) : (
-            <p>This check is unavailable in the current report format.</p>
+            <p><T>{"This check is unavailable in the current report format."}</T></p>
           )}
         </Modal>
       )}
@@ -793,17 +780,14 @@ export function Documents({ organizationId }: { organizationId?: string }) {
           organizationId &&
           (portal === "provider" || portal === "admin") && (
             <button className="portal-button" onClick={() => setUpload(true)}>
-              Upload document
-            </button>
+              <T>{"Upload document"}</T></button>
           )
         }
       />
       {upload && organizationId && (
         <Modal title="Upload private evidence" onClose={() => setUpload(false)}>
           <p>
-            PDF, JPG or PNG, maximum 3 MB. Documents are private to your
-            organization and authorized reviewers.
-          </p>
+            <T>{"PDF, JPG or PNG, maximum 3 MB. Documents are private to your organization and authorized reviewers."}</T></p>
           <form
             className="portal-form"
             onSubmit={async (e) => {
@@ -847,7 +831,7 @@ export function Documents({ organizationId }: { organizationId?: string }) {
               register={association.register}
             />
             <label className="portal-field">
-              <span>Document type</span>
+              <span><T>{"Document type"}</T></span>
               <select name="documentType" required>
                 {[
                   "license",
@@ -865,7 +849,7 @@ export function Documents({ organizationId }: { organizationId?: string }) {
               </select>
             </label>
             <label className="portal-field">
-              <span>File</span>
+              <span><T>{"File"}</T></span>
               <input
                 type="file"
                 name="file"
@@ -874,7 +858,7 @@ export function Documents({ organizationId }: { organizationId?: string }) {
               />
             </label>
             <label className="portal-field">
-              <span>Expiry (if applicable)</span>
+              <span><T>{"Expiry (if applicable)"}</T></span>
               <input type="date" name="expiresOn" />
             </label>
             {error && (
@@ -883,7 +867,7 @@ export function Documents({ organizationId }: { organizationId?: string }) {
               </p>
             )}
             <button className="portal-button" disabled={busy}>
-              {busy ? "Uploading…" : "Upload securely"}
+              <T>{busy ? "Uploading…" : "Upload securely"}</T>
             </button>
           </form>
         </Modal>
@@ -903,23 +887,18 @@ export function Documents({ organizationId }: { organizationId?: string }) {
               disabled={busy}
               onClick={() => void download(selected)}
             >
-              Download private file
-            </button>
+              <T>{"Download private file"}</T></button>
           </div>
           <p>
-            Uploaded {date(selected.created_at)} ·{" "}
-            {Number(selected.size_bytes).toLocaleString()} bytes
-          </p>
+            <T>{"Uploaded"}</T>{' '}{date(selected.created_at)} ·{" "}
+            <LocalNumber value={Number(selected.size_bytes)}/> <T>{"bytes"}</T></p>
           <p>{String(selected.review_message ?? "")}</p>
           {organizationId &&
             portal === "provider" &&
             ["rejected", "expired"].includes(String(selected.status)) && (
               <div className="portal-review-feedback">
                 <p>
-                  Upload a replacement for the same section, then update its
-                  supporting document selection and resubmit the draft. The
-                  earlier document and review stay in history.
-                </p>
+                  <T>{"Upload a replacement for the same section, then update its supporting document selection and resubmit the draft. The earlier document and review stay in history."}</T></p>
                 <button
                   className="portal-button"
                   onClick={() => {
@@ -931,8 +910,7 @@ export function Documents({ organizationId }: { organizationId?: string }) {
                     setUpload(true);
                   }}
                 >
-                  Upload replacement evidence
-                </button>
+                  <T>{"Upload replacement evidence"}</T></button>
               </div>
             )}
           {error && (

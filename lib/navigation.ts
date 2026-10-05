@@ -17,5 +17,7 @@ export function isActiveNavigation(pathname: string, href: string) {
 
 export const navigationGroups = [
   { label: 'Explore', items: [navigation[1], navigation[3], navigation[4], navigation[5], navigation[6]] },
-  { label: 'Plan', items: [navigation[2], { label: 'Packages', href: '/packages' }, navigation[7], { label: 'Medical travel', href: '/medical-travel' }, { label: 'Recovery', href: '/recovery' }, { label: 'Consultation pathway', href: '/consultation' }] },
+  { label: 'Plan', items: [navigation[2], { label: 'My plans', href: '/account?section=plans' }] },
+  { label: 'Treat', items: [{ label: 'Packages', href: '/packages' }, navigation[7], { label: 'Consultation pathway', href: '/consultation' }] },
+  { label: 'Recover', items: [{ label: 'Lifetime Recover', href: '/recover' }, { label: 'Help / Support', href: '/help' }] },
 ] as const;

@@ -1,4 +1,7 @@
 "use client";
+import { Localized } from '@/components/experience/localized';
+
+import { T } from '@/components/experience/translation';
 import { useState } from "react";
 import {
   type Field,
@@ -163,10 +166,7 @@ export function Users({ admin = false }: { admin?: boolean }) {
                   submit="Update staff access"
                 />
                 <p className="portal-muted">
-                  Only Super Admin can grant or change admin roles. Disable the
-                  staff role to remove staff access while retaining their
-                  patient account.
-                </p>
+                  <T>{"Only Super Admin can grant or change admin roles. Disable the staff role to remove staff access while retaining their patient account."}</T></p>
               </Panel>
               <Action
                 action="set_account_status"
@@ -174,7 +174,7 @@ export function Users({ admin = false }: { admin?: boolean }) {
                 confirm
                 danger
               >
-                {selected.active ? "Deactivate account" : "Reactivate account"}
+                <T>{selected.active ? "Deactivate account" : "Reactivate account"}</T>
               </Action>
             </>
           ) : (
@@ -219,8 +219,7 @@ export function Providers() {
         extra={
           portal === "admin" && (
             <button className="portal-button" onClick={() => setCreate(true)}>
-              Add provider organization
-            </button>
+              <T>{"Add provider organization"}</T></button>
           )
         }
       />
@@ -241,7 +240,7 @@ export function Providers() {
           >
             {portal === "admin" ? (
               <>
-                <div
+                <Localized as="div"
                   className="portal-tabs"
                   role="navigation"
                   aria-label="Organization sections"
@@ -265,7 +264,7 @@ export function Providers() {
                         {title}
                       </button>
                     ))}
-                </div>
+                </Localized>
                 <ProviderContent section={section} />
                 <Panel title="Organization availability">
                   <CommandForm
@@ -286,10 +285,7 @@ export function Providers() {
             ) : (
               <>
                 <p>
-                  Open the published provider profile for public information.
-                  Private submissions are visible only when you are assigned as
-                  reviewer.
-                </p>
+                  <T>{"Open the published provider profile for public information. Private submissions are visible only when you are assigned as reviewer."}</T></p>
                 {org.hospital_id && (
                   <PublicProvider id={String(org.hospital_id)} />
                 )}
@@ -315,8 +311,7 @@ function PublicProvider({ id }: { id: string }) {
         target="_blank"
         rel="noreferrer"
       >
-        Open public profile
-      </a>
+        <T>{"Open public profile"}</T></a>
     </Panel>
   ) : (
     <Empty title="No published profile is visible" />
@@ -441,7 +436,7 @@ function CatalogWorkspace({ entity }: { entity: string }) {
         extra={
           !["hospitals", "doctors", "packages"].includes(entity) && (
             <button className="portal-button" onClick={() => setSelected(null)}>
-              Add {label(entity)}
+              <T>{"Add"}</T>{' '}{label(entity)}
             </button>
           )
         }
@@ -449,9 +444,7 @@ function CatalogWorkspace({ entity }: { entity: string }) {
       {["hospitals", "doctors", "packages"].includes(entity) && (
         <Panel title="Add provider content">
           <p>
-            Create hospitals, doctors and packages through Providers, then
-            review and publish the submitted snapshots.
-          </p>
+            <T>{"Create hospitals, doctors and packages through Providers, then review and publish the submitted snapshots."}</T></p>
         </Panel>
       )}
       <ResourceTable
@@ -519,8 +512,7 @@ function CatalogWorkspace({ entity }: { entity: string }) {
                   className="portal-button secondary"
                   onClick={() => setEditDraft(true)}
                 >
-                  Edit revision
-                </button>
+                  <T>{"Edit revision"}</T></button>
               )}
               {draft.status === "draft" && (
                 <Action
@@ -531,8 +523,7 @@ function CatalogWorkspace({ entity }: { entity: string }) {
                   }}
                   onDone={setDraft}
                 >
-                  Approve revision
-                </Action>
+                  <T>{"Approve revision"}</T></Action>
               )}
               {draft.status === "approved" && (
                 <Action
@@ -544,8 +535,7 @@ function CatalogWorkspace({ entity }: { entity: string }) {
                   confirm
                   onDone={setDraft}
                 >
-                  Publish revision
-                </Action>
+                  <T>{"Publish revision"}</T></Action>
               )}
               {!["published", "archived"].includes(String(draft.status)) && (
                 <Action
@@ -558,8 +548,7 @@ function CatalogWorkspace({ entity }: { entity: string }) {
                   danger
                   onDone={setDraft}
                 >
-                  Archive revision
-                </Action>
+                  <T>{"Archive revision"}</T></Action>
               )}
             </div>
           </Modal>
@@ -684,7 +673,7 @@ function CatalogForm({
         })}
       >
         <label className="portal-field">
-          <span>Name *</span>
+          <span><T>{"Name *"}</T></span>
           <input
             {...form.register("name")}
             required
@@ -708,8 +697,7 @@ function CatalogForm({
           </p>
         )}
         <button className="portal-button" disabled={busy}>
-          Save reviewed catalog draft
-        </button>
+          <T>{"Save reviewed catalog draft"}</T></button>
       </form>
       {row?.id && !draft && (
         <Action
@@ -722,8 +710,7 @@ function CatalogForm({
           danger
           confirm
         >
-          Unpublish
-        </Action>
+          <T>{"Unpublish"}</T></Action>
       )}
     </Modal>
   );
@@ -745,9 +732,7 @@ function PlatformSettings() {
       ) : (
         <Panel title="Provider publication requirements">
           <p>
-            Identity evidence is required for first-party provider publication.
-            Providers cannot disable this safeguard.
-          </p>
+            <T>{"Identity evidence is required for first-party provider publication. Providers cannot disable this safeguard."}</T></p>
           {context.role === "super_admin" ? (
             <CommandForm
               action="save_setting"
@@ -764,7 +749,7 @@ function PlatformSettings() {
               submit="Save platform requirements"
             />
           ) : (
-            <p>Only Super Admin can change platform requirements.</p>
+            <p><T>{"Only Super Admin can change platform requirements."}</T></p>
           )}
         </Panel>
       )}
@@ -827,9 +812,7 @@ function Workload() {
     <>
       <Panel title="Team workload">
         <p>
-          Managers can inspect authorized queues, assign cases and track each
-          team member’s tasks.
-        </p>
+          <T>{"Managers can inspect authorized queues, assign cases and track each team member’s tasks."}</T></p>
       </Panel>
       <ResourceTable
         resource={manager ? "workload" : "staff"}

@@ -1,4 +1,7 @@
 "use client";
+import { Localized } from '@/components/experience/localized';
+
+import { T, LocalDateTime } from '@/components/experience/translation';
 import {
   createContext,
   useContext,
@@ -79,7 +82,7 @@ export function useResource<T>(
 export function Status({ value }: { value: unknown }) {
   return (
     <span className={`portal-status status-${String(value ?? "draft")}`}>
-      {label(String(value ?? "draft"))}
+      <T>{label(String(value ?? "draft"))}</T>
     </span>
   );
 }
@@ -87,18 +90,16 @@ export function Loading() {
   return (
     <p className="portal-loading" role="status">
       <LoaderCircle size={18} className="portal-spinner" />
-      Loading your workspace…
-    </p>
+      <T>{"Loading your workspace…"}</T></p>
   );
 }
 export function ErrorPanel({ message }: { message: string }) {
   const { refresh } = usePortal();
   return (
     <div className="portal-error" role="alert">
-      <p>{message}</p>
+      <p><T>{message}</T></p>
       <button className="portal-button secondary" onClick={refresh}>
-        Try again
-      </button>
+        <T>{"Try again"}</T></button>
     </div>
   );
 }
@@ -107,10 +108,7 @@ export function date(value: unknown) {
   const parsed = new Date(String(value));
   return Number.isNaN(parsed.valueOf())
     ? "—"
-    : parsed.toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
+      : <LocalDateTime value={parsed.toISOString()}/>;
 }
 export function Empty({
   title,
@@ -122,7 +120,7 @@ export function Empty({
   return (
     <div className="portal-empty">
       <Check size={24} />
-      <h3>{title}</h3>
+      <h3><T>{title}</T></h3>
       {children}
     </div>
   );
@@ -140,7 +138,7 @@ export function Panel({
     <section className="portal-panel">
       {title && (
         <header className="portal-panel-heading">
-          <h2>{title}</h2>
+          <h2><T>{title}</T></h2>
           {actions}
         </header>
       )}
@@ -179,26 +177,24 @@ export function Modal({
       }}
     >
       <header>
-        <h2 id={titleId}>{title}</h2>
-        <button
+        <h2 id={titleId}><T>{title}</T></h2>
+        <Localized as="button"
           onClick={close}
           className="portal-icon-button"
           aria-label="Close dialog"
         >
           <X size={20} />
-        </button>
+        </Localized>
       </header>
       {confirm ? (
         <div className="portal-confirm">
-          <h3>Discard unsaved changes?</h3>
-          <p>Your saved revision is unchanged.</p>
+          <h3><T>{"Discard unsaved changes?"}</T></h3>
+          <p><T>{"Your saved revision is unchanged."}</T></p>
           <div className="portal-actions">
             <button className="portal-button" onClick={() => setConfirm(false)}>
-              Keep editing
-            </button>
+              <T>{"Keep editing"}</T></button>
             <button className="portal-button danger" onClick={onClose}>
-              Discard changes
-            </button>
+              <T>{"Discard changes"}</T></button>
           </div>
         </div>
       ) : (
@@ -251,7 +247,7 @@ export function Action({
         className={`portal-button ${danger ? "danger" : "secondary"}`}
         onClick={() => (confirm ? setConfirming(true) : void run())}
       >
-        {busy ? "Saving…" : children}
+        {busy ? <T>{"Saving…"}</T> : typeof children==='string'?<T>{children}</T>:children}
       </button>
       {error && (
         <span className="portal-field-error" role="alert">
@@ -260,21 +256,19 @@ export function Action({
       )}
       {confirming && (
         <Modal title="Confirm action" onClose={() => setConfirming(false)}>
-          <p>This action changes the availability or status of this record.</p>
+          <p><T>{"This action changes the availability or status of this record."}</T></p>
           <div className="portal-actions">
             <button
               className="portal-button secondary"
               onClick={() => setConfirming(false)}
             >
-              Cancel
-            </button>
+              <T>{"Cancel"}</T></button>
             <button
               className={`portal-button ${danger ? "danger" : ""}`}
               disabled={busy}
               onClick={() => void run()}
             >
-              Confirm
-            </button>
+              <T>{"Confirm"}</T></button>
           </div>
         </Modal>
       )}
@@ -325,8 +319,8 @@ export function ResourceTable({
         <div className="portal-table-tools">
           <label className="portal-search">
             <Search size={16} />
-            <span className="sr-only">Search {title ?? resource}</span>
-            <input
+              <span className="sr-only"><T>{"Search"}</T>{' '}<T>{title ?? resource}</T></span>
+            <Localized as="input"
               type="search"
               placeholder="Search records"
               value={query}
@@ -342,12 +336,12 @@ export function ResourceTable({
             "catalog_drafts",
           ].includes(resource) && (
             <label>
-              <span className="sr-only">Status</span>
+              <span className="sr-only"><T>{"Status"}</T></span>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
               >
-                <option value="">All statuses</option>
+                <option value=""><T>{"All statuses"}</T></option>
                 {(resource === "support_cases"
                   ? [
                       "open",
@@ -373,20 +367,20 @@ export function ResourceTable({
                       ]
                 ).map((s) => (
                   <option key={s} value={s}>
-                    {label(s)}
+                    <T>{label(s)}</T>
                   </option>
                 ))}
               </select>
             </label>
           )}
           <label>
-            <span className="sr-only">Sort direction</span>
+            <span className="sr-only"><T>{"Sort direction"}</T></span>
             <select
               value={direction}
               onChange={(e) => setDirection(e.target.value)}
             >
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
+              <option value="desc"><T>{"Descending"}</T></option>
+              <option value="asc"><T>{"Ascending"}</T></option>
             </select>
           </label>
         </div>
@@ -398,9 +392,7 @@ export function ResourceTable({
       ) : !data?.rows.length ? (
         <Empty title="No matching records">
           <p>
-            Saved records will appear here. Adjust your filters or add a record
-            to get started.
-          </p>
+            <T>{"Saved records will appear here. Adjust your filters or add a record to get started."}</T></p>
         </Empty>
       ) : (
         <>
@@ -425,16 +417,16 @@ export function ResourceTable({
                             setDirection((d) => (d === "asc" ? "desc" : "asc"));
                           }}
                         >
-                          {c.label}
+                          <T>{c.label}</T>
                         </button>
                       ) : (
-                        c.label
+                        <T>{c.label}</T>
                       )}
                     </th>
                   ))}
                   {onOpen && (
                     <th scope="col">
-                      <span className="sr-only">Actions</span>
+                      <span className="sr-only"><T>{"Actions"}</T></span>
                     </th>
                   )}
                 </tr>
@@ -453,8 +445,7 @@ export function ResourceTable({
                           className="portal-text-button"
                           onClick={() => onOpen(row)}
                         >
-                          Open
-                          <span className="sr-only">
+                          <T>{"Open"}</T><span className="sr-only">
                             {" "}
                             {String(
                               row.name ?? row.title ?? row.id ?? "record",
@@ -470,25 +461,25 @@ export function ResourceTable({
           </div>
           <footer className="portal-pagination">
             <span>
-              {data.total ?? data.rows.length} records · Page {page}
+              {data.total ?? data.rows.length} <T>{"records · Page"}</T>{' '}{page}
             </span>
             <div>
-              <button
+              <Localized as="button"
                 className="portal-icon-button"
                 aria-label="Previous page"
                 disabled={page === 1}
                 onClick={() => setPage((p) => p - 1)}
               >
                 <ChevronLeft size={18} />
-              </button>
-              <button
+              </Localized>
+              <Localized as="button"
                 className="portal-icon-button"
                 aria-label="Next page"
                 disabled={page * 20 >= (data.total ?? data.rows.length)}
                 onClick={() => setPage((p) => p + 1)}
               >
                 <ChevronRight size={18} />
-              </button>
+              </Localized>
             </div>
           </footer>
         </>

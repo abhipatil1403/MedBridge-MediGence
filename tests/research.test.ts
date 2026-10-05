@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { renderToStaticMarkup } from './fixtures/render';
 vi.mock('server-only', () => ({}));
 import { researchInputSchema, researchResultSchema, sourceTypes } from '@/lib/research/schemas';
 import { approvedSources, evidenceId, publicAddress, selectSources, textFromHtml, validateSourceUrl } from '@/lib/research/sources';

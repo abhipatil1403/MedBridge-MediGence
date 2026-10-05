@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { renderToStaticMarkup } from './fixtures/render';
 vi.mock('server-only', () => ({}));
 import { orchestrate } from '@/lib/agents/orchestrator';
 import { AgentError } from '@/lib/agents/errors';

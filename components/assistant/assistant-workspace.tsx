@@ -1,6 +1,12 @@
 'use client';
+import { LocalDate } from '@/components/experience/translation';
 
+import { Localized } from '@/components/experience/localized';
+
+
+import { T } from '@/components/experience/translation';
 import { ResearchResults } from './research-results';
+import { CoordinationResults } from '@/components/experience/coordination-results';
 import { VerificationResults } from './verification-results';
 import { DocumentPanel } from './document-panel';
 import { FindingsSummary, RequestUnderstanding } from './response-presentation';
@@ -23,13 +29,13 @@ type Conversation = { id: string; title: string; case_id: string | null; updated
 type Case = { id: string; title: string; status: string; agentConsent: boolean; canManageConsent: boolean };
 type Message = { id: string; role: string; content: string; metadata: { response?: AgentResponse; approvalStatus?: string }; created_at: string };
 
-export function AssistantWorkspace({ configured, initialRequest = '' }: { configured: boolean; initialRequest?: string }) {
+export function AssistantWorkspace({ configured, initialRequest = '', initialConversation }: { configured: boolean; initialRequest?: string; initialConversation?: string }) {
   const auth = useMemo(() => getBrowserSupabaseClient(), []);
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState('');
   const [linkSent, setLinkSent] = useState(false);
   const [content, setContent] = useState(initialRequest);
-  const [conversationId, setConversationId] = useState<string | undefined>();
+  const [conversationId, setConversationId] = useState<string | undefined>(initialConversation);
   const [caseId, setCaseId] = useState<string>('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
@@ -81,7 +87,7 @@ export function AssistantWorkspace({ configured, initialRequest = '' }: { config
         const saved = nextUser && !initialRequest ? localStorage.getItem(`medbridge-active-conversation:${nextUser}`) : null;
         let restored: { id?: string; caseId?: string } | undefined;
         try { restored = saved ? JSON.parse(saved) as typeof restored : undefined; } catch { /* Ignore a stale browser preference. */ }
-        setActivity(undefined); setConversationId(restored?.id); setCaseId(restored?.caseId ?? ''); setMessages([]); setLatest(null); setCarePlan(undefined); setConversations([]); setCases([]);
+        setActivity(undefined); setConversationId(initialConversation??restored?.id); setCaseId(restored?.caseId ?? ''); setMessages([]); setLatest(null); setCarePlan(undefined); setConversations([]); setCases([]);
       }
       activeUser.current = nextUser;
       setSession(next);
@@ -89,7 +95,7 @@ export function AssistantWorkspace({ configured, initialRequest = '' }: { config
     auth.auth.getSession().then(({ data }) => applySession(data.session));
     const { data: subscription } = auth.auth.onAuthStateChange((_event, next) => applySession(next));
     return () => subscription.subscription.unsubscribe();
-  }, [auth, initialRequest]);
+  }, [auth, initialRequest, initialConversation]);
   useEffect(() => {
     if (!session) return;
     const key = `medbridge-active-conversation:${session.user.id}`;
@@ -175,60 +181,60 @@ export function AssistantWorkspace({ configured, initialRequest = '' }: { config
     finally { setBusy(false); }
   }
 
-  if (!configured) return <section className="assistant-state" role="status"><h2>Care Workspace is temporarily unavailable</h2>
-    <p>Please try again later. You can continue exploring care options through search.</p>
-    <Link href="/discover">Explore care options →</Link></section>;
+  if (!configured) return <section className="assistant-state" role="status"><h2><T>{"Care Workspace is temporarily unavailable"}</T></h2>
+    <p><T>{"Please try again later. You can continue exploring care options through search."}</T></p>
+    <Link href="/discover"><T>{"Explore care options →"}</T></Link></section>;
 
-  if (!session) return <section className="assistant-state assistant-signin"><div><p className="eyebrow">PRIVATE WORKSPACE</p><h2>Sign in to begin</h2>
-    <p>Keep your research, sources and next steps in one private conversation.</p>{initialRequest && <div className="signin-request"><span className="eyebrow">YOUR REQUEST IS READY</span><p>{initialRequest}</p><small>Sign in, then review and send it.</small></div>}<small>Case information is used only with your consent. Documents are not sent to the assistant.</small></div>
-    <form onSubmit={signIn}><label>Email address<input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setLinkSent(false); }} autoComplete="email" required /></label>
-      <button type="submit" className="button button--primary" disabled={busy}>{linkSent ? 'Send another sign-in link' : 'Send sign-in link'}</button>
+  if (!session) return <section className="assistant-state assistant-signin"><div><p className="eyebrow"><T>{"PRIVATE WORKSPACE"}</T></p><h2><T>{"Sign in to begin"}</T></h2>
+    <p><T>{"Keep your research, sources and next steps in one private conversation."}</T></p>{initialRequest && <div className="signin-request"><span className="eyebrow"><T>{"YOUR REQUEST IS READY"}</T></span><p>{initialRequest}</p><small><T>{"Sign in, then review and send it."}</T></small></div>}<small><T>{"Case information is used only with your consent. Documents are not sent to the assistant."}</T></small></div>
+    <form onSubmit={signIn}><label><T>{"Email address"}</T><input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setLinkSent(false); }} autoComplete="email" required /></label>
+      <button type="submit" className="button button--primary" disabled={busy}><T>{linkSent ? 'Send another sign-in link' : 'Send sign-in link'}</T></button>
       {notice && <p role="status">{notice}</p>}</form></section>;
 
   const selectedCase = cases.find((item) => item.id === caseId);
   const latestRequest = [...messages].reverse().find((message) => message.role === 'user')?.content;
   return <div className="assistant-shell">
-    <aside className="assistant-rail" aria-label="Conversations"><div className="assistant-rail__head"><p className="eyebrow">YOUR WORKSPACE</p><h2>Conversations</h2>
-      <button type="button" disabled={busy} onClick={() => { setActivity(undefined); setConversationId(undefined); setCaseId(''); setMessages([]); setLatest(null); setCarePlan(undefined); setNotice(''); }}>New conversation</button></div>
-      <details className="assistant-conversations" open><summary>Recent · {conversations.length}</summary><div className="assistant-rail__list">{conversations.length === 0 && <p className="editorial-note">Your saved requests will appear here.</p>}{conversations.map((item) => <button key={item.id} type="button" className={item.id === conversationId ? 'active' : ''}
-        aria-pressed={item.id === conversationId} disabled={busy} onClick={() => { setActivity(undefined); setConversationId(item.id); setCaseId(item.case_id ?? ''); setLatest(null); setCarePlan(undefined); }}>{item.title}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}</div></details>
-      <button type="button" className="assistant-signout" onClick={() => auth?.auth.signOut()}>Sign out</button></aside>
+    <Localized as="aside" className="assistant-rail" aria-label="Conversations"><div className="assistant-rail__head"><p className="eyebrow"><T>{"YOUR WORKSPACE"}</T></p><h2><T>{"Conversations"}</T></h2>
+      <button type="button" disabled={busy} onClick={() => { setActivity(undefined); setConversationId(undefined); setCaseId(''); setMessages([]); setLatest(null); setCarePlan(undefined); setNotice(''); }}><T>{"New conversation"}</T></button></div>
+      <details className="assistant-conversations" open><summary><T>{"Recent ·"}</T>{' '}{conversations.length}</summary><div className="assistant-rail__list">{conversations.length === 0 && <p className="editorial-note"><T>{"Your saved requests will appear here."}</T></p>}{conversations.map((item) => <button key={item.id} type="button" className={item.id === conversationId ? 'active' : ''}
+        aria-pressed={item.id === conversationId} disabled={busy} onClick={() => { setActivity(undefined); setConversationId(item.id); setCaseId(item.case_id ?? ''); setLatest(null); setCarePlan(undefined); }}>{item.title}<small><LocalDate value={item.updated_at}/></small></button>)}</div></details>
+      <button type="button" className="assistant-signout" onClick={() => auth?.auth.signOut()}><T>{"Sign out"}</T></button></Localized>
 
-    <section className="assistant-main" aria-label="Care conversation">
-      <div className="assistant-main__intro"><span className="eyebrow">{conversationId ? 'YOUR HEALTHCARE REQUEST' : 'START WITH YOUR QUESTION'}</span><h2>{conversationId ? 'Your conversation' : 'Your journey starts here.'}</h2>
-        <p>{conversationId ? 'Findings, evidence and next steps, together.' : 'Tell MedBridge what you’re trying to figure out.'}</p></div>
+    <Localized as="section" className="assistant-main" aria-label="Care conversation">
+      <div className="assistant-main__intro"><span className="eyebrow"><T>{conversationId ? 'YOUR HEALTHCARE REQUEST' : 'START WITH YOUR QUESTION'}</T></span><h2><T>{conversationId ? 'Your conversation' : 'Your journey starts here.'}</T></h2>
+        <p><T>{conversationId ? 'Findings, evidence and next steps, together.' : 'Tell MedBridge what you’re trying to figure out.'}</T></p></div>
 
 
       <div className="assistant-messages" aria-live="polite">
         {messages.map((message) => <article key={message.id} className={`assistant-message assistant-message--${message.role}`}>
-          <span>{message.role === 'user' ? 'You' : 'MedBridge'}</span>
+          <span><T>{message.role === 'user' ? 'You' : 'MedBridge'}</T></span>
           {message.role === 'assistant' && message.metadata?.response ? <ResponseBlocks response={message.metadata.response} approvalStatus={message.metadata.approvalStatus}
             onDecision={decideApproval} onRetry={latest?.runId === message.metadata.response.runId && latestRequest ? () => { void submitRequest(latestRequest); } : undefined}
             disabled={busy} onRequest={text=>{void submitRequest(text);}} /> : <p>{message.content}</p>}
         </article>)}
         {activity && !messages.some((message) => message.metadata?.response?.runId === activity.runId) && <ExecutionActivity activity={activity} />}
-        {busy && !activity && <div className="assistant-working" role="status">Working on your request… Your results will appear here.</div>}
+        {busy && !activity && <div className="assistant-working" role="status"><T>{"Working on your request… Your results will appear here."}</T></div>}
       </div>
-      <form className="assistant-composer" onSubmit={send}><label htmlFor="assistant-input">{messages.length ? 'Ask a follow-up' : 'Your request'}</label>
+      <form className="assistant-composer" onSubmit={send}><label htmlFor="assistant-input"><T>{messages.length ? 'Ask a follow-up' : 'Your request'}</T></label>
         <textarea id="assistant-input" value={content} onChange={(event) => setContent(event.target.value)} placeholder={messages.length ? 'Ask about these options, evidence or next steps…' : 'Treatment, location, budget — start in your own words…'} rows={3} maxLength={2000} disabled={busy} required />
-        <div><small>For discovery and coordination. A clinician must assess symptoms and treatment decisions.</small><button className="button button--primary" type="submit" disabled={busy || !content.trim()}>{busy ? 'Working…' : 'Send request'}</button></div>
+        <div><small><T>{"For discovery and coordination. A clinician must assess symptoms and treatment decisions."}</T></small><button className="button button--primary" type="submit" disabled={busy || !content.trim()}><T>{busy ? 'Working…' : 'Send request'}</T></button></div>
         {notice && <p className="assistant-error" role="alert">{notice}</p>}</form>
-      {messages.length === 0 && <div className="assistant-empty"><p className="eyebrow">A FEW STARTING POINTS</p>
+      {messages.length === 0 && <div className="assistant-empty"><p className="eyebrow"><T>{"A FEW STARTING POINTS"}</T></p>
         {['I need a cardiologist in India.', 'Find hospitals for knee replacement in Mumbai.', 'Compare knee replacement in India and Turkey.'].map((example) =>
           <button key={example} type="button" onClick={() => setContent(example)}>{example}</button>)}</div>}
       <div className="assistant-support">
             <details className="assistant-case-context" open={Boolean(selectedCase)}><summary>{selectedCase ? `Linked case · ${selectedCase.title}` : "Case context · optional"}</summary>
-      <label htmlFor="case-select">Case<select id="case-select" value={caseId} disabled={Boolean(conversationId) || busy} onChange={(event) => setCaseId(event.target.value)}>
-        <option value="">No linked case record</option>{cases.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
-      {selectedCase && <><p>{selectedCase.agentConsent ? 'Assistant access granted for this case.' : 'Case owner consent is needed before the assistant reads this case.'}</p>
-        {selectedCase.canManageConsent && <button type="button" disabled={busy} onClick={() => changeConsent(selectedCase)}>{selectedCase.agentConsent ? 'Revoke assistant consent' : 'Grant assistant consent'}</button>}</>}
-      <small>Case information stays within the selected conversation. Document contents are not sent to the assistant.</small></details>
+      <label htmlFor="case-select"><T>{"Case"}</T><select id="case-select" value={caseId} disabled={Boolean(conversationId) || busy} onChange={(event) => setCaseId(event.target.value)}>
+        <option value=""><T>{"No linked case record"}</T></option>{cases.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
+      {selectedCase && <><p><T>{selectedCase.agentConsent ? 'Assistant access granted for this case.' : 'Case owner consent is needed before the assistant reads this case.'}</T></p>
+        {selectedCase.canManageConsent && <button type="button" disabled={busy} onClick={() => changeConsent(selectedCase)}><T>{selectedCase.agentConsent ? 'Revoke assistant consent' : 'Grant assistant consent'}</T></button>}</>}
+      <small><T>{"Case information stays within the selected conversation. Document contents are not sent to the assistant."}</T></small></details>
       <DocumentPanel key={`${session.user.id}:${conversationId??'new'}`} token={session.access_token} conversationId={conversationId} disabled={busy} contextual={latest?.agent === 'document_coordination'}
         onResponse={async response=>{setConversationId(response.conversationId);setLatest(response);setActivity(response.activity);await refresh(response.conversationId);}} />
-      {carePlan?.context.patientCase && <details className="assistant-support__section" open={latest?.workflow === 'case_intake'}><summary>Your saved case</summary><CasePanel draft={carePlan.context.patientCase} busy={busy} onAction={(text) => { void submitRequest(text); }} /></details>}
-      {carePlan && <details className="assistant-support__section"><summary>Saved care plan · tasks and progress</summary><CarePlanPanel plan={carePlan} busy={busy} onTaskAction={completePlanTask} /></details>}
+      {carePlan?.context.patientCase && <details className="assistant-support__section" open={latest?.workflow === 'case_intake'}><summary><T>{"Your saved case"}</T></summary><CasePanel draft={carePlan.context.patientCase} busy={busy} onAction={(text) => { void submitRequest(text); }} /></details>}
+      {carePlan && <details className="assistant-support__section"><summary><T>{"Saved care plan · tasks and progress"}</T></summary><CarePlanPanel plan={carePlan} busy={busy} onTaskAction={completePlanTask} /></details>}
       </div>
-    </section>
+    </Localized>
 
   </div>;
 }
@@ -237,31 +243,32 @@ export function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, 
   onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; onRetry?: () => void; onRequest?:(content:string)=>void; disabled: boolean }) {
   return <div className="assistant-response">
     <RequestUnderstanding response={response} />
+    {response.coordination&&<CoordinationResults context={response.coordination}/>}
     {response.workflow === 'case_intake' && response.caseSummary && <CaseSummaryContent summary={response.caseSummary} />}
-    {response.caseHandoff && <p>Using the reviewed case for catalog coordination. Reported medical information is separate from search requirements and does not establish treatment suitability. No case has been submitted to a provider.</p>}
+    {response.caseHandoff && <p><T>{"Using the reviewed case for catalog coordination. Reported medical information is separate from search requirements and does not establish treatment suitability. No case has been submitted to a provider."}</T></p>}
     {response.agent === 'document_coordination' ? <p>{response.summary}</p> : <FindingsSummary response={response} />}
     {response.verification && <VerificationResults result={response.verification} onRequest={onRequest} disabled={disabled} />}
     <div className="assistant-catalog-results">
-      {response.research && response.findings.length > 0 && <h3 className="assistant-section-title">MEDBRIDGE CATALOG</h3>}
-      {response.status === 'failed' && <div className="assistant-recovery">{onRetry && <button type="button" disabled={disabled} onClick={onRetry}>Retry this request</button>}
-        <Link href="/discover">Continue with standard catalog search →</Link></div>}
+      {response.research && response.findings.length > 0 && <h3 className="assistant-section-title"><T>{"MEDBRIDGE CATALOG"}</T></h3>}
+      {response.status === 'failed' && <div className="assistant-recovery">{onRetry && <button type="button" disabled={disabled} onClick={onRetry}><T>{"Retry this request"}</T></button>}
+        <Link href="/discover"><T>{"Continue with standard catalog search →"}</T></Link></div>}
       {response.comparison ? <ComparisonResults comparison={response.comparison} /> : response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} onRequest={onRequest} disabled={disabled} /> : <FindingCards findings={response.findings} onRequest={onRequest} disabled={disabled} />}</div>
-    {response.hospitalMatches && <details className="assistant-evidence-review"><summary>Hospital matching evidence</summary><HospitalMatchResults matches={response.hospitalMatches} /></details>}
-    {response.comparison && response.resultGroups?.length ? <details><summary>Options in this comparison</summary><PlanningResultGroups groups={response.resultGroups} onRequest={onRequest} disabled={disabled} /></details> : null}
+    {response.hospitalMatches && <details className="assistant-evidence-review"><summary><T>{"Hospital matching evidence"}</T></summary><HospitalMatchResults matches={response.hospitalMatches} /></details>}
+    {response.comparison && response.resultGroups?.length ? <details><summary><T>{"Options in this comparison"}</T></summary><PlanningResultGroups groups={response.resultGroups} onRequest={onRequest} disabled={disabled} /></details> : null}
     {response.research && <ResearchResults result={response.research} comparison={response.researchComparison} />}
 
-    {response.analyses?.map((analysis, index) => <details className="assistant-evidence-review" key={index}><summary>CATALOG EVIDENCE REVIEW</summary><p>{analysis.summary}</p>
+    {response.analyses?.map((analysis, index) => <details className="assistant-evidence-review" key={index}><summary><T>{"CATALOG EVIDENCE REVIEW"}</T></summary><p>{analysis.summary}</p>
       {analysis.missingInformation.length > 0 && <ul>{analysis.missingInformation.map((gap, i) => <li key={i}>{gap}</li>)}</ul>}
-      <small>Derived from {analysis.recordIds.length} sourced catalog records · {analysis.complete ? 'Evidence review completed' : 'Incomplete evidence'}</small></details>)}
+      <small><T>{"Derived from"}</T>{' '}{analysis.recordIds.length} <T>{"sourced catalog records ·"}</T><T>{analysis.complete ? 'Evidence review completed' : 'Incomplete evidence'}</T></small></details>)}
     <ClarificationQuestion question={response.question} />
-    {response.findings.length > 0 && response.summarySource !== 'model' && <details className="assistant-evidence-review"><summary>About these results</summary><p>{response.summary}</p></details>}
-    {response.approvalProposal && <div className="assistant-response__approval"><small>PROPOSED ACTION</small><p>{response.approvalProposal.detail}</p>
-      {response.approvalProposal.action === 'request_external_action' ? <p>External sharing and bookings are not connected. This request remains pending human review.</p>
+    {response.findings.length > 0 && response.summarySource !== 'model' && <details className="assistant-evidence-review"><summary><T>{"About these results"}</T></summary><p>{response.summary}</p></details>}
+    {response.approvalProposal && <div className="assistant-response__approval"><small><T>{"PROPOSED ACTION"}</T></small><p>{response.approvalProposal.detail}</p>
+      {response.approvalProposal.action === 'request_external_action' ? <p><T>{"External sharing and bookings are not connected. This request remains pending human review."}</T></p>
         : approvalStatus === 'proposed' && response.approvalId ? <div className="assistant-approval-actions">
-          <button type="button" disabled={disabled} onClick={() => onDecision(response.approvalId!, 'approved')}>Approve this change</button>
-          <button type="button" disabled={disabled} onClick={() => onDecision(response.approvalId!, 'rejected')}>Reject</button></div>
-          : <p>Status: {approvalStatus ?? 'pending'}</p>}</div>}
-    {response.nextSteps.length > 0 && !response.verification && <details className="assistant-next-steps"><summary>Suggested next steps</summary><ul>{response.nextSteps.filter(step => visibleText(step)).map((step) => <li key={step}>{step}</li>)}</ul></details>}
+          <button type="button" disabled={disabled} onClick={() => onDecision(response.approvalId!, 'approved')}><T>{"Approve this change"}</T></button>
+          <button type="button" disabled={disabled} onClick={() => onDecision(response.approvalId!, 'rejected')}><T>{"Reject"}</T></button></div>
+          : <p><T>{"Status:"}</T>{' '}{approvalStatus ?? 'pending'}</p>}</div>}
+    {response.nextSteps.length > 0 && !response.verification && <details className="assistant-next-steps"><summary><T>{"Suggested next steps"}</T></summary><ul>{response.nextSteps.filter(step => visibleText(step)).map((step) => <li key={step}>{step}</li>)}</ul></details>}
     <RequestProgress request={response.compoundRequest} />
     {response.activity && <ExecutionActivity activity={response.activity} />}
   </div>;

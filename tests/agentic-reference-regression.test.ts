@@ -7,7 +7,7 @@ import { ReferenceDetector } from '@/lib/conversation/ReferenceDetector';
 import { validatedConversationContext } from '@/lib/conversation/context';
 import { ExecutionState } from '@/lib/agents/execution-state';
 import { executeRegisteredTool } from '@/lib/agents/tool-execution';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { renderToStaticMarkup } from './fixtures/render';
 import { createElement } from 'react';
 import { ClarificationQuestion, RequestProgress } from '@/components/assistant/response-status';
 import { HospitalMatchResults } from '@/components/assistant/hospital-match-results';

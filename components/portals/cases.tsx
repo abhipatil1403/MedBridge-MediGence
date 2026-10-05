@@ -1,4 +1,6 @@
 "use client";
+
+import { T } from '@/components/experience/translation';
 import { useState } from "react";
 import { label, type Field, type Row } from "@/lib/portals/config";
 import {
@@ -51,24 +53,24 @@ export function Cases({
             { key: "assignedTo", label: "Assignment", options: ["me"] },
           ].map((field) => (
             <label className="portal-field" key={field.key}>
-              <span>{field.label}</span>
+              <span><T>{field.label}</T></span>
               <select
                 value={filters[field.key] ?? ""}
                 onChange={(e) =>
                   setFilters((old) => ({ ...old, [field.key]: e.target.value }))
                 }
               >
-                <option value="">All</option>
+                <option value=""><T>{"All"}</T></option>
                 {field.options.map((value) => (
                   <option key={value} value={value}>
-                    {label(value)}
+                    <T>{label(value)}</T>
                   </option>
                 ))}
               </select>
             </label>
           ))}
           <label className="portal-field">
-            <span>Created from</span>
+            <span><T>{"Created from"}</T></span>
             <input
               type="date"
               value={filters.from ?? ""}
@@ -78,7 +80,7 @@ export function Cases({
             />
           </label>
           <label className="portal-field">
-            <span>Created until</span>
+            <span><T>{"Created until"}</T></span>
             <input
               type="date"
               value={filters.until ?? ""}
@@ -91,15 +93,13 @@ export function Cases({
       </Panel>
       <ResourceTable
         resource="support_cases"
-        title={
-          mode === "mine"
+        title={mode === "mine"
             ? "My queue"
             : mode === "documents"
               ? "Cases with document context"
               : mode === "messages"
                 ? "Case conversations"
-                : "Authorized support cases"
-        }
+                : "Authorized support cases"}
         params={{
           ...filters,
           ...(patientId ? { patientId } : {}),
@@ -213,33 +213,32 @@ export function CaseDetail({
             <Panel title="Authorized context">
               <dl className="portal-facts">
                 <div>
-                  <dt>Patient</dt>
+                  <dt><T>{"Patient"}</T></dt>
                   <dd>{data.patient.displayName ?? data.patient.email}</dd>
                 </div>
                 <div>
-                  <dt>Consent</dt>
+                  <dt><T>{"Consent"}</T></dt>
                   <dd>
-                    {c.consent_revoked_at ? "Revoked" : "Granted for this case"}
+                    <T>{c.consent_revoked_at ? "Revoked" : "Granted for this case"}</T>
                   </dd>
                 </div>
                 <div>
-                  <dt>Conversation sharing</dt>
-                  <dd>{c.share_conversation ? "Enabled" : "Not shared"}</dd>
+                  <dt><T>{"Conversation sharing"}</T></dt>
+                  <dd><T>{c.share_conversation ? "Enabled" : "Not shared"}</T></dd>
                 </div>
                 <div>
-                  <dt>Document sharing</dt>
-                  <dd>{c.share_documents ? "Enabled" : "Not shared"}</dd>
+                  <dt><T>{"Document sharing"}</T></dt>
+                  <dd><T>{c.share_documents ? "Enabled" : "Not shared"}</T></dd>
                 </div>
                 <div>
-                  <dt>Provider sharing</dt>
-                  <dd>{c.share_with_provider ? "Enabled" : "Not shared"}</dd>
+                  <dt><T>{"Provider sharing"}</T></dt>
+                  <dd><T>{c.share_with_provider ? "Enabled" : "Not shared"}</T></dd>
                 </div>
               </dl>
               {data.conversation && (
                 <details>
                   <summary>
-                    Shared conversation · {data.conversation.length} messages
-                  </summary>
+                    <T>{"Shared conversation ·"}</T>{' '}{data.conversation.length} <T>{"messages"}</T></summary>
                   {data.conversation.map((row, index) => (
                     <article className="portal-message" key={index}>
                       <strong>{label(String(row.role))}</strong>
@@ -250,7 +249,7 @@ export function CaseDetail({
               )}
               {data.plan && (
                 <details>
-                  <summary>Shared care plan</summary>
+                  <summary><T>{"Shared care plan"}</T></summary>
                   <h3>{String(data.plan.title ?? "Care plan")}</h3>
                   <p>{String(data.plan.goal ?? "")}</p>
                   {Array.isArray(data.plan.tasks) &&
@@ -263,7 +262,7 @@ export function CaseDetail({
               )}
               {data.documents && (
                 <details>
-                  <summary>Shared document workspace</summary>
+                  <summary><T>{"Shared document workspace"}</T></summary>
                   <SharedDocuments documents={data.documents} caseId={id} />
                 </details>
               )}
@@ -364,8 +363,7 @@ export function CaseDetail({
                         assignedTo: context.userId,
                       }}
                     >
-                      Assign to me
-                    </Action>
+                      <T>{"Assign to me"}</T></Action>
                   )}
                 </Panel>
                 <Panel title="Tasks">
@@ -417,8 +415,7 @@ export function CaseDetail({
                 danger
                 confirm
               >
-                Revoke support access
-              </Action>
+                <T>{"Revoke support access"}</T></Action>
             )}
           </>
         )
@@ -480,18 +477,18 @@ function SharedDocuments({
                   disabled={Boolean(busy)}
                   onClick={() => void download(item)}
                 >
-                  {busy === item.id ? "Downloading…" : "Download shared file"}
+                  <T>{busy === item.id ? "Downloading…" : "Download shared file"}</T>
                 </button>
               )}
             </li>
           ))}
         </ul>
       ) : (
-        <p>No document metadata is present in this shared workspace.</p>
+        <p><T>{"No document metadata is present in this shared workspace."}</T></p>
       )}
       {Array.isArray(documents.requirements) && (
         <>
-          <h4>Document requirements</h4>
+          <h4><T>{"Document requirements"}</T></h4>
           <ul>
             {(documents.requirements as Row[]).map((item) => (
               <li key={String(item.id)}>

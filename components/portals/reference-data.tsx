@@ -1,4 +1,7 @@
 "use client";
+import { Localized } from '@/components/experience/localized';
+
+import { T } from '@/components/experience/translation';
 import { useState } from "react";
 import { providerSections, type Row } from "@/lib/portals/config";
 import { CommandForm } from "./command-form";
@@ -21,24 +24,24 @@ export function ReferenceWorkspace() {
   return <>
     <ReferenceStarter onSelect={id=>{setSelected(id);setSection("profile");}}/>
     <Panel title="Reference data onboarding">
-      <p>Collect factual information from authoritative public sources. Each populated field needs a source and review before approval and explicit publication. These listings are labelled MedBridge reference information.</p>
-      <p className="portal-muted">Unlisted prices, services, credentials and consultation modes remain unavailable. A treatment at one branch does not establish availability at another.</p>
-      {error ? <ErrorPanel message={error}/> : loading ? <Loading/> : <label className="portal-field"><span>Reference organization</span><select value={selected} onChange={event => {setSelected(event.target.value);setSection("profile");}}><option value="">Choose an organization</option>{data?.rows.map(row => <option value={row.id} key={row.id}>{row.name} · {row.status}</option>)}</select></label>}
-      <details><summary>Create a reference organization</summary><CommandForm action="create_reference_organization" fields={[{key:"name",label:"Official display name"},{key:"providerType",label:"Organization type",type:"select",options:["hospital","clinic","healthcare_organization"]}]} initial={{providerType:"hospital"}} submit="Create private reference workspace" onDone={row => {setSelected(String(row.id));setSection("profile");}}/></details>
+      <p><T>{"Collect factual information from authoritative public sources. Each populated field needs a source and review before approval and explicit publication. These listings are labelled MedBridge reference information."}</T></p>
+      <p className="portal-muted"><T>{"Unlisted prices, services, credentials and consultation modes remain unavailable. A treatment at one branch does not establish availability at another."}</T></p>
+      {error ? <ErrorPanel message={error}/> : loading ? <Loading/> : <label className="portal-field"><span><T>{"Reference organization"}</T></span><select value={selected} onChange={event => {setSelected(event.target.value);setSection("profile");}}><option value=""><T>{"Choose an organization"}</T></option>{data?.rows.map(row => <option value={row.id} key={row.id}>{row.name} · {row.status}</option>)}</select></label>}
+      <details><summary><T>{"Create a reference organization"}</T></summary><CommandForm action="create_reference_organization" fields={[{key:"name",label:"Official display name"},{key:"providerType",label:"Organization type",type:"select",options:["hospital","clinic","healthcare_organization"]}]} initial={{providerType:"hospital"}} submit="Create private reference workspace" onDone={row => {setSelected(String(row.id));setSection("profile");}}/></details>
     </Panel>
     <PortalStateContext.Provider value={{...state, organizationId: selected, referenceMode:true}}>
-      <div className="portal-tabs" role="navigation" aria-label="Reference onboarding steps">
-        <button className={`portal-button ${section === "sources" ? "" : "secondary"}`} onClick={()=>setSection("sources")}>Sources</button>
+      <Localized as="div" className="portal-tabs" role="navigation" aria-label="Reference onboarding steps">
+        <button className={`portal-button ${section === "sources" ? "" : "secondary"}`} onClick={()=>setSection("sources")}><T>{"Sources"}</T></button>
         {org && providerSections.filter(([key]) => !["dashboard","onboarding","notifications","settings","team","messages","verification"].includes(key)).map(([key,title]) => <button key={key} className={`portal-button ${section === key ? "" : "secondary"}`} onClick={()=>setSection(key)}>{title}</button>)}
-      </div>
-      {section === "sources" ? <ReferenceSources/> : org ? <><p className="portal-eyebrow">{org.name} · ADMIN REFERENCE · {org.status}</p><ProviderContent section={section}/><details><summary>Organization availability</summary><CommandForm action="organization_status" input={{organizationId:org.id}} fields={[{key:"status",label:"Availability",type:"select",options:["active","suspended","archived"]},{key:"message",label:"Reason",type:"textarea"}]} initial={{status:org.status}} submit="Update reference organization availability"/></details></> : <ReferenceSources/>}
+      </Localized>
+      {section === "sources" ? <ReferenceSources/> : org ? <><p className="portal-eyebrow">{org.name} <T>{"· ADMIN REFERENCE ·"}</T>{' '}{org.status}</p><ProviderContent section={section}/><details><summary><T>{"Organization availability"}</T></summary><CommandForm action="organization_status" input={{organizationId:org.id}} fields={[{key:"status",label:"Availability",type:"select",options:["active","suspended","archived"]},{key:"message",label:"Reason",type:"textarea"}]} initial={{status:org.status}} submit="Update reference organization availability"/></details></> : <ReferenceSources/>}
     </PortalStateContext.Provider>
   </>;
 }
 function ReferenceSources() {
   return <>
     <Panel title="Record an authoritative source">
-      <p>Record when the source was actually read. A review due date is an editorial reminder, not a guarantee that the information remains accurate. Add a new source record when checking updated facts.</p>
+      <p><T>{"Record when the source was actually read. A review due date is an editorial reminder, not a guarantee that the information remains accurate. Add a new source record when checking updated facts."}</T></p>
       <CommandForm action="create_reference_source" fields={[
         {key:"name",label:"Source title"},{key:"url",label:"Public HTTPS URL",type:"url"},
         {key:"sourceType",label:"Source category",type:"select",options:["provider_website","provider_directory","government","regulator","recognized_organization","secondary"]},
@@ -48,7 +51,7 @@ function ReferenceSources() {
     </Panel>
     <ResourceTable resource="source_records" title="Reference sources" params={{reference:"true"}} columns={[
       {key:"source_name",label:"Source"},{key:"source_type",label:"Category"},
-      {key:"source_url",label:"Public URL",render:row=><a href={String(row.source_url)} target="_blank" rel="noreferrer">Read source</a>},
+      {key:"source_url",label:"Public URL",render:row=><a href={String(row.source_url)} target="_blank" rel="noreferrer"><T>{"Read source"}</T></a>},
       {key:"retrieved_at",label:"Collected",render:row=>date(row.retrieved_at)},
       {key:"review_after",label:"Review due",render:row=>row.review_after ? date(row.review_after) : "No due date set"},
       {key:"freshness",label:"Refresh",render:row=>{if(!row.review_after)return "No review date set";const days=(Date.parse(`${row.review_after}T23:59:59Z`)-Date.now())/86400000;return days<0?"Stale":days<=14?"Needs review":"Fresh";}}

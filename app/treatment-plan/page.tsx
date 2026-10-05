@@ -1,3 +1,4 @@
+import { T } from '@/components/experience/translation';
 import { PageHeader } from "@/components/page-header";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -21,12 +22,12 @@ export default async function TreatmentPlanPage({ searchParams }: { searchParams
     <PageHeader eyebrow="CARE COORDINATION" title="Treatment planning brief" description="Keep your sample care options together. This brief does not contact a provider or generate a quote." />
     <DemoNotice compact />
     <form className="plan-form" action="/treatment-plan" method="get"><input type="hidden" name="plan" value="1" />
-      <label>Treatment<select name="treatment" defaultValue={treatment?.slug ?? ""}><option value="">Choose a treatment</option>{treatments.map((item) => <option value={item.slug} key={item.slug}>{item.name}</option>)}</select></label>
-      <label>Hospital<select name="hospital" defaultValue={hospital?.slug ?? ""}><option value="">No preference yet</option>{hospitals.map((item) => <option value={item.slug} key={item.slug}>{item.name}</option>)}</select></label>
-      <label>Sample package<select name="package" defaultValue={selectedPackage?.slug ?? ""}><option value="">No package selected</option>{packages.map((item) => <option value={item.slug} key={item.slug}>{item.name}</option>)}</select></label>
-      <button className="button button--primary button--default" type="submit">Update planning brief</button>
+      <label><T>{"Treatment"}</T><select name="treatment" defaultValue={treatment?.slug ?? ""}><option value=""><T>{"Choose a treatment"}</T></option>{treatments.map((item) => <option value={item.slug} key={item.slug}>{item.name}</option>)}</select></label>
+      <label><T>{"Hospital"}</T><select name="hospital" defaultValue={hospital?.slug ?? ""}><option value=""><T>{"No preference yet"}</T></option>{hospitals.map((item) => <option value={item.slug} key={item.slug}>{item.name}</option>)}</select></label>
+      <label><T>{"Sample package"}</T><select name="package" defaultValue={selectedPackage?.slug ?? ""}><option value=""><T>{"No package selected"}</T></option>{packages.map((item) => <option value={item.slug} key={item.slug}>{item.name}</option>)}</select></label>
+      <button className="button button--primary button--default" type="submit"><T>{"Update planning brief"}</T></button>
     </form>
-    {params.plan === "1" && <section className="service-panel plan-summary" role="status"><p className="eyebrow">YOUR SAMPLE SELECTION</p><h2>Planning brief updated</h2><dl className="fact-list"><div><dt>Treatment</dt><dd>{treatment?.name ?? "To be decided"}</dd></div><div><dt>Hospital</dt><dd>{hospital?.name ?? "No preference"}</dd></div><div><dt>Package</dt><dd>{selectedPackage?.name ?? "No package selected"}</dd></div></dl><p>This URL preserves these non-sensitive selections. It is not a request, booking, or medical plan.</p></section>}
-    <div className="service-page__next"><div><h2>What comes next?</h2><p>A real quote needs clinical details, current provider terms, an itemized scope, and consent. You can keep exploring sample options now.</p></div><div className="service-page__links"><Link className="button button--outline button--default" href="/discover">Explore options</Link><Link className="button button--primary button--default" href="/second-opinion">Explore second opinion</Link></div></div>
+    {params.plan === "1" && <section className="service-panel plan-summary" role="status"><p className="eyebrow"><T>{"YOUR SAMPLE SELECTION"}</T></p><h2><T>{"Planning brief updated"}</T></h2><dl className="fact-list"><div><dt><T>{"Treatment"}</T></dt><dd>{treatment?.name ?? "To be decided"}</dd></div><div><dt><T>{"Hospital"}</T></dt><dd>{hospital?.name ?? "No preference"}</dd></div><div><dt><T>{"Package"}</T></dt><dd>{selectedPackage?.name ?? "No package selected"}</dd></div></dl><p><T>{"This URL preserves these non-sensitive selections. It is not a request, booking, or medical plan."}</T></p></section>}
+    <div className="service-page__next"><div><h2><T>{"What comes next?"}</T></h2><p><T>{"A real quote needs clinical details, current provider terms, an itemized scope, and consent. You can keep exploring sample options now."}</T></p></div><div className="service-page__links"><Link className="button button--outline button--default" href="/discover"><T>{"Explore options"}</T></Link><Link className="button button--primary button--default" href="/second-opinion"><T>{"Explore second opinion"}</T></Link></div></div>
   </main>;
 }

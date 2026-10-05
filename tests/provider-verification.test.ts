@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { describe,it,expect,vi,afterEach,beforeEach } from 'vitest';
 import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { renderToStaticMarkup } from './fixtures/render';
 vi.mock('server-only',()=>({}));
 import { approvedSources, SourceRetrievalError, type ApprovedSource } from '@/lib/research/sources';
 import { extractVerificationEvidence,providerSources } from '@/lib/verification/evidence';

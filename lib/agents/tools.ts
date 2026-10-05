@@ -46,6 +46,7 @@ const externalActionInput = z.object({ action: z.enum(['share_records', 'booking
 const analysisInput = z.object({ recordIds: z.array(z.guid()).min(1).max(10) }).strict();
 export const toolAliases = { get_hospital_details: 'get_hospital', get_doctor_details: 'get_doctor', get_treatment_details: 'get_treatment', get_package_details: 'get_package', search_locations: 'search_countries' } as const;
 export const toolSchemas = {
+  get_recovery_context: z.object({}).strict(),
   ...verificationToolSchemas,
   ...documentToolSchemas,
   research_healthcare_information: researchInputSchema,
@@ -61,6 +62,7 @@ export const toolSchemas = {
 } satisfies Record<ToolName, z.ZodType>;
 
 export const toolDescriptions: Record<ToolName, string> = {
+  get_recovery_context: 'Read the authenticated owner’s non-clinical recovery journeys, user-created tasks, linked document metadata and saved provider IDs. No other user context, documents contents or clinical advice. Writes require the confirmed recovery dashboard form.',
   verify_provider_information:'Verify resolved provider factual fields against approved authoritative evidence. Save a private immutable report. No catalog mutation.',
   refresh_provider_verification:'Recheck resolved provider fields with new retrieval, bypassing the saved report cache.',
   get_provider_verification_status:'Read the latest owner-scoped saved verification and exact field evidence.',
@@ -141,6 +143,8 @@ export interface ToolContext {
   observedRecordIds?: readonly string[];
 }
 export interface ToolDependencies {
+  publicSession?: boolean;
+  recoveryRead?: (userId:string) => Promise<import('@/lib/experience/coordination-schema').CoordinationContext>;
   verificationStore?: VerificationStore;
   documentStore?: DocumentStore;
   researchRetrieve?: ResearchRetriever;
@@ -217,6 +221,12 @@ export async function executeTool(name: ToolName, rawInput: unknown, context: To
   if (!validated.success) throw new AgentError('TOOL_INPUT_INVALID', 'The assistant requested invalid search information.');
   const input = validated.data as Record<string, string> & { budget?: number };
   if (!context.userId) throw new AgentError('AUTH_REQUIRED', 'Sign in to use catalog tools.');
+  if(dependencies.publicSession && (definition.mode!=='read'&&definition.mode!=='ask' || definition.authorization==='case_consent' || Object.hasOwn(documentToolSchemas,name) || Object.hasOwn(verificationToolSchemas,name) || name==='get_recovery_context'))
+    throw new AgentError('AUTH_REQUIRED','Sign in to manage your private care coordination. Public discovery and comparison are available here.');
+  if(name==='get_recovery_context') {
+    if(!dependencies.recoveryRead)throw new AgentError('AUTH_REQUIRED','Sign in to view your private recovery journey.');
+    return {findings:[],coordination:await dependencies.recoveryRead(context.userId)};
+  }
   if(Object.hasOwn(verificationToolSchemas,name))return {findings:[],verification:await verifyProviderTool(name as VerificationTool,rawInput,context.userId,context.verificationAuthorization,dependencies.verificationStore,dependencies.evaluationSnapshot??await loadDiscoverySnapshot(dependencies.repository),dependencies.researchRetrieve)};
   if (safeText(JSON.stringify(rawInput)) !== JSON.stringify(rawInput)) throw new AgentError('TOOL_INPUT_INVALID', 'Credentials cannot be used as tool arguments.');
   if (Object.hasOwn(documentToolSchemas,name)) return { findings: [], documents: await coordinateDocument(name as DocumentTool,rawInput,context.userId,context.documentAuthorization,dependencies.documentStore) };

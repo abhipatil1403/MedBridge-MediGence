@@ -1,3 +1,5 @@
+import { LocalDate, LocalNumber } from '@/components/experience/translation';
+import { T } from '@/components/experience/translation';
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -14,7 +16,8 @@ import { getHospitalDetail } from "@/lib/catalog/detail-service";
 import { detailMetadata } from "@/lib/seo";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { publishedProviderProfile } from "@/lib/catalog/provider-profile";
-import { packagePrice } from "@/lib/catalog/pricing";
+import { Price } from '@/components/experience/price';
+import { SaveButton } from '@/components/experience/saved';
 import { CatalogProvenance } from "@/components/catalog-provenance";
 import { fieldLabel } from "@/lib/catalog/field-label";
 
@@ -53,6 +56,7 @@ export default async function HospitalDetailPage({ params }: Props) {
           ]}
         />
         {hospital.demo && <DemoNotice />}
+        <div className="inline-actions"><SaveButton kind="hospital" recordId={hospital.recordId}/></div>
         <DetailHero
           type={hospital.provenance?.origin === "admin_reference" ? "MEDBRIDGE REFERENCE" : "PUBLISHED PROVIDER"}
           title={hospital.name}
@@ -86,10 +90,7 @@ export default async function HospitalDetailPage({ params }: Props) {
             </DetailSection>
             <DetailSection id="evidence" title="Information and evidence">
               <p>
-                Publication approval does not establish clinical quality or
-                medical suitability. Verification below applies to individual
-                fields.
-              </p>
+                <T>{"Publication approval does not establish clinical quality or medical suitability. Verification below applies to individual fields."}</T></p>
               {profile?.fieldReviews?.length ? (
                 <dl className="fact-list">
                   {profile.fieldReviews.map((field) => (
@@ -103,12 +104,11 @@ export default async function HospitalDetailPage({ params }: Props) {
                             target="_blank"
                             rel="noreferrer"
                           >
-                            Checked source
-                          </a>
+                            <T>{"Checked source"}</T></a>
                         )}
                         <small>
-                          Checked{" "}
-                          {new Date(field.checkedAt).toLocaleDateString()}
+                          <T>{"Checked"}</T>{" "}
+                          <LocalDate value={field.checkedAt}/>
                         </small>
                       </dd>
                     </div>
@@ -116,13 +116,11 @@ export default async function HospitalDetailPage({ params }: Props) {
                 </dl>
               ) : (
                 <p>
-                  No public field evidence is available. Confirm details with
-                  the provider.
-                </p>
+                  <T>{"No public field evidence is available. Confirm details with the provider."}</T></p>
               )}
             </DetailSection>
             <DetailSection title="Specialties">
-              {!hospital.specialties.length && <p>Not provided in published information.</p>}
+              {!hospital.specialties.length && <p><T>{"Not provided in published information."}</T></p>}
               <ul className="tag-list">
                 {hospital.specialties.map((item) => (
                   <li key={item}>{item}</li>
@@ -142,25 +140,25 @@ export default async function HospitalDetailPage({ params }: Props) {
                   .map((item) => (
                     <article key={`${item.kind}:${item.name}`}>
                       <h3>{item.department || item.name}</h3>
-                      {item.locationCity && <p>Documented location: {item.locationCity}</p>}
+                      {item.locationCity && <p><T>{"Documented location:"}</T>{' '}{item.locationCity}</p>}
                       <p>
                         {item.description ||
                           "Provider-specific information not provided."}
                       </p>
                       {item.availability && (
                         <p>
-                          Availability: {item.availability.replaceAll("_", " ")}
+                          <T>{"Availability:"}</T>{' '}{item.availability.replaceAll("_", " ")}
                         </p>
                       )}
                       {item.eligibilityNote && <p>{item.eligibilityNote}</p>}
                     </article>
                   ))
               ) : (
-                <p>No department information has been published.</p>
+                <p><T>{"No department information has been published."}</T></p>
               )}
             </DetailSection>
             <DetailSection title="Treatments">
-              {!treatments.length && <p>No treatments have been published.</p>}
+              {!treatments.length && <p><T>{"No treatments have been published."}</T></p>}
               <DetailLinks
                 items={treatments.map((item) => ({
                   label: item.name,
@@ -169,16 +167,16 @@ export default async function HospitalDetailPage({ params }: Props) {
               />
             </DetailSection>
             <DetailSection title="Facilities">
-              {!profile?.sections?.some(item => item.kind === "facility") && !hospital.infrastructure.length && <p>Not provided in published information.</p>}
+              {!profile?.sections?.some(item => item.kind === "facility") && !hospital.infrastructure.length && <p><T>{"Not provided in published information."}</T></p>}
               {profile?.sections
                 ?.filter((item) => item.kind === "facility")
                 .map((item) => (
                   <article key={item.name}>
                     <h3>{item.name}</h3>
                     <p>{item.description || "Description not provided."}</p>
-                    {item.locationCity && <p>Documented location: {item.locationCity}</p>}
+                    {item.locationCity && <p><T>{"Documented location:"}</T>{' '}{item.locationCity}</p>}
                     <p>
-                      Availability:{" "}
+                      <T>{"Availability:"}</T>{" "}
                       {item.availability?.replaceAll("_", " ") ||
                         "Not provided"}
                     </p>
@@ -196,13 +194,13 @@ export default async function HospitalDetailPage({ params }: Props) {
                   {profile.accreditations.map((item) => (
                     <li key={item.name}>
                       {item.name} · {item.body}
-                      {" · Current evidence reviewed"}
+                      <T>{" · Current evidence reviewed"}</T>
                       {item.expiresOn ? ` · expires ${item.expiresOn}` : ""}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p>No current accreditation evidence is published.</p>
+                <p><T>{"No current accreditation evidence is published."}</T></p>
               )}
             </DetailSection>
             {!!profile?.internationalServices?.length && <DetailSection title="International patient services">
@@ -211,12 +209,12 @@ export default async function HospitalDetailPage({ params }: Props) {
                   <h3>{item.name}</h3>
                   {item.description && <p>{item.description}</p>}
                   {!!item.languages?.length && <p>{item.languages.join(", ")}</p>}
-                  <p>Availability: {item.availability?.replaceAll("_", " ") || "Not provided"}</p>
+                  <p><T>{"Availability:"}</T>{' '}{item.availability?.replaceAll("_", " ") || "Not provided"}</p>
                 </article>
               ))}
             </DetailSection>}
             <DetailSection id="doctors" title="Doctors">
-              {!doctors.length && <p>No associated doctors have been published.</p>}
+              {!doctors.length && <p><T>{"No associated doctors have been published."}</T></p>}
               <DetailLinks
                 items={doctors.map((item) => ({
                   label: item.name,
@@ -226,12 +224,12 @@ export default async function HospitalDetailPage({ params }: Props) {
               />
             </DetailSection>
             <DetailSection title="Packages">
-              {!packages.length && <p>No associated packages have been published.</p>}
+              {!packages.length && <p><T>{"No associated packages have been published."}</T></p>}
               <DetailLinks
                 items={packages.map((item) => ({
                   label: item.name,
                   href: `/packages/${item.slug}`,
-                  meta: `${packagePrice(item)} · listed estimate`,
+                  meta: <Price amount={item.listedPrice??item.samplePriceUsd} currency={item.currency??'USD'}/>,
                 }))}
               />
             </DetailSection>
@@ -240,16 +238,15 @@ export default async function HospitalDetailPage({ params }: Props) {
                 {profile?.address ??
                   `${hospital.city}, ${country?.name ?? hospital.country}`}
               </p>
-              {profile?.phone && <p>Phone: {profile.phone}</p>}
+              {profile?.phone && <p><T>{"Phone:"}</T>{' '}{profile.phone}</p>}
               {profile?.email && (
                 <p>
-                  Email: <a href={`mailto:${profile.email}`}>{profile.email}</a>
+                  <T>{"Email:"}</T><a href={`mailto:${profile.email}`}>{profile.email}</a>
                 </p>
               )}
               {profile?.website && (
                 <a href={profile.website} target="_blank" rel="noreferrer">
-                  Official provider website
-                </a>
+                  <T>{"Official provider website"}</T></a>
               )}
               {profile?.locations?.map((item) => (
                 <article key={item.name}>
@@ -263,22 +260,18 @@ export default async function HospitalDetailPage({ params }: Props) {
             </DetailSection>
           </div>
           <aside className="detail-aside profile-evidence">
-            <p className="eyebrow">PUBLISHED SNAPSHOT</p>
-            <h2>Confirm your next step</h2>
+            <p className="eyebrow"><T>{"PUBLISHED SNAPSHOT"}</T></p>
+            <h2><T>{"Confirm your next step"}</T></h2>
             <p>
-              Prices and documented services require current
-              confirmation. No booking or payment is processed here.
-            </p>
+              <T>{"Prices and documented services require current confirmation. No booking or payment is processed here."}</T></p>
             <CatalogProvenance item={hospital} kind="hospital" />
             <Link
               className="text-link"
               href={`/assistant?q=${encodeURIComponent(`Verify ${hospital.name}`)}`}
             >
-              Check factual information →
-            </Link>
+              <T>{"Check factual information →"}</T></Link>
             <Link className="text-link" href="/help">
-              Get coordination support →
-            </Link>
+              <T>{"Get coordination support →"}</T></Link>
           </aside>
         </div>
       </main>
@@ -345,29 +338,23 @@ export default async function HospitalDetailPage({ params }: Props) {
         <div>
           <DetailSection title="Overview">
             <p>
-              This synthetic profile demonstrates how a hospital page connects
-              clinical services, clinicians, package terms, and a quote request.
-              No facility claim has been verified.
-            </p>
+              <T>{"This synthetic profile demonstrates how a hospital page connects clinical services, clinicians, package terms, and a quote request. No facility claim has been verified."}</T></p>
           </DetailSection>
           <DetailSection title="Verification and accreditation">
             <StatusBadge status="unverified" />
             <p>
-              This profile is synthetic. Its catalog fields do not establish
-              factual verification or clinical suitability.
-            </p>
+              <T>{"This profile is synthetic. Its catalog fields do not establish factual verification or clinical suitability."}</T></p>
             <details>
-              <summary>Illustrative accreditation and catalog status</summary>
+              <summary><T>{"Illustrative accreditation and catalog status"}</T></summary>
               <dl className="fact-list">
                 <div>
-                  <dt>Catalog status</dt>
+                  <dt><T>{"Catalog status"}</T></dt>
                   <dd>{hospital.verification}</dd>
                 </div>
                 <div>
-                  <dt>Accreditation field</dt>
+                  <dt><T>{"Accreditation field"}</T></dt>
                   <dd>
-                    {hospital.sampleAccreditation} — not a real credential
-                  </dd>
+                    {hospital.sampleAccreditation} <T>{"— not a real credential"}</T></dd>
                 </div>
               </dl>
             </details>
@@ -375,7 +362,7 @@ export default async function HospitalDetailPage({ params }: Props) {
           <DetailSection title="Infrastructure">
             <ul className="plain-list">
               {hospital.infrastructure.map((item) => (
-                <li key={item}>{item} (illustrative)</li>
+                <li key={item}>{item} <T>{"(illustrative)"}</T></li>
               ))}
             </ul>
           </DetailSection>
@@ -391,8 +378,8 @@ export default async function HospitalDetailPage({ params }: Props) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th scope="col">Treatment</th>
-                    <th scope="col">Sample estimate</th>
+                    <th scope="col"><T>{"Treatment"}</T></th>
+                    <th scope="col"><T>{"Sample estimate"}</T></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -404,8 +391,7 @@ export default async function HospitalDetailPage({ params }: Props) {
                         </Link>
                       </td>
                       <td>
-                        USD {item.sampleBaseCostUsd.toLocaleString()} · demo
-                      </td>
+                        USD <LocalNumber value={item.sampleBaseCostUsd}/> <T>{"· demo"}</T></td>
                     </tr>
                   ))}
                 </tbody>
@@ -432,45 +418,41 @@ export default async function HospitalDetailPage({ params }: Props) {
           </DetailSection>
           <DetailSection title="Location">
             <p>
-              {hospital.city}, {country?.name ?? hospital.country}. This
-              location is illustrative and is not a real facility address.
-            </p>
+              {hospital.city}, {country?.name ?? hospital.country}<T>{". This location is illustrative and is not a real facility address."}</T></p>
           </DetailSection>
           <DetailSection title="Frequently asked questions">
             <FaqList items={faq} />
           </DetailSection>
         </div>
         <aside className="detail-aside profile-evidence">
-          <p className="eyebrow">INFORMATION & EVIDENCE</p>
-          <h2>What is known?</h2>
+          <p className="eyebrow"><T>{"INFORMATION & EVIDENCE"}</T></p>
+          <h2><T>{"What is known?"}</T></h2>
           <StatusBadge status="demo" />
           <dl>
             <div>
-              <dt>Source</dt>
-              <dd>Synthetic MedBridge catalog</dd>
+              <dt><T>{"Source"}</T></dt>
+              <dd><T>{"Synthetic MedBridge catalog"}</T></dd>
             </div>
             <div>
-              <dt>Authoritative evidence</dt>
-              <dd>Not available for this demo provider</dd>
+              <dt><T>{"Authoritative evidence"}</T></dt>
+              <dd><T>{"Not available for this demo provider"}</T></dd>
             </div>
             <div>
-              <dt>Last checked</dt>
-              <dd>No public verification date</dd>
+              <dt><T>{"Last checked"}</T></dt>
+              <dd><T>{"No public verification date"}</T></dd>
             </div>
           </dl>
-          <p>Saved checks are private to your Care Workspace.</p>
+          <p><T>{"Saved checks are private to your Care Workspace."}</T></p>
           <Link
             className="text-link"
             href={`/assistant?q=${encodeURIComponent(`Verify ${hospital.name}`)}`}
           >
-            Open a verification request →
-          </Link>
+            <T>{"Open a verification request →"}</T></Link>
           <Link
             className="text-link"
             href={`/assistant?q=${encodeURIComponent(`Organize documents for ${hospital.name}`)}`}
           >
-            Organize requested documents →
-          </Link>
+            <T>{"Organize requested documents →"}</T></Link>
         </aside>
       </div>
     </main>

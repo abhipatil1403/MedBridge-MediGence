@@ -1,3 +1,5 @@
+import { T } from '@/components/experience/translation';
+import { Localized } from '@/components/experience/localized';
 import { DemoNotice } from "@/components/demo-notice";
 import { ResultSections } from "@/components/discovery/result-sections";
 import { SearchBox } from "@/components/discovery/search-box";
@@ -45,11 +47,11 @@ export async function CatalogDirectory({
         />
         <div className="directory-intro__aside">
           <SearchBox label={`Search ${type}`} />
-          <p>{guidance[type]}</p>
+          <p><T>{guidance[type]}</T></p>
         </div>
       </div>
       {type === "treatments" && (
-        <nav className="category-index" aria-label="Treatment specialties">
+        <Localized as="nav" className="category-index" aria-label="Treatment specialties">
           {categories.map((category) => (
             <a
               key={category}
@@ -58,7 +60,7 @@ export async function CatalogDirectory({
               {category}
             </a>
           ))}
-        </nav>
+        </Localized>
       )}
       <div className="directory-page__toolbar">
         <div>
@@ -66,21 +68,18 @@ export async function CatalogDirectory({
             <DemoNotice compact />
           ) : (
             <p className="muted">
-              Listings use reviewed, published information. Check their sources
-              and confirm current details with the provider.
-            </p>
+              <T>{"Listings use reviewed, published information. Check their sources and confirm current details with the provider."}</T></p>
           )}
         </div>
         <a className="text-link" href={`/discover?type=${type}`}>
-          Refine your options →
-        </a>
+          <T>{"Refine your options →"}</T></a>
       </div>
       {results.sections[type].length === 0 && (
-        <section className="catalog-empty" aria-label="No published listings">
-          <h2>No published {type} are available yet.</h2>
-          <p>Try another location or treatment as reviewed listings become available.</p>
-          <a className="text-link" href="/help">Get coordination support →</a>
-        </section>
+        <Localized as="section" className="catalog-empty" aria-label="No published listings">
+          <h2><T>{"No published"}</T>{' '}<T>{type}</T>{' '}<T>{"are available yet."}</T></h2>
+          <p><T>{"Try another location or treatment as reviewed listings become available."}</T></p>
+          <a className="text-link" href="/help"><T>{"Get coordination support →"}</T></a>
+        </Localized>
       )}
       {type === "treatments" ? (
         <div className="treatment-categories">

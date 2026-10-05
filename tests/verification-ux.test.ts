@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { renderToStaticMarkup } from './fixtures/render';
 vi.mock('server-only', () => ({}));
 import { fixtureReport, verificationFixtures, withVerificationFixtures, fixtureSources, fixtureTime } from './fixtures/provider-verification-fixtures';
 import { approvedSources } from '@/lib/research/collection';

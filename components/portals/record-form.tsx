@@ -1,4 +1,6 @@
 "use client";
+
+import { T, useTranslation } from '@/components/experience/translation';
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -64,12 +66,12 @@ export function FieldControl({
     return (
       <label className="portal-check">
         <input type="checkbox" {...inputProps} />
-        {field.label}
+        <T>{field.label}</T>
       </label>
     );
   return (
     <label className="portal-field">
-      <span>{field.label}</span>
+      <span><T>{field.label}</T></span>
       {field.type === "list" && field.catalog ? (
         <select
           multiple
@@ -91,7 +93,7 @@ export function FieldControl({
         />
       ) : field.type === "select" ? (
         <select disabled={loading || Boolean(error)} {...inputProps}>
-          <option value="">Select {field.label.toLowerCase()}</option>
+          <option value=""><T>{"Select"}</T>{' '}<T>{field.label}</T></option>
           {field.catalog && Boolean(defaultValue) && (
             <option key="current-choice" value={String(defaultValue)}>
               {currentChoice
@@ -109,7 +111,7 @@ export function FieldControl({
           )}
           {field.options?.map((option) => (
             <option key={option} value={option}>
-              {label(option)}
+              <T>{label(option)}</T>
             </option>
           ))}
           {field.catalog &&
@@ -131,13 +133,12 @@ export function FieldControl({
             !field.catalog &&
             !field.options?.includes(String(defaultValue)) &&
             !data?.rows.some((row) => row.id === defaultValue) && (
-              <option value={String(defaultValue)}>Current selection</option>
+              <option value={String(defaultValue)}><T>{"Current selection"}</T></option>
             )}
         </select>
       ) : (
         <input
-          type={
-            field.type === "number"
+          type={field.type === "number"
               ? "number"
               : field.type === "email"
                 ? "email"
@@ -145,8 +146,7 @@ export function FieldControl({
                   ? "url"
                   : field.type === "date"
                     ? "date"
-                    : "text"
-          }
+                    : "text"}
           min={field.min}
           step={field.type === "number" ? "any" : undefined}
           {...inputProps}
@@ -158,7 +158,7 @@ export function FieldControl({
             ? "Enter only services or facts you can support. One per line."
             : "")}
       </small>
-      {loading && <small role="status">Loading choices…</small>}
+      {loading && <small role="status"><T>{"Loading choices…"}</T></small>}
       {error && (
         <small role="alert" className="portal-field-error">
           {error}
@@ -177,6 +177,7 @@ export function RecordForm({
   onClose: () => void;
 }) {
   const { organizationId, command, referenceMode } = usePortal();
+  const {t}=useTranslation();
   const formFields: Field[] = referenceMode ? [...fields[kind], ...(!["organization", "location"].includes(kind) ? [{key:"locationId",label:"Exact sourced location",type:"select" as const,catalog:"provider_records",catalogParams:{kind:"location"},help:"This offering applies only to the selected branch. Create another separately sourced record for another branch."}] : []), ...(kind === "package" ? [{key:"priceType",label:"Documented pricing type",type:"select" as const,options:["estimate","package_price","starting_price","published_price"],help:"Choose only the terminology supported by the source."}] : [])] : fields[kind];
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -260,19 +261,17 @@ export function RecordForm({
   });
   return (
     <Modal
-      title={row ? `Edit ${label(kind)}` : `Add ${label(kind)}`}
+      title={`${t(row?'Edit':'Add')} ${t(label(kind))}`}
       onClose={onClose}
       dirty={form.formState.isDirty}
     >
       <p className="portal-muted">
-        Save a private draft now. Required fields and evidence are checked when
-        you submit.
-      </p>
-      {referenceMode && <p className="portal-muted">Enter only facts the source explicitly supports. Leave missing contact information, consultation mode and service inclusions blank. Attach field sources after saving; edits create a new revision that requires fresh source associations.</p>}
+        <T>{"Save a private draft now. Required fields and evidence are checked when you submit."}</T></p>
+      {referenceMode && <p className="portal-muted"><T>{"Enter only facts the source explicitly supports. Leave missing contact information, consultation mode and service inclusions blank. Attach field sources after saving; edits create a new revision that requires fresh source associations."}</T></p>}
       <form onSubmit={save} className="portal-form">
         <label className="portal-field">
           <span>
-            {kind === "organization" ? "Organization name" : "Name"} *
+            <T>{kind === "organization" ? "Organization name" : "Name"}</T> *
           </span>
           <input
             autoFocus
@@ -310,10 +309,9 @@ export function RecordForm({
                 ?.dispatchEvent(new Event("cancel", { cancelable: true }))
             }
           >
-            Cancel
-          </button>
+            <T>{"Cancel"}</T></button>
           <button className="portal-button" disabled={busy} type="submit">
-            {busy ? "Saving draft…" : "Save draft"}
+            <T>{busy ? "Saving draft…" : "Save draft"}</T>
           </button>
         </div>
       </form>
@@ -336,14 +334,14 @@ export function RecordDetails({
       <div className="portal-actions">
         <Status value={row.status} />
         <span>
-          Draft revision {row.revision} · Published revision{" "}
+          <T>{"Draft revision"}</T>{' '}{row.revision} <T>{"· Published revision"}</T>{" "}
           {String(row.published_revision ?? "none")}
         </span>
       </div>
       <dl className="portal-facts">
         {Object.entries(row.data ?? {}).map(([key, value]) => (
           <div key={key}>
-            <dt>{label(key.replace(/([A-Z])/g, " $1"))}</dt>
+            <dt><T>{label(key.replace(/([A-Z])/g, " $1"))}</T></dt>
             <dd>
               {Array.isArray(value)
                 ? value.join(", ")
@@ -362,8 +360,7 @@ export function RecordDetails({
           String(row.status),
         ) && (
           <button className="portal-button" onClick={() => onEdit(row)}>
-            Edit draft
-          </button>
+            <T>{"Edit draft"}</T></button>
         )}
         <RecordActions row={row} onDone={onClose} />
       </div>
@@ -393,7 +390,7 @@ export function RecordDetails({
           <dl className="portal-facts">
             {Object.entries(history.data ?? {}).map(([key, value]) => (
               <div key={key}>
-                <dt>{label(key)}</dt>
+                <dt><T>{label(key)}</T></dt>
                 <dd>
                   {Array.isArray(value)
                     ? value.join(", ")
@@ -403,15 +400,12 @@ export function RecordDetails({
             ))}
           </dl>
           <p className="portal-muted">
-            This immutable snapshot is read only. Edit the current draft to make
-            changes.
-          </p>
+            <T>{"This immutable snapshot is read only. Edit the current draft to make changes."}</T></p>
         </Modal>
       )}
       {portal === "admin" && (
         <p className="portal-muted">
-          Use Submissions to review the frozen revision and publish it.
-        </p>
+          <T>{"Use Submissions to review the frozen revision and publish it."}</T></p>
       )}
     </Modal>
   );
@@ -433,8 +427,7 @@ export function RecordActions({
           input={{ organizationId, recordId: row.id }}
           onDone={onDone}
         >
-          Submit
-        </Action>
+          <T>{"Submit"}</T></Action>
       )}
       {row.kind !== "organization" && (
         <Action
@@ -442,8 +435,7 @@ export function RecordActions({
           input={{ recordId: row.id }}
           onDone={onDone}
         >
-          Duplicate
-        </Action>
+          <T>{"Duplicate"}</T></Action>
       )}
       {(!row.published_revision || portal === "admin") && (
         <Action
@@ -453,8 +445,7 @@ export function RecordActions({
           confirm
           danger
         >
-          Archive
-        </Action>
+          <T>{"Archive"}</T></Action>
       )}
       {portal === "admin" && Boolean(row.published_revision) && (
         <Action
@@ -463,8 +454,7 @@ export function RecordActions({
           input={{ recordId: row.id, expectedRevision: row.revision }}
           confirm
         >
-          Unpublish
-        </Action>
+          <T>{"Unpublish"}</T></Action>
       )}
     </>
   );
@@ -513,7 +503,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
         extra={
           (kind !== "organization" || !data?.rows.length) && (
             <button className="portal-button" onClick={() => setEditing(null)}>
-              Add {label(kind)}
+              <T>{"Add"}</T>{' '}<T>{label(kind)}</T>
             </button>
           )
         }
@@ -547,9 +537,7 @@ function SpecialtyRequest() {
   return (
     <Panel title="Request a new specialty">
       <p>
-        Requests go to the platform team. A requested specialty cannot be
-        published until it exists in the reviewed canonical catalog.
-      </p>
+        <T>{"Requests go to the platform team. A requested specialty cannot be published until it exists in the reviewed canonical catalog."}</T></p>
       <form
         className="portal-inline-form"
         onSubmit={async (e) => {
@@ -573,7 +561,7 @@ function SpecialtyRequest() {
         }}
       >
         <label className="portal-field">
-          <span>Requested specialty</span>
+          <span><T>{"Requested specialty"}</T></span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -583,8 +571,7 @@ function SpecialtyRequest() {
           />
         </label>
         <button className="portal-button secondary" disabled={busy}>
-          Send request
-        </button>
+          <T>{"Send request"}</T></button>
         {error && <p role="alert">{error}</p>}
       </form>
     </Panel>

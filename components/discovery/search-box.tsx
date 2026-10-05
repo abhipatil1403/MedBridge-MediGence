@@ -1,5 +1,8 @@
 "use client";
+import { Localized } from '@/components/experience/localized';
 
+
+import { T } from '@/components/experience/translation';
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
@@ -44,22 +47,22 @@ export function SearchBox({ initialQuery = "", label = "Describe your need", but
 
   return <div className={prominent ? "search-box search-box--prominent" : "search-box"}>
     <form role="search" onSubmit={(event) => { event.preventDefault(); submit(query); }}>
-      <label htmlFor={listId}>{label}</label>
+      <label htmlFor={listId}><T>{label}</T></label>
       <div className="search-box__control">
         <Search size={21} aria-hidden="true" />
-        <input id={listId} value={query} onChange={(event) => setQuery(event.target.value)}
+        <Localized as="input" id={listId} value={query} onChange={(event) => setQuery(event.target.value)}
           onFocus={() => setFocused(true)} onKeyDown={(event) => { if (event.key === "Escape") setFocused(false); }}
           placeholder="Treatment, specialty, place or question…" autoComplete="off" maxLength={240} />
-        <button className="button button--primary button--default" type="submit">{buttonLabel}</button>
+        <button className="button button--primary button--default" type="submit"><T>{buttonLabel}</T></button>
       </div>
     </form>
-    {focused && query.trim().length >= 2 && (loading || suggestions.length > 0) && <div className="search-box__suggestions" aria-label="Search suggestions">
-      <p>{loading ? "Finding suggestions…" : "Suggested searches"}</p>
+    {focused && query.trim().length >= 2 && (loading || suggestions.length > 0) && <Localized as="div" className="search-box__suggestions" aria-label="Search suggestions">
+      <p><T>{loading ? "Finding suggestions…" : "Suggested searches"}</T></p>
       {!loading && <ul>{suggestions.map((suggestion) => <li key={`${suggestion.type}-${suggestion.label}`}>
         <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => submit(suggestion.query, suggestion.type)}>
-          <span>{suggestion.label}</span><small>{suggestion.kind}</small>
+          <span>{suggestion.label}</span><small><T>{suggestion.kind}</T></small>
         </button>
       </li>)}</ul>}
-    </div>}
+    </Localized>}
   </div>;
 }

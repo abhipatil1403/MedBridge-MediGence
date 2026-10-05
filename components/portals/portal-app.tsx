@@ -1,4 +1,7 @@
 "use client";
+import { Localized } from '@/components/experience/localized';
+
+import { T } from '@/components/experience/translation';
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -166,15 +169,15 @@ export function PortalApp({
   if (!getBrowserSupabaseClient())
     return (
       <main id="main-content" className="portal-login">
-        <h1>Sign-in is unavailable</h1>
-        <p>The site’s authentication configuration is missing.</p>
-        <Link href={publicUrl()}>Back to MedBridge</Link>
+        <h1><T>{"Sign-in is unavailable"}</T></h1>
+        <p><T>{"The site’s authentication configuration is missing."}</T></p>
+        <Link href={publicUrl()}><T>{"Back to MedBridge"}</T></Link>
       </main>
     );
   if (!authReady)
     return (
       <main id="main-content" className="portal-login">
-        <p role="status">Loading sign-in…</p>
+        <p role="status"><T>{"Loading sign-in…"}</T></p>
       </main>
     );
   if (!token || section === "login")
@@ -196,19 +199,18 @@ export function PortalApp({
         </Link>
         <div className="portal-login-card">
           <ShieldCheck size={32} />
-          <h1>Portal access unavailable</h1>
+          <h1><T>{"Portal access unavailable"}</T></h1>
           <p role="alert">{error}</p>
           <button className="portal-button" onClick={() => void signOut()}>
-            Sign in with a different account
-          </button>
-          <Link href={publicUrl()}>Back to MedBridge</Link>
+            <T>{"Sign in with a different account"}</T></button>
+          <Link href={publicUrl()}><T>{"Back to MedBridge"}</T></Link>
         </div>
       </main>
     );
   if (!context || !state)
     return (
       <main id="main-content" className="portal-login">
-        <p role="status">Verifying portal access…</p>
+        <p role="status"><T>{"Verifying portal access…"}</T></p>
       </main>
     );
   if (!portalAllowed(portal, context.role)) return null;
@@ -224,18 +226,18 @@ export function PortalApp({
               <Activity size={23} />
               MedBridge
             </Link>
-            <button
+            <Localized as="button"
               className="portal-icon-button portal-mobile-only"
               onClick={() => setMenu(false)}
               aria-label="Close navigation"
             >
               <X size={20} />
-            </button>
+            </Localized>
           </div>
           <p className="portal-sidebar-label">
-            {portal === "patient"
+            <T>{portal === "patient"
               ? "Patient support"
-              : `${label(portal)} portal`}
+              : `${label(portal)} portal`}</T>
           </p>
           <nav aria-label={`${label(portal)} navigation`}>
             {sections.map(([key, name], index) => (
@@ -255,23 +257,22 @@ export function PortalApp({
                 ) : (
                   <Building2 size={18} />
                 )}
-                <span>{name}</span>
+                <span><T>{name}</T></span>
               </Link>
             ))}
           </nav>
           <div className="portal-sidebar-bottom">
             <Link href={publicUrl()}>
-              Public MedBridge <ArrowUpRight size={15} />
+              <T>{"Public MedBridge"}</T><ArrowUpRight size={15} />
             </Link>
             <span>{context.email}</span>
             <button onClick={() => void signOut()}>
               <LogOut size={16} />
-              Sign out
-            </button>
+              <T>{"Sign out"}</T></button>
           </div>
         </aside>
         {menu && (
-          <button
+          <Localized as="button"
             className="portal-nav-backdrop"
             aria-label="Close navigation"
             onClick={() => setMenu(false)}
@@ -279,21 +280,21 @@ export function PortalApp({
         )}
         <div className="portal-main">
           <header className="portal-topbar">
-            <button
+            <Localized as="button"
               className="portal-icon-button portal-mobile-only"
               onClick={() => setMenu(true)}
               aria-label="Open navigation"
             >
               <Menu size={22} />
-            </button>
+            </Localized>
             <div>
-              <small>MedBridge / {label(portal)}</small>
-              <strong>{title}</strong>
+              <small><T>{"MedBridge /"}</T>{' '}<T>{label(portal)}</T></small>
+              <strong><T>{title}</T></strong>
             </div>
             <div className="portal-topbar-right">
               {portal === "provider" && context.organizations.length > 0 && (
                 <label>
-                  <span className="sr-only">Organization</span>
+                  <span className="sr-only"><T>{"Organization"}</T></span>
                   <select
                     value={organizationId}
                     onChange={(event) => setOrganizationId(event.target.value)}
@@ -333,28 +334,28 @@ export function PortalApp({
                   ? (context.organizations.find(
                       (org) => org.id === organizationId,
                     )?.name ?? "Your organization")
-                  : `${label(portal)} workspace`}
+                  : <><T>{label(portal)}</T>{' '}<T>{'workspace'}</T></>}
               </p>
-              <h1>{title}</h1>
+              <h1><T>{title}</T></h1>
               <p>
-                {portal === "provider"
+                <T>{portal === "provider"
                   ? "Manage your MedBridge presence, evidence and publication."
                   : portal === "admin"
                     ? "Review provider submissions and govern the platform."
                     : portal === "support"
                       ? "Coordinate authorized patient and provider requests."
-                      : "Create a support request and choose which context to share."}
+                      : "Create a support request and choose which context to share."}</T>
               </p>
             </div>
             {notice && (
               <div className="portal-notice" role="status">
                 {notice}
-                <button
+                <Localized as="button"
                   onClick={() => setNotice("")}
                   aria-label="Dismiss message"
                 >
                   <X size={16} />
-                </button>
+                </Localized>
               </div>
             )}
             {search.get("invite") && portal === "provider" && (
@@ -370,8 +371,8 @@ export function PortalApp({
             {portal !== "patient" &&
             !sections.some(([key]) => key === section) ? (
               <Panel title="Page unavailable">
-                <p>This page does not exist in this portal.</p>
-                <Link href={`/${portal}/dashboard`}>Return to dashboard</Link>
+                <p><T>{"This page does not exist in this portal."}</T></p>
+                <Link href={`/${portal}/dashboard`}><T>{"Return to dashboard"}</T></Link>
               </Panel>
             ) : portal === "provider" && !organizationId ? (
               <CreateOrganization />
@@ -415,43 +416,38 @@ function PortalLogin({
         <span className="portal-login-icon">
           <ShieldCheck size={29} />
         </span>
-        <p className="portal-eyebrow">{label(portal)} portal</p>
+        <p className="portal-eyebrow">{label(portal)} <T>{"portal"}</T></p>
         <h1>
-          {authenticated
+          <T>{authenticated
             ? "Continue to your workspace"
-            : "Sign in to your workspace"}
+            : "Sign in to your workspace"}</T>
         </h1>
         <p>
-          {portal === "provider"
+          <T>{portal === "provider"
             ? "Manage your organization, documents and published care offerings."
             : portal === "admin"
               ? "Access is limited to assigned platform administrators."
               : portal === "support"
                 ? "Access is limited to assigned operations staff."
-                : "Get help with your MedBridge care coordination."}
+                : "Get help with your MedBridge care coordination."}</T>
         </p>
         {authenticated ? (
           <div className="portal-actions">
             <button className="portal-button" onClick={onContinue}>
-              Continue
-            </button>
+              <T>{"Continue"}</T></button>
             <button className="portal-button secondary" onClick={onSignOut}>
-              Switch account
-            </button>
+              <T>{"Switch account"}</T></button>
           </div>
         ) : sent ? (
           <div role="status">
-            <h2>Check your email</h2>
+            <h2><T>{"Check your email"}</T></h2>
             <p>
-              Click the sign-in link to confirm your email and return to this
-              portal.
-            </p>
+              <T>{"Click the sign-in link to confirm your email and return to this portal."}</T></p>
             <button
               className="portal-button secondary"
               onClick={() => setSent(false)}
             >
-              Use another email
-            </button>
+              <T>{"Use another email"}</T></button>
           </div>
         ) : (
           <form
@@ -497,8 +493,8 @@ function PortalLogin({
             }}
           >
             <label className="portal-field">
-              <span>Email address</span>
-              <input
+              <span><T>{"Email address"}</T></span>
+              <Localized as="input"
                 type="email"
                 autoComplete="email"
                 required
@@ -513,14 +509,13 @@ function PortalLogin({
               </p>
             )}
             <button className="portal-button" disabled={busy}>
-              {busy ? "Sending link…" : "Send sign-in link"}
+              <T>{busy ? "Sending link…" : "Send sign-in link"}</T>
             </button>
           </form>
         )}
         <p className="portal-login-footer">
-          Protected access · Database enforced permissions
-        </p>
-        <Link href={publicUrl()}>Back to public MedBridge</Link>
+          <T>{"Protected access · Database enforced permissions"}</T></p>
+        <Link href={publicUrl()}><T>{"Back to public MedBridge"}</T></Link>
       </div>
     </main>
   );
@@ -530,10 +525,7 @@ function PatientSupport() {
     <>
       <Panel title="New support request">
         <p>
-          Support can access only this request and the context you explicitly
-          choose. Internal staff notes are private to staff. You can revoke
-          access from the case workspace.
-        </p>
+          <T>{"Support can access only this request and the context you explicitly choose. Internal staff notes are private to staff. You can revoke access from the case workspace."}</T></p>
         <CommandForm
           action="create_case"
           fields={[

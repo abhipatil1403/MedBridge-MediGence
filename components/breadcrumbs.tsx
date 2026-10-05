@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Localized } from '@/components/experience/localized';
 
 export interface Crumb { label: string; href?: string }
 
@@ -12,11 +13,11 @@ export function Breadcrumbs({ items, currentPath }: { items: readonly Crumb[]; c
     })),
   };
   return <>
-    <nav className="breadcrumbs" aria-label="Breadcrumb">
+    <Localized as="nav" className="breadcrumbs" aria-label="Breadcrumb">
       <ol>{items.map((item, index) => <li key={`${item.label}-${index}`}>
         {item.href ? <Link href={item.href}>{item.label}</Link> : <span aria-current="page">{item.label}</span>}
       </li>)}</ol>
-    </nav>
+    </Localized>
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structured).replace(/</g, "\\u003c") }} />
   </>;
 }
