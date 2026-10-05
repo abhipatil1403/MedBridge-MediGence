@@ -3,7 +3,7 @@ import type { NavigationItem } from "@/types/navigation";
 export const navigation: NavigationItem[] = [
   { label: "Home", href: "/" },
   { label: "Discover", href: "/discover" },
-  { label: "Care workspace", href: "/assistant" },
+  { label: "MedBridge AI", href: "/assistant" },
   { label: "Treatments", href: "/treatments" },
   { label: "Hospitals", href: "/hospitals" },
   { label: "Doctors", href: "/doctors" },

@@ -6,8 +6,11 @@ import { SearchBox } from "@/components/discovery/search-box";
 import { searchService } from "@/lib/discovery/search-service";
 import type { ResultType } from "@/types/discovery";
 import { PageHeader } from "./page-header";
+import { Suspense } from 'react';
+import { DirectoryFilters } from './directory-filters';
+import {catalogRepository} from '@/lib/catalog/repository';
 
-export async function CatalogDirectory({
+export function CatalogDirectory({
   type,
   title,
   description,
@@ -16,40 +19,20 @@ export async function CatalogDirectory({
   title: string;
   description: string;
 }) {
-  const results = await searchService.search({ q: "", type, sort: "name" });
-  const guidance: Record<string, string> = {
-    treatments:
-      "Start with a treatment area. Explore related providers and destinations from each topic.",
-    hospitals:
-      "Explore specialties and relationships. Open a profile to inspect what is known and what needs confirmation.",
-    doctors:
-      "Find a specialty and explore the associated hospital. Inspect the profile’s provenance and evidence; appointment availability requires confirmation.",
-    packages:
-      "Look at the estimate together with inclusions and exclusions. Listed estimates are not current provider quotes.",
-  };
+  return <main id="main-content" tabIndex={-1} data-page-content className={`directory-page directory-page--${type} container`}>
+    <div className="directory-intro"><PageHeader eyebrow={type.toUpperCase()} title={title} description={description}/><div className="directory-intro__aside"><SearchBox label={`Search ${type}`} resultType={type}/></div></div>
+    <Suspense fallback={<div className="directory-loading" data-secondary-loading={type} aria-busy="true"><div className="skeleton-tabs"><span/><span/><span/></div><div className="skeleton-results">{[1,2,3,4].map(i=><div className="skeleton-result" key={i}><div className="skeleton-line skeleton-line--wide"/><div className="skeleton-line"/></div>)}</div></div>}><DirectoryResults type={type}/></Suspense>
+  </main>;
+}
+async function DirectoryResults({type}:{type:Exclude<ResultType,'all'>}) {
+  const [results,facets,catalog] = await Promise.all([searchService.search({ q: "", type, sort: "name" }),searchService.facets(),catalogRepository.loadSnapshot!()]);
   const onlySynthetic = results.sections[type].length > 0 && results.sections[type].every(({ item }) => item.demo);
   const categories = [
     ...new Set(results.sections.treatments.map(({ item }) => item.specialty)),
   ];
   return (
-    <main
-      id="main-content"
-      tabIndex={-1}
-      className={`directory-page directory-page--${type} container`}
-    >
-      <div className="directory-intro">
-        <PageHeader
-          eyebrow={
-            type === "packages" ? "PLAN · PACKAGES" : `EXPLORE · ${type}`
-          }
-          title={title}
-          description={description}
-        />
-        <div className="directory-intro__aside">
-          <SearchBox label={`Search ${type}`} />
-          <p><T>{guidance[type]}</T></p>
-        </div>
-      </div>
+    <div data-directory-results={type}>
+      <DirectoryFilters type={type} facets={facets}/>
       {type === "treatments" && (
         <Localized as="nav" className="category-index" aria-label="Treatment specialties">
           {categories.map((category) => (
@@ -97,14 +80,15 @@ export async function CatalogDirectory({
                     ),
                   },
                 }}
+                catalog={catalog}
                 limit={100}
               />
             </section>
           ))}
         </div>
       ) : (
-        <ResultSections results={results} limit={100} />
+        <ResultSections results={results} limit={100} catalog={catalog}/>
       )}
-    </main>
+    </div>
   );
 }

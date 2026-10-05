@@ -17,8 +17,8 @@ import type {
 import type { ParsedQuery } from "@/types/discovery";
 import { packageServicesSchema } from "./package-services";
 import { normalize } from "@/lib/discovery/normalize";
-import { publicHospitalFields, publicDoctorFields } from "./public-fields";
 import { publicCatalogRead } from "./read-budget";
+import type { Database } from '@/types/database';
 
 const faqSchema = z.array(
   z.object({ question: z.string(), answer: z.string() }),
@@ -52,53 +52,21 @@ function sourceKind(value: string): "synthetic" | "external" | "first_party" {
 
 const loadSnapshot = cache(async () => {
   const db = getPublicSupabaseClient();
-  const read = publicCatalogRead;
-  const [
-    countryQuery,
-    cityQuery,
-    specialtyQuery,
-    treatmentQuery,
-    treatmentCountryQuery,
-    hospitalQuery,
-    hospitalSpecialtyQuery,
-    hospitalTreatmentQuery,
-    doctorQuery,
-    doctorSpecialtyQuery,
-    doctorTreatmentQuery,
-    hospitalDoctorQuery,
-    packageQuery,
-    inclusionQuery,
-    exclusionQuery,
-    serviceQuery,
-    priceQuery,
-    packageDetailsQuery,
-    hospitalDetailsQuery,
-    referenceLocationsQuery,
-  ] = await Promise.all([
-    read(() => db.from("countries").select("*")),
-    read(() => db.from("cities").select("*")),
-    read(() => db.from("specialties").select("*")),
-    read(() => db.from("treatments").select("*")),
-    read(() => db.from("treatment_countries").select("*")),
-    read(() => db.from("hospitals").select(publicHospitalFields)),
-    read(() => db.from("hospital_specialties").select("*")),
-    read(() => db.from("hospital_treatments").select("*")),
-    read(() => db.from("doctors").select(publicDoctorFields)),
-    read(() => db.from("doctor_specialties").select("*")),
-    read(() => db.from("doctor_treatments").select("*")),
-    read(() => db.from("hospital_doctors").select("*")),
-    read(() => db.from("packages").select("*")),
-    read(() => db.from("package_inclusions").select("*")),
-    read(() => db.from("package_exclusions").select("*")),
-    read(() => db.from("healthcare_services").select("*")),
-    read(() => db.from("price_estimates").select("*")),
-    read(() => db.rpc("public_provider_package_details", {})),
-    read(() => db.rpc("public_provider_hospital_details", {})),
-    read(() => db.rpc("public_reference_locations", {})),
-  ]);
-  // Provenance validates publication across every catalog kind. Run it after
-  // the table reads so those statements do not compete with this visibility check.
-  const provenanceQuery = await read(() => db.rpc("public_catalog_provenance", {}));
+  const started = performance.now();
+  const response = await publicCatalogRead(() => db.rpc('public_catalog_snapshot', {}));
+  if (response.error) throw new Error('Published catalog is unavailable. Please try again.');
+  const payload = z.record(z.string(), z.unknown()).parse(response.data);
+  type Tables = Database['public']['Tables'];
+  // The RPC preserves the exact public projections; every key is required.
+  function table<K extends keyof Tables>(key: K) {
+    return {data:z.array(z.record(z.string(),z.unknown())).parse(payload[key]) as Tables[K]['Row'][],error:null};
+  }
+  const countryQuery=table('countries'),cityQuery=table('cities'),specialtyQuery=table('specialties'),treatmentQuery=table('treatments'),treatmentCountryQuery=table('treatment_countries');
+  const hospitalQuery=table('hospitals'),hospitalSpecialtyQuery=table('hospital_specialties'),hospitalTreatmentQuery=table('hospital_treatments');
+  const doctorQuery=table('doctors'),doctorSpecialtyQuery=table('doctor_specialties'),doctorTreatmentQuery=table('doctor_treatments'),hospitalDoctorQuery=table('hospital_doctors');
+  const packageQuery=table('packages'),inclusionQuery=table('package_inclusions'),exclusionQuery=table('package_exclusions'),serviceQuery=table('healthcare_services'),priceQuery=table('price_estimates');
+  const packageDetailsQuery={data:payload.package_details,error:null},hospitalDetailsQuery={data:payload.hospital_details,error:null},referenceLocationsQuery={data:payload.reference_locations,error:null},provenanceQuery={data:payload.provenance,error:null};
+  if(process.env.MEDBRIDGE_PERFORMANCE_TRACE==='1')console.info(JSON.stringify({event:'catalog.snapshot',requestMs:Math.round(performance.now()-started),databaseMs:payload.databaseMs,requests:1}));
   const countryRows = rows(countryQuery.data, countryQuery.error, "countries");
   if (provenanceQuery.error) throw new Error("Published catalog provenance is unavailable.");
   const provenance = z.array(z.object({

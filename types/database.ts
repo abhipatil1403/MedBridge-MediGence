@@ -2711,6 +2711,7 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      public_catalog_snapshot: { Args: Record<string, never>; Returns: Json };
       experience_command: { Args: { p_action: string; p_input?: Json }; Returns: Json };
       experience_guest_session: { Args: { p_action: string; p_hash: string; p_ip_hash?: string | null; p_lease?: string | null; p_state?: Json | null }; Returns: Json };
       experience_import_visitor: { Args: { p_hash: string; p_lease: string; p_user: string }; Returns: string };

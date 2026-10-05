@@ -30,6 +30,7 @@ export async function getHospitalDetail(slug: string) {
     treatments: treatments.filter((item) => hospital.treatmentSlugs.includes(item.slug)),
     doctors: doctors.filter((item) => item.hospitalSlug === slug),
     packages: packages.filter((item) => item.hospitalSlug === slug),
+    related: hospitals.filter((item) => item.slug !== slug && item.specialties.some(s => hospital.specialties.includes(s))).slice(0, 3),
   };
 }
 
@@ -45,6 +46,7 @@ export async function getDoctorDetail(slug: string) {
     hospital: hospitals.find((item) => item.slug === doctor.hospitalSlug),
     country: countries.find((item) => item.slug === doctor.country),
     treatments: treatments.filter((item) => doctor.treatmentSlugs.includes(item.slug)),
+    related: doctors.filter(item=>item.slug!==slug&&item.specialty===doctor.specialty).slice(0,3),
   };
 }
 

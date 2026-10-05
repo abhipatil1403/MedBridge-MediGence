@@ -34,6 +34,7 @@ import { Cases } from "./cases";
 import { CommandForm } from "./command-form";
 import "./portal.css";
 import { publicUrl } from "@/lib/portals/public-url";
+import {RouteSkeleton} from '@/components/route-skeleton';
 type PackageInquiry={title:string;description:string;hospitalId?:string};
 
 export function PortalApp({
@@ -178,6 +179,7 @@ export function PortalApp({
       </main>
     );
   if (!authReady)
+    if(portal==='patient')return <RouteSkeleton kind="help"/>;else
     return (
       <main id="main-content" className="portal-login">
         <p role="status"><T>{"Loading sign-in…"}</T></p>
@@ -211,6 +213,7 @@ export function PortalApp({
       </main>
     );
   if (!context || !state)
+    if(portal==='patient')return <RouteSkeleton kind="help"/>;else
     return (
       <main id="main-content" className="portal-login">
         <p role="status"><T>{"Verifying portal access…"}</T></p>
@@ -222,6 +225,7 @@ export function PortalApp({
     (portal === "patient" ? "Support requests" : "Page unavailable");
   return (
     <PortalStateContext.Provider value={state}>
+      {portal==='patient'?<main id="main-content" tabIndex={-1} className="container patient-help-page"><header><p className="eyebrow">MEDBRIDGE SUPPORT</p><h1><T>{'My support requests'}</T></h1><p><T>{'Ask for help with your next step and follow the response here.'}</T></p></header>{notice&&<p role="status" className="personal-notice">{notice}</p>}<PatientSupport packageInquiry={packageInquiry}/></main>:
       <div className={`portal-shell portal-${portal}`}>
         <aside className={`portal-sidebar ${menu ? "is-open" : ""}`}>
           <div className="portal-sidebar-brand">
@@ -238,15 +242,13 @@ export function PortalApp({
             </Localized>
           </div>
           <p className="portal-sidebar-label">
-            <T>{portal === "patient"
-              ? "Patient support"
-              : `${label(portal)} portal`}</T>
+            <T>{`${label(portal)} portal`}</T>
           </p>
           <nav aria-label={`${label(portal)} navigation`}>
             {sections.map(([key, name], index) => (
               <Link
                 key={key}
-                href={portal === "patient" ? "/help" : `/${portal}/${key}`}
+                href={`/${portal}/${key}`}
                 className={key === section ? "is-active" : ""}
                 aria-current={key === section ? "page" : undefined}
                 onClick={() => setMenu(false)}
@@ -319,7 +321,7 @@ export function PortalApp({
                     "patient",
                 )}
               </span>
-              {portal !== "patient" && (
+              {(
                 <Link
                   className="portal-icon-button"
                   href={`/${portal}/notifications`}
@@ -371,8 +373,7 @@ export function PortalApp({
                 />
               </Panel>
             )}
-            {portal !== "patient" &&
-            !sections.some(([key]) => key === section) ? (
+            {!sections.some(([key]) => key === section) ? (
               <Panel title="Page unavailable">
                 <p><T>{"This page does not exist in this portal."}</T></p>
                 <Link href={`/${portal}/dashboard`}><T>{"Return to dashboard"}</T></Link>
@@ -390,7 +391,7 @@ export function PortalApp({
             )}
           </main>
         </div>
-      </div>
+      </div>}
     </PortalStateContext.Provider>
   );
 }
@@ -410,7 +411,7 @@ function PortalLogin({
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   return (
-    <main id="main-content" className="portal-login">
+    <main id="main-content" className={portal==='patient'?'portal-login patient-help-login':'portal-login'}>
       <Link className="portal-brand" href={publicUrl()}>
         <Activity size={26} />
         MedBridge
@@ -419,9 +420,9 @@ function PortalLogin({
         <span className="portal-login-icon">
           <ShieldCheck size={29} />
         </span>
-        <p className="portal-eyebrow">{label(portal)} <T>{"portal"}</T></p>
+        <p className="portal-eyebrow">{portal==='patient'?'MEDBRIDGE SUPPORT':<>{label(portal)} <T>{"portal"}</T></>}</p>
         <h1>
-          <T>{authenticated
+          <T>{portal==='patient'?(authenticated?'My support requests':'Sign in for support'):authenticated
             ? "Continue to your workspace"
             : "Sign in to your workspace"}</T>
         </h1>
@@ -517,7 +518,7 @@ function PortalLogin({
           </form>
         )}
         <p className="portal-login-footer">
-          <T>{"Protected access · Database enforced permissions"}</T></p>
+          <T>{portal==='patient'?'Your support requests are private.':'Protected access · Database enforced permissions'}</T></p>
         <Link href={publicUrl()}><T>{"Back to public MedBridge"}</T></Link>
       </div>
     </main>
@@ -526,11 +527,11 @@ function PortalLogin({
 function PatientSupport({packageInquiry}: {packageInquiry?:PackageInquiry}) {
   return (
     <>
-      <Panel title="New support request">
-        <p>
-          <T>{"Support can access only this request and the context you explicitly choose. Internal staff notes are private to staff. You can revoke access from the case workspace."}</T></p>
+      <Panel title="Create a request">
+        <details className="privacy-sharing"><summary><T>{'Privacy & sharing'}</T></summary><p><T>{"Support can access only this request and the context you explicitly choose. Internal staff notes are private to staff. You can revoke access from the case workspace."}</T></p></details>
         <CommandForm
           action="create_case"
+          advancedKeys={['conversationId','documentWorkspaceId','shareConversation','shareDocuments','shareWithProvider']}
           fields={[
             { key: "title", label: "Request title" },
             { key: "description", label: "How can we help?", type: "textarea" },

@@ -4,6 +4,7 @@ import { workflowMessages } from './messages-workflows';
 import { documentMessages } from './messages-documents';
 import { operationMessages } from './messages-operations';
 import { reviewMessages } from './messages-review';
+import { uxMessages } from './messages-ux';
 import { finalMessages } from './messages-final';
 import { fieldMessages } from './messages-fields';
 import { runtimeMessages } from './messages-runtime';
@@ -16,11 +17,12 @@ export const messages: Record<string, readonly [string,string]> = {
   ...documentMessages,
   ...operationMessages,
   ...reviewMessages,
+  ...uxMessages,
   ...finalMessages,
   ...fieldMessages,
   ...runtimeMessages,
   'Home':['होम','मुख्यपृष्ठ'],'Discover':['खोजें','शोधा'],'Explore':['विकल्प देखें','पर्याय पाहा'],'Plan':['योजना बनाएँ','नियोजन'],'Treat':['उपचार से जुड़ें','उपचाराशी जोडा'],'Recover':['पुनर्प्राप्ति','पुनर्प्राप्ती'],
-  'Compare':['तुलना','तुलना'],'Care Workspace':['केअर वर्कस्पेस','केअर वर्कस्पेस'],'Care workspace':['केअर वर्कस्पेस','केअर वर्कस्पेस'],
+  'Compare':['तुलना','तुलना'],'MedBridge AI':['MedBridge AI','MedBridge AI'],
   'Treatments':['उपचार','उपचार'],'Hospitals':['अस्पताल','रुग्णालये'],'Doctors':['डॉक्टर','डॉक्टर'],'Packages':['पैकेज','पॅकेज'],'Countries':['देश','देश'],'Services':['सेवाएँ','सेवा'],
   'Currency':['मुद्रा','चलन'],'Language':['भाषा','भाषा'],'Account':['खाता','खाते'],'Profile':['प्रोफ़ाइल','प्रोफाइल'],'Preferences':['पसंद','प्राधान्ये'],'Saved':['सहेजे गए','जतन केलेले'],
   'My plans':['मेरी योजनाएँ','माझ्या योजना'],'Recent searches':['हाल की खोजें','अलीकडील शोध'],'Recent conversations':['हाल की बातचीत','अलीकडील संभाषणे'],'Notifications':['सूचनाएँ','सूचना'],
@@ -55,7 +57,7 @@ export const messages: Record<string, readonly [string,string]> = {
   'Tasks':['कार्य','कामे'],'Task title':['कार्य का शीर्षक','कामाचे शीर्षक'],'Due date (optional)':['नियत तिथि (वैकल्पिक)','नियोजित तारीख (ऐच्छिक)'],'Add task':['कार्य जोड़ें','काम जोडा'],'Complete':['पूरा करें','पूर्ण करा'],'Reopen':['फिर खोलें','पुन्हा सुरू करा'],
   'Completed':['पूरा हुआ','पूर्ण झाले'],'Upcoming':['आगामी','आगामी'],'Timeline':['समयरेखा','कालरेषा'],'Add milestone':['पड़ाव जोड़ें','महत्त्वाचा टप्पा जोडा'],'Milestone title':['पड़ाव का शीर्षक','टप्प्याचे शीर्षक'],'Date':['तारीख','तारीख'],
   'Documents':['दस्तावेज़','दस्तऐवज'],'Link existing document':['मौजूदा दस्तावेज़ जोड़ें','विद्यमान दस्तऐवज जोडा'],'Choose a document':['दस्तावेज़ चुनें','दस्तऐवज निवडा'],
-  'Upload securely in Care Workspace':['केअर वर्कस्पेस में सुरक्षित अपलोड करें','केअर वर्कस्पेसमध्ये सुरक्षित अपलोड करा'],
+  'Upload securely in MedBridge AI':['MedBridge AI में सुरक्षित अपलोड करें','MedBridge AIमध्ये सुरक्षित अपलोड करा'],
   'Provider connection':['प्रदाता से संबंध','सेवाप्रदात्याशी संबंध'],'A saved connection does not mean the provider is monitoring you or that an appointment is confirmed.':['सहेजे गए संबंध का अर्थ यह नहीं है कि प्रदाता आपकी निगरानी कर रहा है या अपॉइंटमेंट की पुष्टि हो गई है।','जतन केलेल्या संबंधाचा अर्थ सेवाप्रदाता तुमचे निरीक्षण करतो किंवा भेट निश्चित आहे असा नाही.'],
   'Contact support':['सहायता से संपर्क करें','सहाय्याशी संपर्क करा'],'Request title':['अनुरोध का शीर्षक','विनंतीचे शीर्षक'],'Describe the coordination help you need':['आवश्यक समन्वय सहायता बताएँ','हवा असलेला समन्वय स्पष्ट करा'],
   'I consent to share this written request with MedBridge Support. My journey and documents are not shared.':['मैं यह लिखित अनुरोध MedBridge सहायता के साथ साझा करने की सहमति देता/देती हूँ। मेरी यात्रा और दस्तावेज़ साझा नहीं होंगे।','ही लिखित विनंती MedBridge सहाय्याशी शेअर करण्यास मी संमती देतो/देते. माझा प्रवास आणि दस्तऐवज शेअर केले जाणार नाहीत.'],
@@ -65,7 +67,7 @@ export const messages: Record<string, readonly [string,string]> = {
   'Open MedBridge assistant':['MedBridge सहायक खोलें','MedBridge सहाय्यक उघडा'],'Close assistant':['सहायक बंद करें','सहाय्यक बंद करा'],'MedBridge assistant':['MedBridge सहायक','MedBridge सहाय्यक'],
   'Send':['भेजें','पाठवा'],'Message MedBridge':['MedBridge को संदेश भेजें','MedBridge ला संदेश पाठवा'],'Ask about care options or coordination':['देखभाल विकल्प या समन्वय के बारे में पूछें','देखभाल पर्याय किंवा समन्वयाबद्दल विचारा'],
   'Working on your request…':['आपके अनुरोध पर काम चल रहा है…','तुमच्या विनंतीवर काम सुरू आहे…'],'New conversation':['नई बातचीत','नवीन संभाषण'],
-  'Open in Care Workspace':['केअर वर्कस्पेस में खोलें','केअर वर्कस्पेसमध्ये उघडा'],'Keep this conversation in my account':['यह बातचीत मेरे खाते में रखें','हे संभाषण माझ्या खात्यात ठेवा'],
+  'Open in MedBridge AI':['MedBridge AI में खोलें','MedBridge AIमध्ये उघडा'],'Keep this conversation in my account':['यह बातचीत मेरे खाते में रखें','हे संभाषण माझ्या खात्यात ठेवा'],
   'Temporary conversation. Sign in to keep your plan and history.':['अस्थायी बातचीत। योजना और इतिहास रखने के लिए साइन इन करें।','तात्पुरते संभाषण. योजना आणि इतिहास जतन करण्यासाठी साइन इन करा.'],
   'Public provider context':['सार्वजनिक प्रदाता संदर्भ','सार्वजनिक सेवाप्रदाता संदर्भ'],'Medical decisions require a qualified professional.':['चिकित्सा निर्णय के लिए योग्य पेशेवर आवश्यक है।','वैद्यकीय निर्णयासाठी पात्र तज्ज्ञ आवश्यक आहे.'],
   'Your coordination context':['आपका समन्वय संदर्भ','तुमचा समन्वय संदर्भ'],'Show my upcoming recovery tasks':['मेरे आगामी पुनर्प्राप्ति कार्य दिखाएँ','माझी आगामी पुनर्प्राप्तीची कामे दाखवा'],

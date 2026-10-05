@@ -9,6 +9,9 @@ import { cookies, headers } from 'next/headers';
 import { ExperienceProvider } from '@/components/experience/provider';
 import { browserLocale, defaultPreferences, preferenceSchema } from '@/lib/experience/preferences';
 import { PublicAssistant } from '@/components/experience/public-assistant';
+import { NavigationFeedback } from '@/components/navigation-feedback';
+import { Suspense } from 'react';
+import './production-ux.css';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
@@ -26,6 +29,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <ExperienceProvider initial={initial}>
         <a className="skip-link" href="#main-content"><T>{"Skip to content"}</T></a>
         <PublicChrome position="header" />
+        <Suspense fallback={null}><NavigationFeedback/></Suspense>
         {children}
         <PublicChrome position="footer" />
         <PublicAssistant/>

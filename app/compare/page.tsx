@@ -1,7 +1,7 @@
 import { T } from '@/components/experience/translation';
 import { Price } from '@/components/experience/price';
 import { PageHeader } from "@/components/page-header";
-import Link from "next/link";
+import Link from "@/components/catalog-link";
 import { CompareForm } from "@/components/compare-form";
 import { DemoNotice } from "@/components/demo-notice";
 import { catalogRepository } from "@/lib/catalog/repository";

@@ -11,9 +11,10 @@ function quote(from:string,to:string) {
   const promise=fetch(`/api/currency?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`).then(async r=>r.ok?(await r.json()).quote as Conversion|null:null).catch(()=>null);
   quotes.set(key,{at:Date.now(),promise});return promise;
 }
-export function Price({amount,currency='USD',originalLabel='Original provider price'}:{amount:number;currency?:string;originalLabel?:string}) {
+export function Price({amount,currency='USD',originalLabel='Original provider price',compact=false}:{amount:number;currency?:string;originalLabel?:string;compact?:boolean}) {
   const {preferences}=useExperience(),{t}=useTranslation();
   const [conversion,setConversion]=useState<{key:string;value:Conversion|null}|null>(null);
+  const [rateOpen,setRateOpen]=useState(false);
   const key=`${currency}:${preferences.currency}`;
   useEffect(()=>{
     let active=true;
@@ -27,6 +28,8 @@ export function Price({amount,currency='USD',originalLabel='Original provider pr
   if(!Number.isFinite(amount)||amount<0)return <span>{t('Price not provided')}</span>;
   const current=conversion?.key===key?conversion.value:null;
   const hasConversion=currency!==preferences.currency&&current;
+  const rate=current?<>{t(current.stale?'Stale rate':'Rate')} 1 {currency} = {current.rate.toLocaleString(intlLocales[preferences.locale],{maximumFractionDigits:6})} {preferences.currency} · <LocalDateTime value={current.updatedAt}/><br/><a href={current.source} target="_blank" rel="noreferrer">{t('Rates by ExchangeRate-API')}</a> · {t('Confirm the provider quote and payment rate.')}</>:null;
+  if(compact&&hasConversion)return <span className="converted-price"><span className="converted-price__amount">{format(amount*current.rate,preferences.currency)}</span><small>{t('Converted estimate')} · {t(originalLabel)}: {format(amount,currency,true)}</small><span className="exchange-details"><button type="button" aria-expanded={rateOpen} onClick={()=>setRateOpen(value=>!value)}>{t('Exchange rate details')}</button>{rateOpen&&<small>{rate}</small>}</span></span>;
   return <span className="converted-price"><span className="converted-price__amount">{format(hasConversion?amount*current.rate:amount,hasConversion?preferences.currency:currency,!hasConversion)}</span>
     {currency!==preferences.currency&&<small>{hasConversion?<>{t('Converted estimate')} · {t(originalLabel)}: {format(amount,currency,true)}<br/>{t(current.stale?'Stale rate':'Rate')} 1 {currency} = {current.rate.toLocaleString(intlLocales[preferences.locale],{maximumFractionDigits:6})} {preferences.currency} · <LocalDateTime value={current.updatedAt}/><br/><a href={current.source} target="_blank" rel="noreferrer">{t('Rates by ExchangeRate-API')}</a> · {t('Confirm the provider quote and payment rate.')}</>:t(conversion?.key===key?'Conversion unavailable. Original price shown.':'Loading conversion. Original price shown.')}</small>}
   </span>;

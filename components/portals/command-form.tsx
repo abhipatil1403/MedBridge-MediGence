@@ -21,6 +21,7 @@ export function CommandForm({
   initial = {},
   submit = "Save changes",
   onDone,
+  advancedKeys=[],
 }: {
   action: string;
   input?: Record<string, unknown>;
@@ -28,6 +29,7 @@ export function CommandForm({
   initial?: Record<string, unknown>;
   submit?: string;
   onDone?: (row: Row) => void;
+  advancedKeys?:string[];
 }) {
   const { command } = usePortal();
   const [error, setError] = useState("");
@@ -87,7 +89,7 @@ export function CommandForm({
       })}
     >
       <div className="portal-form-grid">
-        {fields.map((field) => (
+        {fields.filter(field=>!advancedKeys.includes(field.key)).map((field) => (
           <FieldControl
             key={field.key}
             field={field}
@@ -96,6 +98,7 @@ export function CommandForm({
           />
         ))}
       </div>
+      {advancedKeys.length>0&&<details className="privacy-sharing"><summary><T>{'Privacy & sharing'}</T></summary><div className="portal-form-grid">{fields.filter(field=>advancedKeys.includes(field.key)).map(field=><FieldControl key={field.key} field={field} register={form.register} defaultValue={initial[field.key]}/>)}</div></details>}
       {error && (
         <p role="alert" className="portal-field-error">
           <T>{error}</T>

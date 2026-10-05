@@ -13,7 +13,9 @@ export function getIsolatedFixtureClient() {
   if (kinds.some(kind => fixture[kind]?.some(row => row.source_kind !== "synthetic"))) throw new Error("Only isolated synthetic fixtures are allowed");
   return {
     from: (table: string) => ({ select: async () => ({ data: fixture[table] ?? [], error: null }) }),
-    rpc: async (name: string) => ({ data: name === "search_catalog_candidates"
+    rpc: async (name: string) => ({ data: name === "public_catalog_snapshot"
+      ? {...fixture,package_details:[],hospital_details:[],reference_locations:[],provenance:[],databaseMs:0}
+      : name === "search_catalog_candidates"
       ? kinds.flatMap(kind => (fixture[kind] ?? []).map(row => ({ kind: kind === "healthcare_services" ? "services" : kind, slug: row.slug })))
       : [], error: null }),
   } as unknown as SupabaseClient<Database>;

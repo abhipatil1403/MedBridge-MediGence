@@ -536,12 +536,15 @@ export class SearchService {
     const catalog = await loadCatalog(this.repository);
     return {
       specialties: [
-        ...new Set(catalog.treatments.map((item) => item.specialty)),
+        ...new Set([...catalog.treatments.map((item) => item.specialty), ...catalog.doctors.map((item)=>item.specialty), ...catalog.hospitals.flatMap(item=>item.specialties)]),
       ].sort(),
       countries: catalog.countries.map(({ slug, name }) => ({ slug, name })),
       cities: [...new Set(catalog.hospitals.flatMap((item) => [item.city, ...(item.locationCities ?? [])]))].sort(),
       hospitals: catalog.hospitals.map(({ slug, name }) => ({ slug, name })),
       treatments: catalog.treatments.map(({ slug, name }) => ({ slug, name })),
+      hasPublishedExperience: catalog.doctors.some(item=>item.sampleExperienceYears>0),
+      hasPublishedCredentials: catalog.hospitals.some(item=>Boolean(item.sampleAccreditation)),
+      consultationModes: [...new Set(catalog.doctors.flatMap(item=>item.consultationMode==='both'?['video','in-person']:item.consultationMode?[item.consultationMode]:[]))].filter(mode=>['video','in-person'].includes(mode)),
     };
   }
 

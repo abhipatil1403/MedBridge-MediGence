@@ -6,7 +6,7 @@ import { useTranslation } from '@/components/experience/translation';
 
 import { SlidersHorizontal, X } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { DemoNotice } from "@/components/demo-notice";
 import { ResultSections } from "@/components/discovery/result-sections";
@@ -19,6 +19,9 @@ type Facets = {
   cities: string[];
   hospitals: { slug: string; name: string }[];
   treatments: { slug: string; name: string }[];
+  consultationModes?: string[];
+  hasPublishedExperience?: boolean;
+  hasPublishedCredentials?: boolean;
 };
 
 const tabs: { key: ResultType; label: string }[] = [
@@ -45,22 +48,21 @@ function FilterControls({ facets, type, params, update, clear }: {
   const fields = [];
   if (["all", "treatments", "hospitals", "doctors"].includes(type)) fields.push(field("specialty", "Specialty", facets.specialties.map((name) => ({ value: name, label: name }))));
   if (type !== "services") fields.push(field("country", "Country", facets.countries.map((item) => ({ value: item.slug, label: item.name }))));
-  if (type === "hospitals") {
-    fields.push(field("city", "City", facets.cities.map((name) => ({ value: name, label: name }))));
+  if (["hospitals","doctors","packages"].includes(type)) fields.push(field("city", "City", facets.cities.map((name) => ({ value: name, label: name }))));
+  if (type === "hospitals" && facets.hasPublishedCredentials) {
     fields.push(field("accreditation", "Accreditation field", [{ value: "sample", label: "Credential information listed" }, { value: "none", label: "No credential information listed" }]));
   }
   if (type === "doctors") {
     fields.push(field("hospital", "Hospital", facets.hospitals.map((item) => ({ value: item.slug, label: item.name }))));
-    fields.push(field("mode", "Consultation mode", [{ value: "video", label: "Video" }, { value: "in-person", label: "In person" }]));
+    if(facets.consultationModes?.length)fields.push(field("mode", "Consultation mode", facets.consultationModes.map(mode=>({value:mode,label:mode==='video'?'Video':'In person'}))));
   }
   if (["hospitals", "treatments", "packages"].includes(type)) fields.push(field("treatment", "Treatment", facets.treatments.map((item) => ({ value: item.slug, label: item.name }))));
   if (type === "packages") fields.push(field("budget", "Listed USD budget", [5000, 10000, 20000, 40000].map((amount) => ({ value: String(amount), label: `${t('Up to')} USD ${number(amount)}` }))));
   return <div className="filter-controls"><div className="filter-controls__title"><strong>{t('Refine results')}</strong><button type="button" onClick={clear}>{t('Clear filters')}</button></div>{fields.length ? fields : <p>{t('No additional filters for this category.')}</p>}</div>;
 }
 
-export function DiscoveryExperience({ facets }: { facets: Facets }) {
+export function DiscoveryExperience({ facets,initialResults,initialQuery='' }: { facets: Facets;initialResults?:DiscoveryResults;initialQuery?:string }) {
   const {t,number}=useTranslation();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const serialized = searchParams.toString();
   const params = new URLSearchParams(serialized);
@@ -68,15 +70,17 @@ export function DiscoveryExperience({ facets }: { facets: Facets }) {
   const type = (tabs.some((tab) => tab.key === params.get("type")) ? params.get("type") : "all") as ResultType;
   const [retry, setRetry] = useState(0);
   const requestKey = `${serialized}::${retry}`;
-  const [response, setResponse] = useState<{ key: string; results?: DiscoveryResults; error?: string }>({ key: "" });
-  const loading = response.key !== requestKey;
-  const results = loading ? undefined : response.results;
+  const [response, setResponse] = useState<{ key: string; results?: DiscoveryResults; error?: string }>({ key: initialResults?`${initialQuery}::0`:'',results:initialResults });
+  const loadedInitial=Boolean(initialResults&&serialized===initialQuery&&retry===0);
+  const loading = !loadedInitial&&response.key !== requestKey;
+  const results = loadedInitial?initialResults:loading ? undefined : response.results;
   const error = loading ? undefined : response.error;
   const [filterOpen, setFilterOpen] = useState(false);
   const filterButton = useRef<HTMLButtonElement>(null);
   const filterDialog = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if(initialResults&&serialized===initialQuery&&retry===0)return;
     const controller = new AbortController();
     fetch(`/api/discover${serialized ? `?${serialized}` : ""}`, { signal: controller.signal })
       .then(async (response) => {
@@ -87,7 +91,7 @@ export function DiscoveryExperience({ facets }: { facets: Facets }) {
       .then((body) => { if (!controller.signal.aborted) setResponse({ key: requestKey, results: body }); })
       .catch((cause: unknown) => { if (!controller.signal.aborted) setResponse({ key: requestKey, error: cause instanceof Error ? cause.message : "Search is unavailable." }); });
     return () => controller.abort();
-  }, [serialized, requestKey]);
+  }, [serialized, requestKey,initialResults,initialQuery,retry]);
 
   useEffect(() => {
     if (!filterOpen) return;
@@ -107,7 +111,7 @@ export function DiscoveryExperience({ facets }: { facets: Facets }) {
     return () => { document.removeEventListener("keydown", onKey); returnButton?.focus(); };
   }, [filterOpen]);
 
-  function push(next: URLSearchParams) { router.push(`/discover${next.size ? `?${next}` : ""}`); }
+  function push(next: URLSearchParams) { window.history.pushState(null,'',`/discover${next.size ? `?${next}` : ""}`); }
   function update(key: string, value: string) {
     const next = new URLSearchParams(serialized);
     if (value) next.set(key, value); else next.delete(key);
@@ -132,12 +136,12 @@ export function DiscoveryExperience({ facets }: { facets: Facets }) {
 
   const sortOptions: { value: SortOption; label: string }[] = [
     { value: "relevance", label: "Relevance" }, { value: "name", label: "Name A–Z" },
-    ...(type === "doctors" ? [{ value: "experience" as const, label: "Listed experience" }] : []),
+    ...(type === "doctors" && facets.hasPublishedExperience ? [{ value: "experience" as const, label: "Listed experience" }] : []),
     ...(type === "packages" || type === "treatments" ? [{ value: "price" as const, label: "Listed USD price: low to high" }] : []),
     ...(type === "hospitals" || type === "doctors" ? [{ value: "location" as const, label: "Location A–Z" }] : []),
   ];
 
-  return <main id="main-content" tabIndex={-1} className="discover-page">
+  return <main id="main-content" tabIndex={-1} className="discover-page" data-page-content data-results-loading={loading?'true':undefined}>
     <div className="container discover-page__intro">
       <PageHeader eyebrow="EXPLORE" title="What are you looking for?" description="Start with a treatment, place or question. Explore the information, then bring the next step into your workspace."><SearchBox key={query} initialQuery={query} label="Search healthcare options" buttonLabel="Explore" /></PageHeader>
       {results && Object.values(results.sections).some(entries => entries.some(({item}) => item.demo)) && <DemoNotice compact />}
@@ -151,10 +155,10 @@ export function DiscoveryExperience({ facets }: { facets: Facets }) {
       <div className="discover-layout">
         <aside className="discover-sidebar" aria-label={t("Search filters")}><FilterControls facets={facets} type={type} params={params} update={update} clear={clear} /></aside>
         <div className="discover-results">
-          {results && <div className="search-context" aria-label={t("Understood search")}>{results.understanding.entities.procedure && <span>{facets.treatments.find((item) => item.slug === results.understanding.entities.procedure)?.name}</span>}{results.understanding.entities.city && <span>{results.understanding.entities.city}</span>}{results.understanding.entities.country && <span>{facets.countries.find((item) => item.slug === results.understanding.entities.country)?.name}</span>}{results.filters.budget && <span>{t("Budget")} ≤ USD <LocalNumber value={results.filters.budget}/></span>}{query && <Link className="text-link" href={`/assistant?q=${encodeURIComponent(query)}`}>{t("Continue in Care Workspace →")}</Link>}</div>}
+          {results && <div className="search-context" aria-label={t("Understood search")}>{results.understanding.entities.procedure && <span>{facets.treatments.find((item) => item.slug === results.understanding.entities.procedure)?.name}</span>}{results.understanding.entities.city && <span>{results.understanding.entities.city}</span>}{results.understanding.entities.country && <span>{facets.countries.find((item) => item.slug === results.understanding.entities.country)?.name}</span>}{results.filters.budget && <span>{t("Budget")} ≤ USD <LocalNumber value={results.filters.budget}/></span>}{query && <Link className="text-link" href={`/assistant?q=${encodeURIComponent(query)}`}>{t("Continue in MedBridge AI →")}</Link>}</div>}
           {loading && <div className="result-state" role="status" aria-live="polite"><h2>{t("Finding relevant options…")}</h2><p>{t("Checking published catalog information and current filters.")}</p><div className="result-skeleton" /><div className="result-skeleton" /><div className="result-skeleton" /></div>}
           {!loading && error && <div className="result-state result-state--error" role="alert"><h2>{t("We couldn’t load these results.")}</h2><p>{t(error)}</p><button className="button button--primary button--default" type="button" onClick={resetError}>{t(error.includes("invalid") ? "Reset filters and try again" : "Retry search")}</button></div>}
-          {!loading && !error && results?.total === 0 && <div className="result-state"><h2>{t("No published listings match this search yet.")}</h2><p>{t("Your search is still in the field above. Try another location or treatment, or ask support for help.")}</p><button className="button button--outline button--default" type="button" onClick={clear}>{t("Try a broader search")}</button><div className="result-state__suggested"><Link href="/help">{t("Get coordination support")}</Link></div></div>}
+          {!loading && !error && results?.total === 0 && <div className="result-state"><h2>{t("No published listings match this search yet.")}</h2><p>{t("Your search is still in the field above. Try another location or treatment, or ask support for help.")}</p><button className="button button--outline button--default" type="button" onClick={()=>push(new URLSearchParams(type==='all'?'':`type=${type}`))}>{t("Clear filters")}</button><div className="result-state__suggested"><Link href="/hospitals" prefetch={false}>{t('Explore hospitals')}</Link><Link href={`/assistant?q=${encodeURIComponent(query)}`}>{t('Ask MedBridge AI')}</Link><Link href="/help">{t("Get coordination support")}</Link></div></div>}
           {!loading && !error && results && results.total > 0 && <ResultSections results={results} />}
         </div>
       </div>

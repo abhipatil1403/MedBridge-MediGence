@@ -1,4 +1,5 @@
 'use client';
+import { InlineSkeleton } from '@/components/inline-skeleton';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useExperience } from './provider';
@@ -34,9 +35,9 @@ export function RecoveryDashboard({initialJourney}:{initialJourney?:string}) {
     if(action==='create_support'){input.title=title;input.description=f.get('description');input.consent=f.get('consent')==='on';}
     void command(input,form);
   }
-  if(!authReady)return <p role="status">{t('Loading…')}</p>;
+  if(!authReady)return <InlineSkeleton kind="journey"/>;
   if(!session)return <SignIn/>;
-  if(!data)return <>{state?.owner===owner&&state?.error?<><p role="alert">{t('Recovery information could not be loaded. Please try again.')}</p><button className="save-control" onClick={()=>setRevision(v=>v+1)}>{t('Try again')}</button></>:<p role="status">{t('Loading…')}</p>}</>;
+  if(!data)return <>{state?.owner===owner&&state?.error?<><p role="alert">{t('Recovery information could not be loaded. Please try again.')}</p><button className="save-control" onClick={()=>setRevision(v=>v+1)}>{t('Try again')}</button></>:<InlineSkeleton kind="journey"/>}</>;
   const hospital=data.hospitals.find(h=>h.id===journey?.hospital_id);
   const tasks=data.tasks.filter(task=>task.journey_id===journey?.id);
   const links=data.links.filter(l=>l.journey_id===journey?.id);
@@ -46,7 +47,7 @@ export function RecoveryDashboard({initialJourney}:{initialJourney?:string}) {
   }
   return <><p className="personal-muted">{t('No reminders or clinical milestones are generated automatically.')}</p>{notice&&<p className="personal-notice" role="status">{t(notice)}</p>}
     <section className="personal-panel"><details open={!journey}><summary>{t('Create recovery journey')}</summary><form className="personal-form" onSubmit={e=>submit(e,'create_journey')}><label>{t('Journey title')}<input name="title" required minLength={3} maxLength={120}/></label><label>{t('Published hospital (optional)')}<select name="hospitalId"><option value="">{t('No hospital selected')}</option>{data.hospitals.map(h=><option key={h.id} value={h.id}>{h.name}</option>)}</select></label><label>{t('Existing care case (optional)')}<select name="caseId"><option value="">{t('No case selected')}</option>{data.cases.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</select></label><button className="button button--primary button--default" disabled={busy}>{t('Create recovery journey')}</button></form></details></section>
-    {journey&&<><label className="sr-only" htmlFor="recovery-journey-select">{t('Recovery journey')}</label><select id="recovery-journey-select" className="recovery-switch" value={journey.id} onChange={e=>setSelected(e.target.value)}>{data.journeys.map(j=><option value={j.id} key={j.id}>{j.title}</option>)}</select>
+    {journey&&<><section className="recovery-overview" aria-label={t('Your journey at a glance')}><div><span>{t('Current stage')}</span><strong>{t(stages.find(([key])=>key===journey.stage)?.[1]??journey.stage)}</strong></div><div><span>{t('Next task')}</span><strong>{tasks.find(task=>task.status!=='completed')?.title??t('No coordination tasks yet.')}</strong></div><div><span>{t('Provider connection')}</span><strong>{hospital?.name??t('No hospital selected')}</strong></div></section><label className="sr-only" htmlFor="recovery-journey-select">{t('Recovery journey')}</label><select id="recovery-journey-select" className="recovery-switch" value={journey.id} onChange={e=>setSelected(e.target.value)}>{data.journeys.map(j=><option value={j.id} key={j.id}>{j.title}</option>)}</select>
       <div className="recover-grid"><div><section className="personal-panel"><h2>{journey.title}</h2><label className="personal-form">{t('Current stage')}<select aria-label={t('Current stage')} value={journey.stage} disabled={busy} onChange={e=>void command({action:'update_journey',journeyId:journey.id,stage:e.target.value})}>{stages.map(([value,label])=><option key={value} value={value}>{t(label)}</option>)}</select></label>
         <h3>{t('Provider connection')}</h3>{hospital?<Link href={`/hospitals/${hospital.slug}`}>{hospital.name}</Link>:<p>{t(journey.hospital_id?'Provider listing no longer available':'No hospital selected')}</p>}<p className="personal-muted">{t('A saved connection does not mean the provider is monitoring you or that an appointment is confirmed.')}</p>
         <Link className="text-link" href="/assistant?q=Show%20my%20upcoming%20recovery%20tasks">{t('Show my upcoming recovery tasks')} →</Link>
@@ -55,7 +56,7 @@ export function RecoveryDashboard({initialJourney}:{initialJourney?:string}) {
         <form className="personal-form" onSubmit={e=>submit(e,'add_task')}><label>{t('Task title')}<input name="title" required minLength={3} maxLength={160}/></label><label>{t('Due date (optional)')}<input type="datetime-local" name="dueAt"/></label><button className="button button--primary button--default" disabled={busy}>{t('Add task')}</button></form>
       </section><section className="personal-panel"><h2>{t('Documents')}</h2><ul className="personal-list">{data.documents.filter(d=>d.journey_id===journey.id).map(d=><li key={d.document_id}>{data.files.find(f=>f.id===d.document_id)?.title??t('Document unavailable')}</li>)}</ul>
         {data.files.length>0&&<form className="personal-form" onSubmit={e=>submit(e,'link_document')}><label>{t('Choose a document')}<select name="documentId" required>{data.files.map(f=><option value={f.id} key={f.id}>{f.title}</option>)}</select></label><button disabled={busy} className="save-control">{t('Link existing document')}</button></form>}
-        <Link className="text-link" href="/assistant?q=Organize%20my%20documents">{t('Upload securely in Care Workspace')} →</Link>
+        <Link className="text-link" href="/assistant?q=Organize%20my%20documents">{t('Upload securely in MedBridge AI')} →</Link>
       </section></div><div><section className="personal-panel"><h2>{t('Timeline')}</h2><ol className="recovery-timeline">{data.events.filter(event=>event.journey_id===journey.id).map(event=><li key={event.id}><strong>{timelineTitle(event)}</strong><small>{t(event.event_type.replaceAll('_',' '))} · <LocalDate value={event.occurred_at}/></small></li>)}</ol>
         <details><summary>{t('Add milestone')}</summary><form className="personal-form" onSubmit={e=>submit(e,'add_event')}><label>{t('Milestone title')}<input name="title" required minLength={3} maxLength={160}/></label><label>{t('Date')}<input name="occurredAt" type="date" required/></label><button disabled={busy} className="save-control">{t('Add milestone')}</button></form></details>
       </section><section className="personal-panel"><h2>{t('Contact support')}</h2><ul className="personal-list">{data.support.filter(s=>links.some(l=>l.support_case_id===s.id)).map(s=><li key={s.id}><Link href="/help">{s.title}</Link><span>{t(s.status.replaceAll('_',' '))}</span></li>)}</ul>

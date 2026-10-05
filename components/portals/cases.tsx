@@ -27,11 +27,12 @@ export function Cases({
   patientId?: string;
   assignedTo?: string;
 }) {
+  const {portal}=usePortal();
   const [selected, setSelected] = useState<Row>();
   const [filters, setFilters] = useState<Record<string, string>>({});
   return (
     <>
-      <Panel title="Case filters">
+      {portal!=='patient'&&<Panel title="Case filters">
         <div className="portal-form-grid">
           {[
             {
@@ -90,10 +91,10 @@ export function Cases({
             />
           </label>
         </div>
-      </Panel>
+      </Panel>}
       <ResourceTable
         resource="support_cases"
-        title={mode === "mine"
+        title={portal==='patient'?'Your requests':mode === "mine"
             ? "My queue"
             : mode === "documents"
               ? "Cases with document context"
@@ -111,7 +112,7 @@ export function Cases({
               ? { status: "escalated" }
               : {}),
         }}
-        columns={[
+        columns={portal==='patient'?[{key:'title',label:'Request'},{key:'status',label:'Status',render:row=><Status value={row.status}/>},{key:'updated_at',label:'Updated',render:row=>date(row.updated_at)}]:[
           {
             key: "id",
             label: "Case",
@@ -210,7 +211,7 @@ export function CaseDetail({
               <span>{date(c.created_at)}</span>
             </div>
             <p>{String(c.description ?? "")}</p>
-            <Panel title="Authorized context">
+            <details open={portal!=='patient'} className="privacy-sharing"><summary><T>{'Privacy & sharing'}</T></summary><Panel title="Authorized context">
               <dl className="portal-facts">
                 <div>
                   <dt><T>{"Patient"}</T></dt>
@@ -266,7 +267,7 @@ export function CaseDetail({
                   <SharedDocuments documents={data.documents} caseId={id} />
                 </details>
               )}
-            </Panel>
+            </Panel></details>
             <Panel title="Conversation">
               {data.messages.length ? (
                 data.messages.map((row) => (

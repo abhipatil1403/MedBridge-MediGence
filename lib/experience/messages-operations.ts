@@ -1,6 +1,6 @@
 export const operationMessages: Record<string, readonly [string,string]> = {
  'Explore second opinions →':['दूसरी राय के विकल्प देखें →','दुसऱ्या मताचे पर्याय पाहा →'],
- 'Local preview only. To store an explicitly requested document privately, use document coordination in Care Workspace.':['केवल स्थानीय पूर्वावलोकन। अनुरोधित दस्तावेज़ निजी रूप से रखने के लिए केअर वर्कस्पेस में दस्तावेज़ समन्वय का उपयोग करें।','फक्त स्थानिक पूर्वदृश्य. स्पष्टपणे मागितलेला दस्तऐवज खाजगी ठेवण्यासाठी केअर वर्कस्पेसमधील दस्तऐवज समन्वय वापरा.'],
+ 'Local preview only. To store an explicitly requested document privately, use document coordination in MedBridge AI.':['केवल स्थानीय पूर्वावलोकन। अनुरोधित दस्तावेज़ निजी रूप से रखने के लिए MedBridge AI में दस्तावेज़ समन्वय का उपयोग करें।','फक्त स्थानिक पूर्वदृश्य. स्पष्टपणे मागितलेला दस्तऐवज खाजगी ठेवण्यासाठी MedBridge AIमधील दस्तऐवज समन्वय वापरा.'],
  'Location':['स्थान','ठिकाण'],'MEDBRIDGE ACCOUNT':['MEDBRIDGE खाता','MEDBRIDGE खाते'],'MEDBRIDGE CATALOG':['MEDBRIDGE सूची','MEDBRIDGE सूची'],
  'Manage support consent in Patient Help':['रोगी सहायता में समर्थन सहमति प्रबंधित करें','रुग्ण मदतीत सहाय्याची संमती व्यवस्थापित करा'],
  'Manage team member':['टीम सदस्य प्रबंधित करें','संघ सदस्य व्यवस्थापित करा'],

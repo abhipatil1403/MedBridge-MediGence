@@ -59,8 +59,9 @@ describe('result-aware presentation', () => {
     const response: AgentResponse = { conversationId: report.conversationId, runId: report.id, agent: 'provider_verification', status: 'completed', understanding: 'Check provider details', summary: 'Saved factual check', findings: [], tasks: [], nextSteps: [], question: null, verification: { report, history: [], reused: false, message: 'QA only' }, activity: { runId: report.id, state: 'completed', steps: [], warnings: [], updatedAt: fixtureTime } };
     const html = renderToStaticMarkup(createElement(ResponseBlocks, { response, disabled: false, onDecision: () => {} }));
     expect(html).not.toContain('Catalog records'); expect(html).not.toContain('0 catalog');
-    expect(html.indexOf('PROVIDER VERIFICATION')).toBeLessThan(html.indexOf('Recorded agent activity'));
-    expect(html).not.toMatch(/<details[^>]+aria-label="Recorded agent activity"[^>]*open/);
+    expect(html).toContain('PROVIDER VERIFICATION');
+    expect(html).not.toContain('Recorded agent activity');
+    expect(html).not.toContain(response.runId);
     expect(html).not.toContain('source_unavailable'); expect(html).not.toContain('unsupported_source');
     expect(html).toContain('View evidence'); expect(html).toContain('unresolved');
     if (report.counts.verified === 0) expect(html).not.toContain('Partially verified');

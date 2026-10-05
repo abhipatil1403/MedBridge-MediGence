@@ -17,7 +17,7 @@ export function FaqList({ items }: { items: readonly Faq[] }) {
 }
 
 export function DetailLinks({ items }: { items: readonly { label: string; href: string; meta?: React.ReactNode }[] }) {
-  return <ul className="detail-links">{items.map((item) => <li key={item.href}><Link href={item.href}><span>{item.label}</span>{item.meta && <small>{item.meta}</small>}</Link></li>)}</ul>;
+  return <ul className="detail-links">{items.map((item) => <li key={item.href}><Link href={item.href}><span>{item.label}</span></Link>{item.meta && <small>{item.meta}</small>}</li>)}</ul>;
 }
 
 export function DetailHero({ type, title, intro, facts, actions }: {

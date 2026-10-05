@@ -22,7 +22,7 @@ function errorResponse(error: unknown) {
 }
 function bearer(request: NextRequest) {
   const match = /^Bearer (.+)$/.exec(request.headers.get('authorization') ?? '');
-  if (!match) throw new AgentError('AUTH_REQUIRED', 'Sign in to use the care workspace.');
+  if (!match) throw new AgentError('AUTH_REQUIRED', 'Sign in to use the MedBridge AI.');
   return match[1];
 }
 

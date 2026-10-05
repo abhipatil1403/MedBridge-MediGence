@@ -35,12 +35,12 @@ export function SiteHeader() {
       </nav>
       <div className="header-preferences"><PreferenceSelectors/></div>
       <Link className="header-account" href="/account" aria-label={t('Account')} onClick={close}><UserRound size={19} aria-hidden="true"/></Link>
-      <Link className="header-workspace button button--primary" href="/assistant" onClick={close}>{t('Care Workspace')}<ArrowUpRight size={16} aria-hidden="true"/></Link>
+      <Link className="header-workspace button button--primary" href="/assistant" onClick={close}>{t('MedBridge AI')}<ArrowUpRight size={16} aria-hidden="true"/></Link>
       <button ref={toggle} className="menu-toggle" type="button" aria-expanded={drawerOpen} aria-controls="mobile-navigation" aria-label={t('Open navigation')} onClick={()=>{dialog.current?.showModal();setDrawerOpen(true);document.body.style.overflow='hidden';}}><Menu size={22} aria-hidden="true"/></button>
     </div>
     <dialog id="mobile-navigation" className="navigation-drawer" ref={dialog} aria-label={t('Mobile navigation')} onClose={()=>{setDrawerOpen(false);document.body.style.overflow='';toggle.current?.focus();}} onClick={e=>{if(e.target===e.currentTarget)close();}}>
       <div className="drawer-surface"><div className="drawer-heading"><span className="brand">MEDBRIDGE</span><button type="button" onClick={close} aria-label={t('Close navigation')}><X size={24} aria-hidden="true"/></button></div>
-        <PreferenceSelectors/><Link className="button button--primary button--default" href="/assistant" onClick={close}>{t('Care Workspace')}<ArrowUpRight size={18} aria-hidden="true"/></Link>
+        <PreferenceSelectors/><Link className="button button--primary button--default" href="/assistant" onClick={close}>{t('MedBridge AI')}<ArrowUpRight size={18} aria-hidden="true"/></Link>
         <nav aria-label={t('Mobile navigation')}><Link href="/" onClick={close}>{t('Home')}</Link>{drawerGroups.map(section=><section key={section.label}><h2 className="eyebrow">{t(section.label)}</h2>{section.items.map(item=><Link key={item.href} href={item.href} onClick={close}>{t(item.label)}</Link>)}</section>)}</nav>
       </div>
     </dialog>

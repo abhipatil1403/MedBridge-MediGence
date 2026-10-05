@@ -6,7 +6,7 @@ const server=await createServer({configFile:false,server:{middlewareMode:true},a
 try {
  const {translate}=await server.ssrLoadModule('/lib/experience/messages.ts');
  const catalogue=JSON.parse(readFileSync('lib/experience/interface-catalogue.json','utf8'));
- const invariants=new Set(['MEDBRIDGE','MedBridge','MedBridge /','PDF','PNG','JPG','USD','INR','application/pdf','image/png','you@organization.com']);
+ const invariants=new Set(['MEDBRIDGE','MedBridge','MedBridge AI','MedBridge /','PDF','PNG','JPG','USD','INR','application/pdf','image/png','you@organization.com']);
  const missing=catalogue.filter(text=>!invariants.has(text)&&/[A-Za-z]/.test(text)&&translate(text,'hi')===text);
  writeFileSync(join(tmpdir(),'medbridge-missing-locales.json'),JSON.stringify(missing,null,2));
  console.log(`${missing.length}/${catalogue.length} untranslated interface messages.`);
