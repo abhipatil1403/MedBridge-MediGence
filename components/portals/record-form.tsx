@@ -6,6 +6,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ReferenceClaims } from "./reference-claims";
+import { PackageReview } from './package-review';
+import { packagePrice } from '@/lib/catalog/pricing';
 import {
   fields,
   label,
@@ -153,10 +155,10 @@ export function FieldControl({
         />
       )}
       <small>
-        {field.help ??
+        <T>{field.help ??
           (field.type === "list"
             ? "Enter only services or facts you can support. One per line."
-            : "")}
+            : "")}</T>
       </small>
       {loading && <small role="status"><T>{"Loading choices…"}</T></small>}
       {error && (
@@ -178,7 +180,7 @@ export function RecordForm({
 }) {
   const { organizationId, command, referenceMode } = usePortal();
   const {t}=useTranslation();
-  const formFields: Field[] = referenceMode ? [...fields[kind], ...(!["organization", "location"].includes(kind) ? [{key:"locationId",label:"Exact sourced location",type:"select" as const,catalog:"provider_records",catalogParams:{kind:"location"},help:"This offering applies only to the selected branch. Create another separately sourced record for another branch."}] : []), ...(kind === "package" ? [{key:"priceType",label:"Documented pricing type",type:"select" as const,options:["estimate","package_price","starting_price","published_price"],help:"Choose only the terminology supported by the source."}] : [])] : fields[kind];
+  const formFields: Field[] = referenceMode ? [...fields[kind], ...(!["organization", "location", "package"].includes(kind) ? [{key:"locationId",label:"Exact sourced location",type:"select" as const,catalog:"provider_records",catalogParams:{kind:"location"},help:"This offering applies only to the selected branch. Create another separately sourced record for another branch."}] : [])] : fields[kind];
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const defaultValues: FormValues = {
@@ -285,7 +287,7 @@ export function RecordForm({
           )}
         </label>
         <div className="portal-form-grid">
-          {formFields.map((field) => (
+          {kind === 'package' ? <PackageFields fields={formFields} register={form.register} data={row?.data}/> : formFields.map((field) => (
             <FieldControl
               key={field.key}
               field={field}
@@ -318,6 +320,16 @@ export function RecordForm({
     </Modal>
   );
 }
+function PackageFields({fields: formFields,register,data}: {fields: Field[];register: ReturnType<typeof useForm<FormValues>>['register'];data?: Row['data']}) {
+  const groups = [
+    {name:'Basic package information',keys:['treatmentId','locationId','description','durationDays','validFrom','validUntil']},
+    {name:'Original pricing and evidence',keys:['priceType','price','priceMax','currency','priceSourceUrl','priceSourceName','priceCheckedAt','priceValidFrom','priceValidUntil']},
+    {name:'Included and excluded services',keys:['inclusions','exclusions', ...['procedure','hospitalStay','consultation','diagnostics','followUp','rehabilitation'].flatMap(key=>[`${key}Status`,`${key}Info`])]},
+    {name:'Travel and patient services',keys:['accommodation','transfer','localTransport','interpreter','visaAssistance'].flatMap(key=>[`${key}Status`,`${key}Info`])},
+    {name:'Conditions and supporting documents',keys:['terms','notes','documentIds']},
+  ];
+  return groups.map(group=><fieldset key={group.name} className="portal-package-fields"><legend><T>{group.name}</T></legend><div className="portal-form-grid">{formFields.filter(field=>group.keys.includes(field.key)).map(field=><FieldControl key={field.key} field={field} register={register} defaultValue={data?.[field.key]}/>)}</div></fieldset>);
+}
 export function RecordDetails({
   row,
   onClose,
@@ -338,6 +350,7 @@ export function RecordDetails({
           {String(row.published_revision ?? "none")}
         </span>
       </div>
+      {row.kind === 'package' && <PackageReview row={row}/>}
       <dl className="portal-facts">
         {Object.entries(row.data ?? {}).map(([key, value]) => (
           <div key={key}>
@@ -482,10 +495,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                 {
                   key: "data",
                   label: "Price",
-                  render: (row) =>
-                    row.data?.price === undefined
-                      ? "Not provided"
-                      : `${row.data.currency ?? ""} ${Number(row.data.price).toLocaleString()}`,
+                  render: (row) => <T>{packagePrice({listedPrice:typeof row.data?.price==='number'?row.data.price:undefined,listedPriceMax:typeof row.data?.priceMax==='number'?row.data.priceMax:undefined,currency:typeof row.data?.currency==='string'?row.data.currency:undefined,priceType:String(row.data?.priceType??'not_published')})}</T>,
                 },
                 {
                   key: "data.durationDays",

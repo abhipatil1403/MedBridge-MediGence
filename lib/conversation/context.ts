@@ -19,6 +19,11 @@ export function buildReferenceContext(response: AgentResponse, createdAt = new D
         city: typeof item.facts.city === 'string' ? item.facts.city : undefined,
         country: typeof item.facts.country === 'string' ? item.facts.country : undefined,
         samplePrice: typeof item.facts.samplePriceUsd === 'number' && item.facts.samplePriceUsd > 0 ? item.facts.samplePriceUsd : undefined,
+        listedPrice:typeof item.facts.listedPrice==='number'?item.facts.listedPrice:undefined,
+        listedPriceMax:typeof item.facts.listedPriceMax==='number'?item.facts.listedPriceMax:undefined,
+        priceType:typeof item.facts.priceType==='string'?item.facts.priceType:undefined,
+        priceValidFrom:typeof item.facts.priceValidFrom==='string'?item.facts.priceValidFrom:undefined,
+        priceValidUntil:typeof item.facts.priceValidUntil==='string'?item.facts.priceValidUntil:undefined,
         currency: typeof item.facts.currency === 'string' ? item.facts.currency : undefined,
         durationDays: typeof item.facts.durationDays === 'number' && item.facts.durationDays > 0 ? item.facts.durationDays : undefined,
       })) });
@@ -75,6 +80,24 @@ export function persistedResponses(messages: ConversationMessage[], conversation
     const parsed = assistantResponseSchema.safeParse(metadata.response);
     return parsed.success && parsed.data.conversationId === conversationId ? [parsed.data] : [];
   });
+}
+
+/** A detail/price selection keeps its original displayed list as the ordinal
+ * anchor. A new search (including an empty one) always establishes a new scope. */
+export function selectionListContext(response: AgentResponse, responses: AgentResponse[]): ReferenceContext {
+  let anchor=response;
+  const seen=new Set<string>();
+  while(!seen.has(anchor.runId)){
+    seen.add(anchor.runId);
+    const resolution=anchor.referenceResolution;
+    const selected=resolution?.status==='resolved' ? resolution.reference : undefined;
+    if(!selected || !['details','price'].includes(resolution!.query.operation)
+      || anchor.findings.length!==1 || anchor.findings[0].provenance.recordId!==selected.entityId) break;
+    const source=responses.find(item=>item.runId===selected.sourceRunId);
+    if(!source || seen.has(source.runId)) break;
+    anchor=source;
+  }
+  return buildReferenceContext(anchor,anchor.referenceContext?.createdAt);
 }
 
 export function planReferenceContext(plan: CarePlan, requestedType?: ReferenceEntityType): ReferenceContext {

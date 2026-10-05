@@ -3,7 +3,7 @@ import { attributePatterns } from './RequirementExtractor';
 import type { RequirementEvaluation } from './RequirementTypes';
 
 export function attributeEvidence(record: Package, type: string): Pick<RequirementEvaluation, 'status' | 'evidence' | 'sourceFields' | 'explanation'> {
-  const serviceKeys: Record<string, keyof NonNullable<Package['serviceDetails']>> = { accommodation: 'accommodation', airport_transfer: 'transfer', interpreter: 'interpreter', consultation: 'consultation', diagnostics: 'diagnostics', follow_up: 'followUp' };
+  const serviceKeys: Record<string, keyof NonNullable<Package['serviceDetails']>> = { accommodation: 'accommodation', airport_transfer: 'transfer', interpreter: 'interpreter', consultation: 'consultation', diagnostics: 'diagnostics', follow_up: 'followUp', hospital_stay: 'hospitalStay', rehabilitation: 'rehabilitation', local_transport: 'localTransport', visa: 'visaAssistance' };
   const key = serviceKeys[type];
   const detail = key ? record.serviceDetails?.[key] : undefined;
   const listed = listedAttributeEvidence(record, type);

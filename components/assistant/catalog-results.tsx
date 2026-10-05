@@ -1,7 +1,8 @@
 import { LocalDate } from '@/components/experience/translation';
 import { T } from '@/components/experience/translation';
 import Link from '@/components/catalog-link';
-import { Price } from '@/components/experience/price';
+import { PackagePrice } from '@/components/experience/package-price';
+import { factsPrice, priceTypeLabels } from '@/lib/catalog/pricing';
 import { SaveButton } from '@/components/experience/saved';
 import type { Finding, PlanningResultGroup } from '@/lib/agents/schemas';
 import { RequirementResults } from './requirement-results';
@@ -28,7 +29,7 @@ export function FindingCards({ findings, onRequest, disabled }: { findings: Find
     {item.facts.city && <p className="assistant-finding__location">{String(item.facts.city)}{item.facts.country ? `, ${factValue(item.facts.country).replaceAll('-', ' ')}` : ''}</p>}
     {!(item.provenance.sourceKind === 'synthetic' && ['hospitals','doctors'].includes(item.kind)) && <p>{item.detail}</p>}
     {item.provenance.sourceKind === 'synthetic' && ['hospitals', 'doctors'].includes(item.kind) && <small><T>{"Synthetic provider record · Not a live provider"}</T></small>}
-    {item.kind === 'packages' && <p className="assistant-package-facts">{typeof (item.facts.listedPrice??item.facts.samplePriceUsd) === 'number' && Number(item.facts.listedPrice??item.facts.samplePriceUsd) > 0 ? <Price amount={Number(item.facts.listedPrice??item.facts.samplePriceUsd)} currency={String(item.facts.currency??'USD')}/> : <T>{'Listed price not specified'}</T>}{typeof item.facts.durationDays === 'number' && item.facts.durationDays > 0 ? ` · ${item.facts.durationDays} days` : ''}<small><T>{item.provenance.sourceKind==='synthetic'?'Sample price':'Listed estimate'}</T> <T>{"· Not a provider quote"}</T></small></p>}
+    {item.kind === 'packages' && <p className="assistant-package-facts"><PackagePrice item={factsPrice(item.facts)}/>{typeof item.facts.durationDays === 'number' && item.facts.durationDays > 0 ? ` · ${item.facts.durationDays} days` : ''}<small><T>{item.provenance.sourceKind==='synthetic'?'Sample price':priceTypeLabels[String(item.facts.priceType ?? 'estimate')] ?? 'Price not published'}</T>{' '}<T>{"· Not a provider quote"}</T></small></p>}
     <RequirementResults evaluation={item.requirementEvaluation} />
     <div className="assistant-finding__actions">{['hospitals','doctors','packages'].includes(item.kind)&&<SaveButton kind={item.kind==='hospitals'?'hospital':item.kind==='doctors'?'doctor':'package'} recordId={item.provenance.recordId}/>} {item.href && <Link href={item.href}><T>{"View details →"}</T></Link>}
       {onRequest && ['hospitals', 'doctors'].includes(item.kind) && <button type="button" disabled={disabled} onClick={() => onRequest(`Verify ${item.title}`)}><T>{"Check provider information"}</T></button>}

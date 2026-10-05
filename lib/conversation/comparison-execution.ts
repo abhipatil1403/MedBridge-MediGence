@@ -6,13 +6,19 @@ import type { RuntimeContext } from '@/lib/agents/runtime';
 import type { PlanningStore } from '@/lib/agents/treatment-planning/store';
 import { upsertTask } from '@/lib/agents/treatment-planning/tasks';
 import { describePackageDifferences } from '@/lib/agents/comparison/candidates';
-import { persistedResponses, buildReferenceContext, planReferenceContext, type ConversationMessage } from './context';
+import { persistedResponses, buildReferenceContext, planReferenceContext, selectionListContext, type ConversationMessage } from './context';
+import { ReferenceDetector } from './ReferenceDetector';
+import { ReferenceResolver } from './ReferenceResolver';
 
 /** A pair refers to actual displayed records, never two inferred destinations. */
 export async function prepareReferenceComparison(input: { content: string; conversationId: string; recent: ConversationMessage[]; active?: CarePlan;
   snapshot: CatalogSnapshot; store: PlanningStore; lease: string }): Promise<NonNullable<RuntimeContext['execution']> | undefined> {
-  if (!/^\s*compare\s+(?:those|these|the)(?:\s+two)?(?:\s+(?:packages|hospitals|doctors))?[.!?]?\s*$/i.test(input.content)) return undefined;
-  const latest = persistedResponses(input.recent, input.conversationId).at(-1);
+  const selectedPair=/^\s*compare\s+(?:it|this|that)(?:\s+(?:package|hospital|doctor))?\s+(?:with|to)\s+(.+?)[.!?]?\s*$/i.exec(input.content);
+  // Named destinations continue through the existing destination comparison path.
+  if (selectedPair && !ReferenceDetector.detect(selectedPair[1])?.ordinal) return undefined;
+  if (!selectedPair && !/^\s*compare\s+(?:those|these|the)(?:\s+two)?(?:\s+(?:packages|hospitals|doctors))?[.!?]?\s*$/i.test(input.content)) return undefined;
+  const responses=persistedResponses(input.recent,input.conversationId);
+  const latest = responses.at(-1);
   const requested = /packages/i.test(input.content) ? 'package' : /hospitals/i.test(input.content) ? 'hospital' : /doctors/i.test(input.content) ? 'doctor' : undefined;
   if (latest?.comparison && !requested) return undefined;
   const target = requested ?? latest?.referenceResolution?.reference?.entityType;
@@ -21,7 +27,18 @@ export async function prepareReferenceComparison(input: { content: string; conve
   const groups = context?.groups.filter((g) => ['hospital', 'package', 'doctor'].includes(g.entityType) && (!target || g.entityType === target)) ?? [];
   const byType = [...new Set(groups.map((g) => g.entityType))].map((type) => ({ type, references: groups.filter((g) => g.entityType === type).flatMap((g) => g.references) }));
   const pairs = byType.filter((g) => g.references.length === 2);
-  const references = pairs.length === 1 ? pairs[0].references : [];
+  let references = pairs.length === 1 ? pairs[0].references : [];
+  if(selectedPair){
+    references=[];
+    const selected=latest?.referenceResolution?.status==='resolved' ? latest.referenceResolution.reference : undefined;
+    const query=ReferenceDetector.detect(selectedPair[1]);
+    if(selected && latest && query?.ordinal){
+      const other=ReferenceResolver.resolve({conversationId:input.conversationId,userMessage:selectedPair[1],
+        currentContext:selectionListContext(latest,responses),query:{...query,entityType:selected.entityType}});
+      if(other.status==='resolved' && other.reference && other.reference.entityId!==selected.entityId)
+        references=[selected,other.reference];
+    }
+  }
   const table = { package: 'packages', hospital: 'hospitals', doctor: 'doctors' } as const;
   const valid = references.length === 2 && references.every((ref) => ref.entityType in table && input.snapshot[table[ref.entityType as keyof typeof table]]
     .some((r) => r.recordId === ref.entityId && r.slug === ref.slug));

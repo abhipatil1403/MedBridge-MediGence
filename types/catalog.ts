@@ -75,11 +75,15 @@ export interface Country extends CatalogRecord {
 }
 
 export interface Package extends CatalogRecord {
+  readonly publishedRevision?: number;
   readonly priceType?: string;
   readonly city?: string;
   readonly serviceDetails?: import("@/lib/catalog/package-services").PackageServices;
   readonly currency?: string;
   readonly listedPrice?: number;
+  readonly listedPriceMax?: number;
+  readonly priceValidFrom?: string;
+  readonly priceValidUntil?: string;
   readonly treatmentSlug: string;
   readonly hospitalSlug: string;
   readonly hospitalName: string;
@@ -110,6 +114,7 @@ export interface PriceEstimate {
 export type CatalogCandidates = Readonly<Record<CatalogKind, ReadonlySet<string>>>;
 
 export interface CatalogSnapshot {
+  readonly exchangeRates?: import('@/lib/experience/currency').RateSnapshot | null;
   treatments: readonly Treatment[];
   hospitals: readonly Hospital[];
   doctors: readonly Doctor[];

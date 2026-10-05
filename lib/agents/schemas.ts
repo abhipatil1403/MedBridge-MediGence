@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { currencies } from '@/lib/experience/preferences';
 import { coordinationSchema, type CoordinationContext } from '@/lib/experience/coordination-schema';
 import { verificationResultSchema, type VerificationResult } from '@/lib/verification/schemas';
 import { documentWorkspaceSchema, type DocumentWorkspace } from '@/lib/documents/schemas';
@@ -48,6 +49,7 @@ export const userRequestSchema = z.object({
   content: z.string().trim().min(1).max(2000),
   conversationId: z.uuid().optional(),
   caseId: z.uuid().optional(),
+  displayCurrency: z.enum(currencies).optional(),
 }).strict();
 
 export interface Provenance {
@@ -157,7 +159,7 @@ export const comparisonSubjectSchema = z.object({ type: z.enum(['treatment', 'sp
 export const comparisonRequestSchema = z.object({ intent: z.literal('comparison'), subject: comparisonSubjectSchema.optional(),
   requirements: requirementsSchema.optional(),
   options: z.array(comparisonOptionSchema).max(2), targets: z.array(z.enum(['hospitals', 'packages', 'doctors'])).min(1).max(3),
-  budget: z.object({ amount: z.number().positive().max(100000000), currency: z.enum(['USD', 'INR']), source: z.literal('user') }).strict().optional(),
+  budget: z.object({ amount: z.number().positive().max(100000000), currency: z.enum(currencies), source: z.literal('user') }).strict().optional(),
   focus: z.enum(['catalog', 'package_price']),
 }).strict();
 export type ComparisonRequest = z.infer<typeof comparisonRequestSchema>;
@@ -183,7 +185,7 @@ export const planningContextSchema = z.object({
   goalType: z.enum(['treatment', 'consultation', 'intake']),
   treatmentSlug: z.string().optional(), treatmentName: z.string().optional(), treatmentId: z.guid().optional(),
   specialty: z.string().optional(), city: z.string().optional(), country: z.string().optional(),
-  budget: z.object({ amount: z.number().positive().max(100000000), currency: z.enum(['USD', 'INR']), source: z.literal('user') }).strict().optional(),
+  budget: z.object({ amount: z.number().positive().max(100000000), currency: z.enum(currencies), source: z.literal('user') }).strict().optional(),
   preferredHospital: z.string().max(100).optional(), consultationMode: z.enum(['video', 'in-person']).optional(),
   requestedTargets: z.array(z.enum(['hospitals', 'packages', 'doctors', 'services'])).max(4),
 }).strict();

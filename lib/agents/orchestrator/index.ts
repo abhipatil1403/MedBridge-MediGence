@@ -123,7 +123,7 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
         documentMetadata: request.caseId ? await context.caseAccess.readDocumentMetadata(request.caseId) : undefined });
       return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
     }
-    const snapshot = await loadDiscoverySnapshot(context.tools?.repository ?? defaultToolDependencies.repository);
+    let snapshot = await loadDiscoverySnapshot(context.tools?.repository ?? defaultToolDependencies.repository);
     const verificationExecution=prepareVerification({content:request.content,conversationId,userId:context.userId,recent,snapshot});
     if(verificationExecution)return validateResponse(await runAgent({...request,conversationId},{...context,tools:{...(context.tools??defaultToolDependencies),evaluationSnapshot:snapshot},execution:verificationExecution}));
     let routingContent = wantsHandoff && continueCase ? draft!.pendingCoordinationRequest! : request.content;
@@ -137,6 +137,13 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
     const previousRequirements = active?.context.requirements ?? lastResponse?.requirements ?? [];
     const newGoal = /\b(?:new|separate) (?:plan|goal|search)\b/i.test(request.content);
     const requirements = RequirementExtractor.extract(routingContent, snapshot, newGoal ? [] : previousRequirements);
+    // A preference supplies units only for a newly stated amount without units.
+    // Explicit user currency and existing conversation budgets retain their units.
+    if(request.displayCurrency)for(const requirement of requirements)if(requirement.type==='budget'&&requirement.currency==='unspecified'&&requirement.originalExpression&&routingContent.includes(requirement.originalExpression))requirement.currency=request.displayCurrency;
+    if (requirements.some(r => r.type === 'budget' && snapshot.packages.some(p => p.currency && p.currency !== r.currency)) || /\b(?:cheapest|cheaper|expensive|lowest price)\b/i.test(routingContent) && new Set(snapshot.packages.map(p=>p.currency).filter(Boolean)).size>1) {
+      const { exchangeRates } = await import('@/lib/experience/rates');
+      snapshot = { ...snapshot, exchangeRates: await exchangeRates().catch(() => null) };
+    }
     // An answer to an intake search clarification updates administrative context;
     // it neither becomes a clinical fact nor bypasses the review/Continue step.
     if (draft?.pendingCoordinationRequest && !wantsHandoff && draft.missingInformation.some((m) => m.category === 'required_for_requested_action')

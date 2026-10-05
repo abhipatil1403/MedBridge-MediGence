@@ -73,7 +73,6 @@ const loadSnapshot = cache(async () => {
     priceQuery,
     packageDetailsQuery,
     hospitalDetailsQuery,
-    provenanceQuery,
     referenceLocationsQuery,
   ] = await Promise.all([
     read(() => db.from("countries").select("*")),
@@ -95,9 +94,11 @@ const loadSnapshot = cache(async () => {
     read(() => db.from("price_estimates").select("*")),
     read(() => db.rpc("public_provider_package_details", {})),
     read(() => db.rpc("public_provider_hospital_details", {})),
-    read(() => db.rpc("public_catalog_provenance", {})),
     read(() => db.rpc("public_reference_locations", {})),
   ]);
+  // Provenance validates publication across every catalog kind. Run it after
+  // the table reads so those statements do not compete with this visibility check.
+  const provenanceQuery = await read(() => db.rpc("public_catalog_provenance", {}));
   const countryRows = rows(countryQuery.data, countryQuery.error, "countries");
   if (provenanceQuery.error) throw new Error("Published catalog provenance is unavailable.");
   const provenance = z.array(z.object({
@@ -159,11 +160,12 @@ const loadSnapshot = cache(async () => {
   if (packageDetailsQuery.error)
     throw new Error("Published package details are unavailable.");
   const packageDetails = z
-    .array(z.object({ id: z.string(), serviceDetails: packageServicesSchema }))
+    .array(z.object({ id: z.string(), publishedRevision: z.number().int().positive().optional(), serviceDetails: packageServicesSchema }))
     .parse(packageDetailsQuery.data);
   const detailsById = new Map(
     packageDetails.map((item) => [item.id, item.serviceDetails]),
   );
+  const publishedRevisionById = new Map(packageDetails.map(item => [item.id, item.publishedRevision]));
   if (hospitalDetailsQuery.error)
     throw new Error("Published hospital details are unavailable.");
   const hospitalDetails = z
@@ -437,7 +439,7 @@ const loadSnapshot = cache(async () => {
         treatmentById.get(item.treatment_id),
         "package treatment",
       ).slug,
-      city: referenceLocations.find(location => location.kind === "package" && location.canonicalId === item.id)?.city,
+      city: item.city_id ? cityById.get(item.city_id)?.name : referenceLocations.find(location => location.kind === "package" && location.canonicalId === item.id)?.city,
       hospitalSlug: item.hospital_id
         ? required(hospitalById.get(item.hospital_id), "package hospital").slug
         : "",
@@ -446,12 +448,16 @@ const loadSnapshot = cache(async () => {
         : "Provider to be confirmed",
       country: required(countryById.get(item.country_id), "package country")
         .slug,
-      durationDays: item.duration_days,
+      durationDays: item.duration_days ?? 0,
       serviceDetails: detailsById.get(item.id),
-      currency: item.currency.trim(),
-      listedPrice: item.estimated_min,
+      publishedRevision: publishedRevisionById.get(item.id),
+      currency: item.currency?.trim(),
+      listedPrice: item.estimated_min ?? undefined,
+      listedPriceMax: item.estimated_max ?? undefined,
+      priceValidFrom: item.price_valid_from ?? undefined,
+      priceValidUntil: item.price_valid_until ?? undefined,
       priceType: item.price_type,
-      samplePriceUsd: item.currency.trim() === "USD" ? item.estimated_min : 0,
+      samplePriceUsd: item.currency?.trim() === "USD" ? item.estimated_min ?? 0 : 0,
       inclusions: inclusionRows
         .filter((link) => link.package_id === item.id)
         .sort((a, b) => a.position - b.position)

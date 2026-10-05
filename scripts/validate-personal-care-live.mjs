@@ -42,6 +42,28 @@ try{
  good(await api('/api/account',{action:'save_item',input:{kind:'doctor',recordId:doctor.id,saved:false}},owner));
  check(good(await api('/api/account?section=saved',undefined,owner)).items.length===1,'saved-item removal persists');
  const unknown=await api('/api/account',{action:'save_item',input:{kind:'package',recordId:randomUUID(),saved:true}},owner);check(unknown.status!==200,'unpublished/nonexistent package cannot be saved');
+ if(process.env.MEDBRIDGE_PACKAGE_CATALOG_LIVE==='1'){
+  const packages=await anon.from('packages').select('id,name,slug,hospital_id,treatment_id,city_id,country_id');assert.equal(packages.error,null);
+  check(packages.data.length===7,'positive saved package gate uses seven real published references');
+  const carePackage=packages.data.find(p=>p.name==='Platinum (Male)');assert.ok(carePackage);
+  good(await api('/api/account',{action:'save_item',input:{kind:'package',recordId:carePackage.id,saved:true}},owner));
+  const packageSaved=good(await api('/api/account?section=saved',undefined,owner)).items.find(i=>i.package_id===carePackage.id);
+  check(packageSaved?.record?.name===carePackage.name&&packageSaved.record.slug===carePackage.slug,'saved package reload preserves canonical public identity and link');
+  const page=await fetch(`${origin}/packages/${carePackage.slug}`);check(page.status===200&&(await page.text()).includes(carePackage.name),'saved package link opens actual published detail');
+  check(!good(await api('/api/account?section=saved',undefined,other)).items.some(i=>i.package_id===carePackage.id),'another patient cannot see the saved package');
+  const isolated=await other.db.from('saved_items').select('id').eq('owner_id',owner.id).eq('package_id',carePackage.id);check(!isolated.error&&isolated.data.length===0,'direct saved-package RLS preserves ownership');
+  const revision=(await anon.rpc('public_provider_package_details',{})).data.find(p=>p.id===carePackage.id).publishedRevision;check(revision===1,'inquiry revision resolves from published public snapshot');
+  const inquiryPage=await fetch(`${origin}/help?package=${carePackage.slug}`);const inquiryHtml=await inquiryPage.text();
+  check(inquiryPage.status===200&&inquiryHtml.includes('Published package revision: 1')&&inquiryHtml.includes('Location: Mumbai, India')&&inquiryHtml.includes(carePackage.name),'real Support form contains location and published package revision');
+  const description=`Package: ${carePackage.name}\nProvider: ${hospital.name}\nLocation: Mumbai, India\nTreatment: Health Checkup\nPublished package revision: ${revision}\nCatalog: ${origin}/packages/${carePackage.slug}\nMy question: QA ONLY confirm published conditions. No health information.`;
+  const supportPackage=good(await api('/api/portals?portal=patient',{action:'create_case',input:{title:'QA ONLY published package inquiry',description,hospitalId:carePackage.hospital_id,consent:true,shareWithProvider:false}},owner));
+  const supportRow=await owner.db.from('support_cases').select('id,patient_id,hospital_id,description,created_at').eq('id',supportPackage.id).single();assert.equal(supportRow.error,null);
+  check(supportRow.data.patient_id===owner.id&&supportRow.data.hospital_id===carePackage.hospital_id&&supportRow.data.description===description&&Date.parse(supportRow.data.created_at)>0,'existing consented Support case persists package, provider, location, treatment, revision, request, user and timestamp');
+  const cross=await other.db.from('support_cases').select('id').eq('id',supportPackage.id);check(!cross.error&&cross.data.length===0,'package inquiry remains isolated from another patient');
+  check(!good(await api('/api/recovery',undefined,owner)).journeys.length,'package save and inquiry do not create Lifetime Recover promises or milestones');
+  good(await api('/api/account',{action:'save_item',input:{kind:'package',recordId:carePackage.id,saved:false}},owner));
+  check(!good(await api('/api/account?section=saved',undefined,owner)).items.some(i=>i.package_id===carePackage.id),'unsaved published package stays removed after refresh');
+ }
  good(await api('/api/account',{action:'save_search',input:{query:'Knee replacement in Mumbai'}},owner));
  check(good(await api('/api/account?section=searches',undefined,owner)).items.length===1,'recent search persists');
  const journey=good(await api('/api/recovery',{action:'create_journey',title:'QA ONLY non-clinical coordination',hospitalId:hospital.id},owner));
@@ -81,7 +103,7 @@ try{
  const adopted=good(await api('/api/assistant/public',{action:'adopt',content:'Keep this conversation in my account'},owner,true));check(adopted.conversationId===guest.conversationId,'explicit import reuses the real conversation identifier');
  const privateHistory=good(await api(`/api/assistant/public?conversationId=${adopted.conversationId}`,undefined,owner));check(privateHistory.messages.length>=history.messages.length,'imported messages persist in the existing account history');
  check((await api(`/api/assistant/public?conversationId=${adopted.conversationId}`,undefined,other)).status!==200,'another account cannot read imported history');
- console.log(`${passes} live personal care/API checks passed. Positive package/price checks remain isolated database QA; no production catalog fixtures were inserted.`);
+ console.log(`${passes} live personal care/API checks passed. Package checks use actual published references when opted in; no production catalog fixtures were inserted.`);
 }finally{
  const closed=await admin.from('support_cases').update({status:'closed',consent_revoked_at:new Date().toISOString()}).in('patient_id',users);assert.equal(closed.error,null);
  for(const id of users){const result=await admin.auth.admin.updateUserById(id,{ban_duration:'876000h'});assert.equal(result.error,null);}

@@ -14,13 +14,14 @@ export const ReferenceDetector = {
       return referenceQuerySchema.parse({ entityType: 'case', operation: 'details' });
     if (/\b(?:is|does)\s+(?:it|this|that|this package|that package)\b.*\b(?:under|below|within|over|above|less than|more than)\b/.test(text))
       return referenceQuerySchema.parse({ entityType: 'package', operation: 'price' });
+    if (/which of (?:the )?hospitals.*\b(?:cheapest|lowest).*\bpackage/.test(text)) return undefined;
     if (/\bcompare\b|\bcomparison\b|\bversus\b|\bvs\b|\bbudget\b/.test(text)
       || /which has (?:the )?cheaper package/.test(text)) return undefined;
     const ordinalMatch = /\b(?:the )?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|\d+(?:st|nd|rd|th))\s+(?:(?:external|researched) )?(?:one|item|result|hospital|doctor|package|treatment|provider)s?\b/.exec(text);
     const location = /\bthe\s+([a-z]+(?:\s+[a-z]+){0,3}?)\s+(?:one|result)\b/.exec(text)?.[1];
     const relation = /\b(?:its|their|that hospital(?:'s|s)?|this hospital(?:'s|s)?)\s+(?:have\s+(?:a\s+)?)?packages?\b|\bdoes (?:that|this|the) hospital have (?:a )?package\b/.test(text);
     const doctorRelation = /\bdoctors?\b.*\b(?:this|that|the|shown|selected) hospital\b|\b(?:its|their|this hospital(?:'s)?|that hospital(?:'s)?)\s+doctors?\b/.test(text);
-    const attribute = /\b(?:cheaper|less expensive|lowest (?:price|cost))\b/.test(text) ? 'cheaper'
+    const attribute = /\b(?:cheapest|cheaper|less expensive|lowest (?:price|cost))\b/.test(text) ? 'cheaper'
       : /\b(?:more expensive|highest (?:price|cost))\b/.test(text) ? 'expensive'
         : /\blonger\b/.test(text) ? 'longer' : /\bshorter\b/.test(text) ? 'shorter' : undefined;
     const demonstrative = /\b(?:this|that|these|those|its|their)\b/.test(text);

@@ -2,7 +2,8 @@ import { T, LocalNumber } from '@/components/experience/translation';
 import Link from '@/components/catalog-link';
 import { ArrowRight } from "lucide-react";
 import type { DiscoveryResults } from "@/types/discovery";
-import { Price } from '@/components/experience/price';
+import { PackagePrice } from '@/components/experience/package-price';
+import { priceTypeLabels } from '@/lib/catalog/pricing';
 import { SaveButton } from '@/components/experience/saved';
 
 const labels = { treatments: "Treatments", hospitals: "Hospitals", doctors: "Doctors", packages: "Packages", countries: "Countries", services: "Services" } as const;
@@ -45,8 +46,8 @@ export function ResultSections({ results, limit = 4, idPrefix = '' }: { results:
             <SaveButton kind="doctor" recordId={item.recordId}/><Link className="result-action" href={`/doctors/${item.slug}`}><T>{"View profile"}</T><ArrowRight size={16} aria-hidden="true" /></Link>
           </article>)}
           {key === "packages" && sections.packages.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }) => <article className="result-row" key={item.slug}>
-            <div><span className="result-kicker">{item.country} · <T>{item.demo?'demo package':'published package'}</T></span><h3><Link href={`/packages/${item.slug}`}>{item.name}</Link></h3><p>{item.hospitalName}</p><small>{item.durationDays} <T>{item.demo?'illustrative':'listed'}</T> <T>{"days"}</T></small><details><summary><T>{"Matching information"}</T></summary><p>{reason}</p></details></div>
-            <div className="package-decision"><SaveButton kind="package" recordId={item.recordId}/><span><T>{item.demo?'SYNTHETIC ESTIMATE':'PROVIDER-LISTED ESTIMATE'}</T></span><strong><Price amount={item.listedPrice??item.samplePriceUsd} currency={item.currency??'USD'}/></strong><span><T>{item.demo?'Not a quote or available offer':'Confirm current quote and availability'}</T></span><Link className="result-action" href={`/packages/${item.slug}`}><T>{"View package"}</T><ArrowRight size={16} aria-hidden="true" /></Link></div>
+            <div><span className="result-kicker">{item.country} · <T>{item.demo?'demo package':'published package'}</T></span><h3><Link href={`/packages/${item.slug}`}>{item.name}</Link></h3><p>{item.hospitalName}</p><small>{item.durationDays > 0 ? <><LocalNumber value={item.durationDays}/>{' '}<T>{item.demo?'illustrative':'listed'}</T>{' '}<T>{'days'}</T></> : <T>{'Duration not published'}</T>}</small><details><summary><T>{"Matching information"}</T></summary><p>{reason}</p></details></div>
+            <div className="package-decision"><SaveButton kind="package" recordId={item.recordId}/><span><T>{item.demo?'SYNTHETIC ESTIMATE':priceTypeLabels[item.priceType ?? 'estimate'] ?? 'Price not published'}</T></span><strong><PackagePrice item={item}/></strong><span><T>{item.demo?'Not a quote or available offer':'Confirm current quote and availability'}</T></span><Link className="result-action" href={`/packages/${item.slug}`}><T>{"View package"}</T><ArrowRight size={16} aria-hidden="true" /></Link></div>
           </article>)}
           {key === "countries" && sections.countries.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }) => <article className="result-row" key={item.slug}>
             <div><span className="result-kicker"><T>{"Destination ·"}</T>{' '}{item.code}</span><h3><Link href={`/compare?countryA=${item.slug}`}>{item.name}</Link></h3><p>{item.description}</p><small>{reason}</small></div>

@@ -159,7 +159,10 @@ it.skipIf(!ready)('persists and restores an authenticated multi-turn care plan w
     expect(newBudget.findings[0].provenance.recordId).toBe(compoundPackage.provenance.recordId);
     expect(newBudget.requirements?.find((r) => r.type === 'budget')?.maximum).toBe(5000);
     expect(newBudget.plan?.context.budget?.amount).toBe(5000);
-    expect(newBudget.findings[0].requirementEvaluation?.evaluations.find((e) => e.type === 'budget')?.status).toBe('exact');
+    // The seeded USD 4,700–5,640 range crosses USD 5,000. Preserving its
+    // documented maximum means this budget cannot be confirmed as an exact fit.
+    expect(newBudget.findings[0].facts.listedPriceMax).toBeGreaterThan(5000);
+    expect(newBudget.findings[0].requirementEvaluation?.evaluations.find((e) => e.type === 'budget')?.status).toBe('unknown');
     const newCity = await orchestrate({ content: 'What about Pune?', conversationId: compound.conversationId }, freshBase);
     expect(newCity.plan?.context).toMatchObject({ treatmentSlug: 'knee-replacement', city: 'Pune', budget: { amount: 5000 } });
     expect(newCity.requirements?.some((r) => r.type === 'package')).toBe(true);

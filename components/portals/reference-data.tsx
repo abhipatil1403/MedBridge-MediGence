@@ -8,6 +8,7 @@ import { CommandForm } from "./command-form";
 import { ErrorPanel, Loading, Panel, PortalStateContext, ResourceTable, date, usePortal, useResource } from "./core";
 import { ProviderContent } from "./provider";
 import { ReferenceStarter } from "./reference-starter";
+import { PackageStarter } from './package-starter';
 
 export function ReferenceWorkspace() {
   const state = usePortal();
@@ -22,6 +23,7 @@ export function ReferenceWorkspace() {
     setSelectedOrganization(currentOrganization);
   const org = currentOrganization ?? (loading && selectedOrganization?.id === selected ? selectedOrganization : undefined);
   return <>
+    <PackageStarter onSelect={id=>{setSelected(id);setSection('packages');}}/>
     <ReferenceStarter onSelect={id=>{setSelected(id);setSection("profile");}}/>
     <Panel title="Reference data onboarding">
       <p><T>{"Collect factual information from authoritative public sources. Each populated field needs a source and review before approval and explicit publication. These listings are labelled MedBridge reference information."}</T></p>

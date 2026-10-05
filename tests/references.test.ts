@@ -26,8 +26,24 @@ function extendedHarness(options: { twoPackages?: boolean } = {}) {
 }
 
 describe('conversational reference detection and resolution', () => {
+  it('retains the source list after cheapest, ordinal detail and service follow-ups for a pair comparison',async()=>{
+    const h=extendedHarness({twoPackages:true});
+    h.data.packages = h.data.packages.map((item,index)=>index===1 ? {...item,serviceDetails:{accommodation:{status:'conditional',information:'One guest-room night subject to eligibility.'}}} : item);
+    const first=await h.send('Find knee replacement packages.');
+    expect(first.findings.filter(f=>f.kind==='packages')).toHaveLength(2);
+    const cheaper=await h.send('Which one is cheaper?',first.conversationId);
+    expect(cheaper.referenceResolution?.reference?.slug).toBe(pkg.slug);
+    const second=await h.send('Tell me more about the second one.',first.conversationId);
+    expect(second.referenceResolution?.reference?.slug).toBe('ankara-package');
+    const accommodation=await h.send('Does it include accommodation?',first.conversationId);
+    expect(accommodation.referenceResolution?.reference?.slug).toBe('ankara-package');
+    expect(accommodation.summary).toContain('Accommodation is conditional');
+    expect(accommodation.summary).toContain('One guest-room night subject to eligibility.');
+    const pair=await h.send('Compare it with the first one.',first.conversationId);
+    expect(pair.type).toBe('comparison');expect(pair.findings.map(f=>f.slug)).toEqual(['ankara-package',pkg.slug]);
+  });
   it('answers catalog information gaps without starting case intake after an empty package clarification', async () => {
-    const h=extendedHarness();h.data.packages=[];
+    const h=extendedHarness();h.data.packages=[{...pkg,treatmentSlug:'health-checkup'}];
     const first=await h.send('Find knee replacement hospitals in Mumbai.');
     await h.send('Show me its packages.',first.conversationId);
     await h.send('Tell me more about the second package.',first.conversationId);

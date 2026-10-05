@@ -9,7 +9,7 @@ import type { AgentResponse } from '@/lib/agents/schemas';
 import '@/app/assistant/assistant.css';
 type Message={id:string;role:string;content:string;metadata:{response?:AgentResponse;approvalStatus?:string}};
 export default function ChatPanel({onClose,page,open}:{onClose:()=>void;page?:{kind:'hospital'|'doctor'|'package';slug:string};open:boolean}) {
-  const {session,api}=useExperience(),{t}=useTranslation();
+  const {session,api,preferences}=useExperience(),{t}=useTranslation();
   const owner=session?.user.id??'guest';
   const [history,setHistory]=useState<{owner:string;messages:Message[];conversationId?:string;guest:boolean}|null>(null),[draft,setDraft]=useState({owner,value:''}),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
   const content=draft.owner===owner?draft.value:'';
@@ -44,7 +44,7 @@ export default function ChatPanel({onClose,page,open}:{onClose:()=>void;page?:{k
     const before=current?.messages??[];
     const id=crypto.randomUUID();setBusy(true);setNotice('');setHistory({owner,messages:[...before,{id,role:'user',content:text,metadata:{}}],conversationId:current?.conversationId,guest});setContent('');
     try {
-      const result=await request({method:'POST',body:JSON.stringify({content:text,conversationId:current?.conversationId,page})},guest) as AgentResponse;
+      const result=await request({method:'POST',body:JSON.stringify({content:text,conversationId:current?.conversationId,page,displayCurrency:preferences.currency})},guest) as AgentResponse;
       if(currentOwner.current!==startOwner)return;
       setHistory({owner,messages:[...before,{id,role:'user',content:text,metadata:{}},{id:crypto.randomUUID(),role:'assistant',content:result.summary,metadata:{response:result}}],conversationId:result.conversationId,guest});
       if(!guest)try{localStorage.setItem(`medbridge-active-conversation:${owner}`,JSON.stringify({id:result.conversationId}));}catch{/* Current conversation remains available in the account. */}

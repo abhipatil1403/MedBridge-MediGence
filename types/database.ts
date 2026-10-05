@@ -1353,10 +1353,10 @@ export type Database = {
           treatment_id: string;
           hospital_id: string | null;
           country_id: string;
-          duration_days: number;
-          currency: string;
-          estimated_min: number;
-          estimated_max: number;
+          duration_days: number | null;
+          currency: string | null;
+          estimated_min: number | null;
+          estimated_max: number | null;
           price_type: string;
           benefits: string[];
           status: string;
@@ -1368,6 +1368,8 @@ export type Database = {
           updated_at: string;
           publication_status: string;
           city_id: string | null;
+          price_valid_from: string | null;
+          price_valid_until: string | null;
         };
         Insert: {
           id?: string;
@@ -1378,10 +1380,10 @@ export type Database = {
           treatment_id: string;
           hospital_id?: string | null;
           country_id: string;
-          duration_days: number;
-          currency: string;
-          estimated_min: number;
-          estimated_max: number;
+          duration_days?: number | null;
+          currency?: string | null;
+          estimated_min?: number | null;
+          estimated_max?: number | null;
           price_type: string;
           benefits?: string[];
           status?: string;
@@ -1393,6 +1395,8 @@ export type Database = {
           updated_at?: string;
           publication_status?: string;
           city_id?: string | null;
+          price_valid_from?: string | null;
+          price_valid_until?: string | null;
         };
         Update: {
           id?: string;
@@ -1403,10 +1407,10 @@ export type Database = {
           treatment_id?: string;
           hospital_id?: string | null;
           country_id?: string;
-          duration_days?: number;
-          currency?: string;
-          estimated_min?: number;
-          estimated_max?: number;
+          duration_days?: number | null;
+          currency?: string | null;
+          estimated_min?: number | null;
+          estimated_max?: number | null;
           price_type?: string;
           benefits?: string[];
           status?: string;
@@ -1418,6 +1422,8 @@ export type Database = {
           updated_at?: string;
           publication_status?: string;
           city_id?: string | null;
+          price_valid_from?: string | null;
+          price_valid_until?: string | null;
         };
         Relationships: [];
       };
@@ -2738,6 +2744,7 @@ export type Database = {
       public_provider_image: { Args: { p_doctor_id: string }; Returns: Json };
       public_provider_record: { Args: { p_kind: string; p_id: string }; Returns: Json };
       public_provider_package_details: { Args: Record<string, never>; Returns: Json };
+      public_package_evidence: { Args: { p_id: string }; Returns: Json };
       public_catalog_provenance: { Args: Record<string, never>; Returns: Json };
       portal_team: { Args: { p_organization_id: string }; Returns: Json };
       portal_staff_directory: { Args: Record<string, never>; Returns: Json };

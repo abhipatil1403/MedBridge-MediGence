@@ -10,6 +10,10 @@ const load=(path,imports={})=>{
 };
 const starter=load('lib/reference-data/starter.ts');
 const taxonomy=load('lib/reference-data/taxonomy.ts',{'./starter':starter});
+const withPackages=process.argv.includes('--packages');
+const packages=withPackages?load('lib/reference-data/package-starter.ts'):null;
+const allTaxonomy=[...taxonomy.starterTaxonomy,...(packages?.packageTaxonomy??[])];
+const allSources={...starter.starterSources,...(packages?.packageSources??{})};
 const quote=value=>`'${String(value).replaceAll("'","''")}'`;
 const json=value=>`${quote(JSON.stringify(value))}::jsonb`;
 const commands=[`\\set ON_ERROR_STOP on
@@ -31,12 +35,12 @@ create function pg_temp.starter_resolve(d jsonb) returns jsonb language plpgsql 
 create function pg_temp.starter_assert(ok boolean,label text) returns void language plpgsql as $$begin if ok is distinct from true then raise exception 'FAIL: %',label;end if;raise notice 'PASS: %',label;end;$$;
 set local role authenticated;
 select set_config('request.jwt.claim.sub',(select id::text from starter_ids where starter_ids.k='admin'),true);`];
-for(const [key,source] of Object.entries(starter.starterSources))commands.push(`insert into starter_ids select ${quote(`source:${key}`)},(public.portal_reference_command('create_reference_source',${json({...source,collectedAt:starter.starterCollectedAt,reviewAfter:starter.starterReviewAfter,notes:'Local validation of the actual researched collection.'})})->>'id')::uuid;`);
+for(const [key,source] of Object.entries(allSources))commands.push(`insert into starter_ids select ${quote(`source:${key}`)},(public.portal_reference_command('create_reference_source',${json({...source,collectedAt:key in starter.starterSources?starter.starterCollectedAt:packages.packageCollectedAt,reviewAfter:key in starter.starterSources?starter.starterReviewAfter:packages.packageReviewAfter,notes:'Local validation of the actual researched collection.'})})->>'id')::uuid;`);
 commands.push(`insert into starter_ids select 'countries:'||slug,id from public.countries;
 insert into starter_ids select 'cities:'||slug,id from public.cities;
 insert into starter_ids select 'specialties:'||slug,id from public.specialties;
 insert into starter_ids select 'treatments:'||slug,id from public.treatments;`);
-for(const entry of taxonomy.starterTaxonomy){
+for(const entry of allTaxonomy){
  const key=`${entry.entity}:${entry.slug}`;
  commands.push(`do $$declare d jsonb;begin
  d:=public.portal_catalog_command('save_catalog_draft',jsonb_build_object('entity',${quote(entry.entity)},'name',${quote(entry.name)},'targetId',(select id from starter_ids where starter_ids.k=${quote(key)}),'data',pg_temp.starter_resolve(${json({...entry.data,slug:entry.slug,source_kind:'external'})})||jsonb_build_object('source_record_id',(select id from starter_ids where starter_ids.k=${quote(`source:${entry.source}`)}))));
@@ -47,7 +51,9 @@ for(const entry of taxonomy.starterTaxonomy){
 }
 for(const provider of starter.starterProviders){
  commands.push(`insert into starter_ids select ${quote(`org:${provider.key}`)},(public.portal_reference_command('create_reference_organization',${json({name:provider.name,providerType:'hospital'})})->>'id')::uuid;`);
- for(const entry of provider.records){
+ const additions=(packages?.sourcedPackages??[]).filter(entry=>entry.providerKey===provider.key);
+ const records=[...provider.records,...(additions.length?[{key:'health-checkup',kind:'treatment',name:'Health Checkup',source:additions[0].source,data:{treatmentId:'$treatments:health-checkup',locationId:'$record:location',description:'Official branch source lists health check packages. Confirm eligibility, preparation and current availability with the provider.'},evidence:additions[0].evidence}]:[]),...additions.map(entry=>({...entry,kind:'package'}))];
+ for(const entry of records){
   commands.push(`do $$declare r jsonb;claim_field text;begin
    r:=public.portal_command('save_record',jsonb_build_object('organizationId',(select id from starter_ids where starter_ids.k=${quote(`org:${provider.key}`)}),'kind',${quote(entry.kind)},'name',${quote(entry.name)},'data',pg_temp.starter_resolve(${json(entry.data)})));
    insert into starter_ids values(${quote(`record:${entry.key}`)},(r->>'id')::uuid) on conflict(k) do update set id=excluded.id;
@@ -70,14 +76,14 @@ for(const provider of starter.starterProviders){
 commands.push(`reset role;set local role anon;
 select pg_temp.starter_assert((select count(*)=5 from public.hospitals),'five sourced hospitals published; synthetic catalog excluded');
 select pg_temp.starter_assert((select count(*)=5 from public.doctors),'five sourced doctors published');
-select pg_temp.starter_assert((select count(*)=0 from public.packages),'no invented starter packages');
+select pg_temp.starter_assert((select count(*)=${withPackages?7:0} from public.packages),'only bounded sourced starter packages');
 select pg_temp.starter_assert((select count(*)=0 from public.price_estimates),'no fabricated starter prices');
 select pg_temp.starter_assert((select bool_and(consultation_mode is null and experience_years is null) from public.doctors),'unknown doctor modes and experience remain unset');
-select pg_temp.starter_assert((select count(*)=2 from public.treatments),'two sourced canonical treatment identities');
+select pg_temp.starter_assert((select count(*)=${withPackages?3:2} from public.treatments),'sourced canonical treatment identities');
 select pg_temp.starter_assert((select count(*)=4 from public.hospital_treatments ht join public.treatments t on t.id=ht.treatment_id where t.slug='knee-replacement'),'four explicitly sourced knee replacement offerings');
 select pg_temp.starter_assert((select bool_and(jsonb_array_length(public.public_reference_claims('hospital',id))>10) from public.hospitals),'every published hospital exposes safe field-level provenance');
 select pg_temp.starter_assert(not exists(select 1 from jsonb_array_elements(public.public_catalog_provenance()) x where x->>'origin'='provider_published'),'references never mislabeled provider-submitted');
 reset role;
-select pg_temp.starter_assert((select count(*)=29 from public.provider_records r join public.organizations o on o.id=r.organization_id where o.onboarding_origin='admin_reference'),'all twenty-nine sourced sections passed governed publication');
-rollback;`);
-const output=process.argv[2];if(!output)throw new Error('Supply a temporary SQL output path.');writeFileSync(output,commands.join('\n'),'utf8');console.log('Generated rollback-only starter collection validation.');
+select pg_temp.starter_assert((select count(*)=${withPackages?38:29} from public.provider_records r join public.organizations o on o.id=r.organization_id where o.onboarding_origin='admin_reference'),'all sourced sections passed governed publication');
+${process.argv.includes('--keep-fixture')?'commit;':'rollback;'}`);
+const output=process.argv[2];if(!output)throw new Error('Supply a temporary SQL output path.');writeFileSync(output,commands.join('\n'),'utf8');console.log(`Generated local-only starter collection validation (${process.argv.includes('--keep-fixture')?'retained isolated fixture':'rollback only'}).`);

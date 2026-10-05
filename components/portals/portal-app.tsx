@@ -34,13 +34,16 @@ import { Cases } from "./cases";
 import { CommandForm } from "./command-form";
 import "./portal.css";
 import { publicUrl } from "@/lib/portals/public-url";
+type PackageInquiry={title:string;description:string;hospitalId?:string};
 
 export function PortalApp({
   portal,
   path = [],
+  packageInquiry,
 }: {
   portal: Portal;
   path?: string[];
+  packageInquiry?: PackageInquiry;
 }) {
   const router = useRouter();
   const search = useSearchParams();
@@ -383,7 +386,7 @@ export function PortalApp({
             ) : portal === "support" ? (
               <SupportContent section={section} />
             ) : (
-              <PatientSupport />
+              <PatientSupport packageInquiry={packageInquiry}/>
             )}
           </main>
         </div>
@@ -520,7 +523,7 @@ function PortalLogin({
     </main>
   );
 }
-function PatientSupport() {
+function PatientSupport({packageInquiry}: {packageInquiry?:PackageInquiry}) {
   return (
     <>
       <Panel title="New support request">
@@ -584,7 +587,7 @@ function PatientSupport() {
               type: "checkbox",
             },
           ]}
-          initial={{ caseType: "coordination" }}
+          initial={{ caseType: "coordination", ...(packageInquiry ? {title:`Package inquiry: ${packageInquiry.title}`,description:packageInquiry.description,hospitalId:packageInquiry.hospitalId ?? ''} : {}) }}
           submit="Create support request"
         />
       </Panel>

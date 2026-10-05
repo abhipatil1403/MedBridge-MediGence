@@ -1,6 +1,7 @@
 import type { CatalogSnapshot, CatalogRecord, Package } from '@/types/catalog';
 import type { Finding } from '@/lib/agents/schemas';
 import { normalize } from '@/lib/discovery/normalize';
+import { packagePriceBounds, packagePrice, comparisonPrice } from '@/lib/catalog/pricing';
 import { hospitalCities, hospitalCountries } from '@/lib/catalog/location-scope';
 import type { Hospital } from '@/types/catalog';
 import { attributeEvidence } from './RequirementEvidence';
@@ -33,12 +34,9 @@ export const RequirementEvaluator = {
         return result(matches ? 'exact' : 'not_met', `The documented ${days}-day package duration ${matches ? 'meets' : 'does not meet'} the requested duration criterion; it does not establish recovery time.`, [`${days} days`], ['durationDays']);
       }
       if (type === 'price') {
-        const price = item.listedPrice??item.samplePriceUsd;
-        const currency=typeof item.currency==='string'?item.currency:'USD';
-        const priceFields=item.listedPrice!==undefined?['listedPrice','currency']:['samplePriceUsd'];
-        return typeof price === 'number' && Number.isFinite(price) && price > 0
-          ? result('exact', `The catalog documents a ${currency} listed estimate; it is not a provider quote.`, [`${currency} ${price}`], priceFields)
-          : result('unknown', 'No listed sample price is available.', [], ['samplePriceUsd']);
+        const price = packagePriceBounds(record as Package);
+        return price ? result('exact', `The catalog documents ${packagePrice(record as Package)}; pricing type: ${price.type}. Confirm applicability with the provider.`, [packagePrice(record as Package)], ['listedPrice','listedPriceMax','currency','priceType'])
+          : result('unknown', 'No published numeric price is available.', [], ['listedPrice','priceType']);
       }
       if ((packageAttributes as readonly string[]).includes(type)) {
         const evidence = attributeEvidence(record as Package, type);
@@ -46,15 +44,16 @@ export const RequirementEvaluator = {
         return { ...base, ...evidence };
       }
       if (type === 'budget') {
-        const price = item.listedPrice??item.samplePriceUsd;
-        const currency=typeof item.currency==='string'?item.currency:'USD';
-        const priceFields=item.listedPrice!==undefined?['listedPrice','currency']:['samplePriceUsd'];
-        if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) return result('unknown', 'No listed sample price is available to check this budget.', [], ['samplePriceUsd']);
-        if (requirement.currency !== currency) return result('unknown', `The listed price is ${currency}; the requested currency is ${requirement.currency ?? 'unspecified'}. No currency conversion was applied.`, [`${currency} ${price}`], priceFields);
+        const price = comparisonPrice(record as Package, requirement.currency ?? '', snapshot.exchangeRates);
+        const priceFields = item.listedPrice === undefined ? ['samplePriceUsd'] : ['listedPrice', ...(item.listedPriceMax !== undefined ? ['listedPriceMax'] : []), 'currency', ...(item.priceType ? ['priceType'] : [])];
+        if (!price) return result('unknown', `No comparable current numeric price is available. The listed price is ${packagePrice(record as Package)}; the requested currency is ${requirement.currency ?? 'unspecified'}. No currency conversion was applied without a valid rate.`, [], priceFields);
         const min = requirement.minimum, max = requirement.maximum;
-        const matches = (min === undefined || (requirement.operator === 'gt' ? price > min : price >= min))
-          && (max === undefined || (requirement.operator === 'lt' ? price < max : price <= max));
-        return result(matches ? 'exact' : 'not_met', `The listed ${currency} ${price.toLocaleString('en-US')} ${record.demo?'sample price':'estimate'} ${matches ? 'meets' : 'does not meet'} “${requirement.originalExpression}”. A listed estimate is not a provider quote.`, [`${currency} ${price}`], priceFields);
+        const fits = (amount: number) => (min === undefined || (requirement.operator === 'gt' ? amount > min : amount >= min)) && (max === undefined || (requirement.operator === 'lt' ? amount < max : amount <= max));
+        const upper = price.type === 'starting_price' ? Infinity : price.max;
+        const allMatch = fits(price.min) && fits(upper);
+        const noneMatch = max !== undefined && (requirement.operator === 'lt' ? price.min >= max : price.min > max) || min !== undefined && (requirement.operator === 'gt' ? upper <= min : upper < min);
+        const status = noneMatch ? 'not_met' : allMatch ? 'exact' : 'unknown';
+        return result(status, `The listed ${packagePrice(record as Package)} ${status === 'exact' ? 'meets the indicative budget criterion' : status === 'not_met' ? 'does not meet the budget criterion' : 'cannot confirm the budget: the range overlaps the limit or only a starting price is documented'}. ${price.note} A listed estimate is not a provider quote.`, [packagePrice(record as Package), ...(price.note ? [price.note] : [])], [...priceFields, ...(price.note ? ['exchangeRates'] : [])]);
       }
       if (type === 'procedure') {
         const values = finding.kind === 'treatments' ? [record.slug] : finding.kind === 'packages' ? [item.treatmentSlug] : Array.isArray(item.treatmentSlugs) ? item.treatmentSlugs : [];

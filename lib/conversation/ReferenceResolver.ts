@@ -1,12 +1,14 @@
 import { normalize } from '@/lib/discovery/normalize';
 import { referenceResolutionSchema, type EntityReference, type ReferenceContext, type ReferenceQuery, type ReferenceResolution } from './schemas';
 import { ReferenceDetector } from './ReferenceDetector';
+import { comparisonPrice, packagePrice } from '@/lib/catalog/pricing';
+import type { RateSnapshot } from '@/lib/experience/currency';
 
 const unique = (items: EntityReference[]) => [...new Map(items.map((item) => [`${item.entityType}:${item.entityId}`, item])).values()];
 const samePlace = (value: string | undefined, location: string) => Boolean(value && normalize(value.replaceAll('-', ' ')) === normalize(location));
 
 export const ReferenceResolver = {
-  resolve(input: { conversationId: string; userMessage: string; currentContext?: ReferenceContext; query?: ReferenceQuery }): ReferenceResolution {
+  resolve(input: { conversationId: string; userMessage: string; currentContext?: ReferenceContext; query?: ReferenceQuery; exchangeRates?: RateSnapshot | null }): ReferenceResolution {
     const query = input.query ?? ReferenceDetector.detect(input.userMessage) ?? { operation: 'details' };
     const context = input.currentContext?.conversationId === input.conversationId ? input.currentContext : undefined;
     const result = (status: ReferenceResolution['status'], reason: string, candidates: EntityReference[] = [], reference?: EntityReference) =>
@@ -21,15 +23,19 @@ export const ReferenceResolver = {
     const all = unique(groups.flatMap((group) => group.references));
     if (query.attribute) {
       const price = query.attribute === 'cheaper' || query.attribute === 'expensive';
-      const valid = all.filter((item) => item.matchType === 'exact' && (price ? item.currency === 'USD' && item.samplePrice !== undefined : item.durationDays !== undefined));
+      const target = all[0]?.currency ?? 'USD';
+      const prices = new Map(all.map(item=>[item.entityId,comparisonPrice({...item,samplePriceUsd:item.samplePrice},target,input.exchangeRates)]));
+      const valid = all.filter((item) => item.matchType === 'exact' && (price ? prices.get(item.entityId) && item.priceType !== 'starting_price' : item.durationDays !== undefined));
+      const numeric = all.filter(item=>prices.get(item.entityId));
       const missingSide = groups.some((group) => group.optionPosition && (!group.references.length || group.incomplete));
       if (valid.length < 2 || valid.length !== all.length || missingSide || groups.some((group) => group.incomplete))
-        return result('unresolved', price ? `I cannot determine a cheaper or more expensive package: a comparable listed USD sample price is missing for at least one option.${valid.length === 1 ? ` I can verify a listed sample of USD ${valid[0].samplePrice!.toLocaleString('en-US')} for ${valid[0].location ?? valid[0].displayName}.` : ''} Available prices are samples, not quotes.`
+        return result('unresolved', price ? `I cannot determine a cheaper or more expensive package: a comparable current numeric price is missing for at least one option, currencies cannot be converted, or only a starting price is documented.${numeric.length===1 ? ` The only numeric listing${numeric[0].listedPrice===undefined&&numeric[0].samplePrice?' (synthetic sample)':''} is ${packagePrice({...numeric[0],samplePriceUsd:numeric[0].samplePrice})}.` : ''} Unpriced packages cannot be ranked. Available prices are listings, not current quotes.`
           : 'I cannot compare package duration because comparable duration data is missing for at least one option.', all);
-      const values = valid.map((item) => price ? item.samplePrice! : item.durationDays!);
+      const values = valid.map((item) => price ? (query.attribute === 'cheaper' ? prices.get(item.entityId)!.max : prices.get(item.entityId)!.min) : item.durationDays!);
       const extreme = ['cheaper', 'shorter'].includes(query.attribute) ? Math.min(...values) : Math.max(...values);
       const candidates = valid.filter((_item, index) => values[index] === extreme);
-      return candidates.length === 1 ? result('resolved', `Resolved from the listed ${price ? 'USD sample prices' : 'package durations'} in the returned records only.`, candidates, candidates[0])
+      if (price && candidates.length === 1 && valid.some(item=>item.entityId!==candidates[0].entityId && (query.attribute==='cheaper' ? prices.get(item.entityId)!.min<extreme : prices.get(item.entityId)!.max>extreme))) return result('unresolved','Published price ranges overlap; they cannot establish a uniquely cheaper package.',all);
+      return candidates.length === 1 ? result('resolved', `Resolved from the listed ${price ? `${target} prices` : 'package durations'} in the returned records only.${price ? ` ${prices.get(candidates[0].entityId)!.note}` : ''}`, candidates, candidates[0])
         : result('ambiguous', 'The listed values are tied. Which package do you mean?', candidates);
     }
     if (!all.length) return result('unresolved', query.location ? `No matching ${query.entityType ?? 'entity'} was shown for ${query.location}. Which result do you mean?`

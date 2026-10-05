@@ -1,5 +1,6 @@
 "use client";
 import { LocalNumber } from '@/components/experience/translation';
+import { packagePrice } from '@/lib/catalog/pricing';
 
 import { Localized } from '@/components/experience/localized';
 
@@ -489,9 +490,8 @@ function Preview() {
                 {row.kind === "package" && (
                   <>
                     <strong>
-                      {String(row.data?.currency ?? "")}{" "}
-                      <LocalNumber value={Number(row.data?.price ?? 0)}/> ·{" "}
-                      {String(row.data?.durationDays ?? "—")} <T>{"days"}</T></strong>
+                      {packagePrice({listedPrice:typeof row.data?.price==='number'?row.data.price:undefined,listedPriceMax:typeof row.data?.priceMax==='number'?row.data.priceMax:undefined,currency:typeof row.data?.currency==='string'?row.data.currency:undefined,priceType:String(row.data?.priceType??'estimate')})} ·{" "}
+                      {row.data?.durationDays?<>{String(row.data.durationDays)} <T>{'days'}</T></>:<T>{'Duration not provided'}</T>}</strong>
                     <h4><T>{"Inclusions"}</T></h4>
                     <ul>
                       {Array.isArray(row.data?.inclusions) &&

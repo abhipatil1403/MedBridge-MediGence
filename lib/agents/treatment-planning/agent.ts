@@ -13,6 +13,7 @@ import { derivePlanStatus, discoveryTask, PLANNING_LIMITS, upsertTask } from './
 import type { PlanningStore } from './store';
 import { discoveryMatch, planningResultGroup, planningTargets } from './results';
 import { packageAttributes } from '@/lib/requirements/RequirementTypes';
+import { factsPrice, packagePrice, lowestComparablePrice } from '@/lib/catalog/pricing';
 
 export async function prepareTreatmentPlanning(input: { content: string; userId: string; conversationId: string;
   snapshot: CatalogSnapshot; active?: CarePlan; caseContext?: Record<string, unknown>; store: PlanningStore; lease: string; provider: LLMProvider; tools: ToolDependencies }): Promise<NonNullable<RuntimeContext['execution']>> {
@@ -136,13 +137,13 @@ export async function prepareTreatmentPlanning(input: { content: string; userId:
         return group ? [group] : [];
       });
       const selectedFindings = uniqueFindings(resultGroups.flatMap((group) => group.findings));
-      const cheapest = /\b(cheapest|lowest|compare)\b/i.test(content) ? packageComparison(plan.findings) : undefined;
+      const cheapest = /\b(cheapest|lowest|compare)\b/i.test(content) ? packageComparison(plan.findings,snapshot) : undefined;
       const summary = response.status === 'failed' ? 'Part of this catalog search could not finish. Your plan and completed findings are saved; you can retry.'
         : question ? 'Your planning goal is saved. I need one detail before searching the catalog.'
           : cheapest ?? (selectedFindings.length ? 'Based on the available catalog, I saved the matching records in your plan. Review the sourced options and confirm your preferences. This is a coordination plan, not a clinical treatment decision.'
             : 'No catalog options meet the saved criteria. Your plan is saved so you can adjust the treatment or destination.');
       const nextSteps = question ? [question] : ['Review the sourced options in your plan.', 'Confirm preferences or share an optional budget or preferred provider.'];
-      if (context.budget?.currency === 'INR') nextSteps.push('Your INR budget is saved. USD sample prices have not been converted or filtered by it.');
+      if (context.budget?.currency === 'INR') nextSteps.push(snapshot.exchangeRates ? 'Your INR budget is saved. Review the indicative conversion source, timestamp and original provider price in each requirement result.' : 'Your INR budget is saved. Cross-currency prices have not been converted without a valid exchange rate; unknown prices have not been treated as budget matches.');
       return { ...response, understanding, summary, findings: selectedFindings, plan: saved, question,
         discovery: undefined, resultGroups,
         status: response.status === 'failed' ? 'failed' : question ? 'awaiting_user_input' : 'completed',
@@ -153,12 +154,11 @@ export async function prepareTreatmentPlanning(input: { content: string; userId:
 }
 
 function uniqueFindings(findings: Finding[]) { return [...new Map(findings.map((item) => [item.provenance.recordId, item])).values()].slice(0, 30); }
-function packageComparison(findings: Finding[]): string | undefined {
-  const packages = findings.filter((item) => item.kind === 'packages' && typeof item.facts.samplePriceUsd === 'number')
-    .sort((a, b) => Number(a.facts.samplePriceUsd) - Number(b.facts.samplePriceUsd));
-  const first = packages[0];
-  if (!first) return 'No comparable package prices are available for the saved criteria. I cannot determine a lowest price.';
-  const hospital = typeof first.facts.hospitalName === 'string' ? first.facts.hospitalName : first.title;
-  const demo = first.provenance.sourceKind === 'synthetic';
-  return `Among the ${packages.length} sourced package ${packages.length === 1 ? 'record' : 'records'} saved in this plan, ${hospital} has the lowest listed ${demo ? 'synthetic sample' : 'catalog'} package price: USD ${Number(first.facts.samplePriceUsd).toLocaleString('en-US')}. ${demo ? 'This is demo data, not a live offer.' : 'This is catalog pricing, not a current provider quote.'} Inclusions and additional costs may differ; a clinician must assess suitability.`;
+function packageComparison(findings: Finding[], snapshot:CatalogSnapshot): string | undefined {
+  const packages=findings.filter(item=>item.kind==='packages');
+  const prices=packages.map(item=>factsPrice(item.facts));
+  const result=lowestComparablePrice(prices,snapshot.exchangeRates);
+  if(result.index===null)return result.reason;
+  const first=packages[result.index];
+  return `${first.title} (${first.facts.hospitalName ?? 'published provider'}): lowest listed ${first.provenance.sourceKind==='synthetic'?'synthetic sample':'catalog'} package price ${packagePrice(prices[result.index])}. ${result.reason}`;
 }

@@ -1,5 +1,6 @@
 'use client';
 import { LocalDate } from '@/components/experience/translation';
+import { useExperience } from '@/components/experience/provider';
 
 import { Localized } from '@/components/experience/localized';
 
@@ -30,6 +31,7 @@ type Case = { id: string; title: string; status: string; agentConsent: boolean; 
 type Message = { id: string; role: string; content: string; metadata: { response?: AgentResponse; approvalStatus?: string }; created_at: string };
 
 export function AssistantWorkspace({ configured, initialRequest = '', initialConversation }: { configured: boolean; initialRequest?: string; initialConversation?: string }) {
+  const {preferences}=useExperience();
   const auth = useMemo(() => getBrowserSupabaseClient(), []);
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState('');
@@ -134,7 +136,7 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
     requestStarted.current = new Set(conversations.map((c) => c.id));
     setActivity(undefined); setBusy(true); setNotice('');
     try {
-      const result: AgentResponse = await api('/api/assistant', { method: 'POST', body: JSON.stringify({ content: text, conversationId, caseId: caseId || undefined }) });
+      const result: AgentResponse = await api('/api/assistant', { method: 'POST', body: JSON.stringify({ content: text, conversationId, caseId: caseId || undefined,displayCurrency:preferences.currency }) });
       if (activeUser.current !== ownerAtStart) return;
       setConversationId(result.conversationId);
       setActivity(result.activity);

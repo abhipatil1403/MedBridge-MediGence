@@ -5,14 +5,16 @@ import type { RuntimeContext } from '@/lib/agents/runtime';
 import type { PlanningStore } from '@/lib/agents/treatment-planning/store';
 import { derivePlanStatus, upsertTask } from '@/lib/agents/treatment-planning/tasks';
 import { createHash, randomUUID } from 'node:crypto';
-import { buildReferenceContext, persistedResponses, planReferenceContext, type ConversationMessage } from './context';
+import { buildReferenceContext, persistedResponses, planReferenceContext, selectionListContext, type ConversationMessage } from './context';
 import { ReferenceDetector } from './ReferenceDetector';
 import { ReferenceResolver } from './ReferenceResolver';
+import { packagePrice, factsPrice } from '@/lib/catalog/pricing';
 import type { EntityReference, ReferenceContext, ReferenceClarification } from './schemas';
 import { normalize } from '@/lib/discovery/normalize';
 import { packageAttributes } from '@/lib/requirements/RequirementTypes';
 import { legacyBudget } from '@/lib/requirements/RequirementNormalizer';
 import { evaluateFindings } from '@/lib/requirements/response';
+import { packageServiceNames } from '@/lib/catalog/package-services';
 
 const lists = { hospital: 'hospitals', package: 'packages', doctor: 'doctors', treatment: 'treatments', country: 'countries', service: 'services' } as const;
 
@@ -52,7 +54,11 @@ export async function prepareReferenceExecution(input: { content: string; conver
     } else repeatClarification = true;
   }
   if (!query) return undefined;
+  if(query.ordinal && !query.entityType && latest?.referenceResolution?.status==='resolved'
+    && ['details','price'].includes(latest.referenceResolution.query.operation))
+    query={...query,entityType:latest.referenceResolution.reference?.entityType};
   const contexts = [...responses].reverse().map((response) => buildReferenceContext(response, response.referenceContext?.createdAt));
+  if(query.ordinal && latest) contexts[0]=selectionListContext(latest,responses);
   const requestedType = query.entityType ?? (query.attribute || query.operation === 'price' ? 'package' : undefined);
   const relevant = (context: ReferenceContext) => context.groups.some((group) => (!group.shared || requestedType === group.entityType)
     && (!requestedType || group.entityType === requestedType)
@@ -67,7 +73,7 @@ export async function prepareReferenceExecution(input: { content: string; conver
   current ??= contexts.slice(1).find(relevant);
   if (namedCandidates && current) current = { ...current, groups: current.groups.map((group) => ({ ...group,
     references: group.references.filter((item) => namedCandidates!.some((candidate) => candidate.entityId === item.entityId && candidate.entityType === item.entityType)) })) };
-  let resolution = ReferenceResolver.resolve({ conversationId: input.conversationId, userMessage: input.content, currentContext: current, query });
+  let resolution = ReferenceResolver.resolve({ conversationId: input.conversationId, userMessage: input.content, currentContext: current, query, exchangeRates:input.snapshot.exchangeRates });
   if (repeatClarification) resolution = { ...resolution, status: previousResolution?.status === 'ambiguous' ? 'ambiguous' : 'unresolved', reference: undefined,
     candidates: pending?.candidates ?? previousResolution?.candidates ?? resolution.candidates,
     reason: pending?.question ?? (previousResolution?.status !== 'resolved' ? previousResolution?.reason : undefined)
@@ -148,28 +154,44 @@ export async function prepareReferenceExecution(input: { content: string; conver
         status: question ? 'awaiting_user_input' : response.status, type: question ? 'clarification' : 'result', question,
         summary: question ? resolution.reason : response.status === 'failed' ? 'I could not retrieve that referenced record. Please try again.'
           : !findings.length ? query.operation === 'doctors' ? 'No published doctor affiliations are available for that hospital.' : query.operation === 'packages' ? 'No matching published packages are associated with that hospital and the current plan criteria.' : finalResolution.reason
-            : catalogGapQuestion ? catalogGapSummary(findings, input.snapshot) : referenceSummary(chosen!, findings, query.operation, query.attribute),
+            : catalogGapQuestion ? catalogGapSummary(findings, input.snapshot, input.active?.context.treatmentSlug) : referenceSummary(chosen!, findings, query.operation, query.attribute, input.content),
         nextSteps: question ? ['Specify the result type, location or name.'] : ['Review the sourced catalog details. A clinician must assess medical suitability.'],
       } as AgentResponse;
     } };
 }
 
-function catalogGapSummary(findings: AgentResponse['findings'], snapshot: CatalogSnapshot) {
+function catalogGapSummary(findings: AgentResponse['findings'], snapshot: CatalogSnapshot, treatmentSlug?: string) {
   const hospital = findings[0];
   const gaps = [...new Set(findings.flatMap(f => f.requirementEvaluation?.evaluations ?? [])
     .filter(e => ['unknown','incomplete','not_met'].includes(e.status)).map(e => e.label))];
-  const packages = snapshot.packages.filter(p => p.hospitalSlug === hospital.slug);
-  return `${hospital.title}: ${gaps.length ? `information still needed for ${gaps.join(', ')}.` : 'No unresolved requested criteria were identified in the returned record.'} ${packages.length ? 'Check each published package for its documented inclusions and price.' : 'No published packages or package prices are linked to this hospital; accommodation inclusions cannot be confirmed.'} Current availability and medical suitability still require confirmation.`.slice(0,1600);
+  const packages = snapshot.packages.filter(p => p.hospitalSlug === hospital.slug && (!treatmentSlug || p.treatmentSlug === treatmentSlug));
+  const packageGaps = [...new Set(packages.flatMap(p=>[
+    ...(!p.durationDays ? ['duration'] : []),
+    ...(['accommodation','transfer','interpreter','visaAssistance'] as const).filter(key=>p.serviceDetails?.[key]?.status !== 'included').map(key=>packageServiceNames[key]),
+  ]))];
+  return `${hospital.title}: ${gaps.length ? `information still needed for ${gaps.join(', ')}.` : 'Review the limits of the documented hospital criteria.'} ${packages.length ? `Check each published package for its documented inclusions and price.${packageGaps.length ? ` Missing or conditional package information: ${packageGaps.join(', ')}.` : ''}` : `No published packages or package prices are linked to this hospital${treatmentSlug ? ' for the current treatment criteria' : ''}; accommodation inclusions cannot be confirmed.`} Current availability and medical suitability still require confirmation.`.slice(0,1600);
 }
 
-function referenceSummary(reference: EntityReference, findings: AgentResponse['findings'], operation: string, attribute?: string) {
+function referenceSummary(reference: EntityReference, findings: AgentResponse['findings'], operation: string, attribute?: string, content = '') {
   const item = findings[0];
+  if (item.kind === 'packages' && /\b(?:include|included|provide|cover)\b/i.test(content)) {
+    const service = /\baccommodation\b/i.test(content) ? 'accommodation'
+      : /\b(?:airport transfer|transfer)\b/i.test(content) ? 'transfer'
+      : /\binterpreter\b/i.test(content) ? 'interpreter'
+      : /\bvisa\b/i.test(content) ? 'visaAssistance' : undefined;
+    if (service) {
+      const status = item.facts[`${service}Status`];
+      const evidenceStatus = ['included', 'excluded', 'conditional', 'not confirmed'].includes(String(status)) ? status : 'not confirmed';
+      const information = item.facts[`${service}Information`];
+      return `${item.title}: ${packageServiceNames[service]} is ${evidenceStatus}. ${typeof information === 'string' ? information : 'No package-specific supporting information is published.'} Confirm eligibility and current arrangements with the provider; hospital stay does not establish accommodation.`.slice(0, 1600);
+    }
+  }
   if (operation === 'doctors') return `I found ${findings.length} published doctor affiliation${findings.length === 1 ? '' : 's'} for ${reference.displayName}. Hospital affiliation does not establish procedure expertise, consultation mode or current availability.`;
   if (operation === 'packages') return `I found ${findings.length} catalog package${findings.length === 1 ? '' : 's'} associated with ${reference.displayName}. Listed sample prices are not provider quotes.`;
-  const price = item.facts.listedPrice??item.facts.samplePriceUsd;
+  const price = packagePrice(factsPrice(item.facts));
   const budget = item.requirementEvaluation?.evaluations.find((e) => e.type === 'budget');
   if (operation === 'price' && budget) return `${item.title}: ${budget.label} — ${budget.status.replaceAll('_', ' ')}. ${budget.explanation} Listed sample prices are not provider quotes.`.slice(0, 1600);
-  if ((operation === 'price' || attribute === 'cheaper' || attribute === 'expensive') && typeof price === 'number')
-    return `${item.title} lists ${item.provenance.sourceKind === 'synthetic' ? 'a synthetic sample price' : 'a catalog estimate'} of ${item.facts.currency??'USD'} ${price.toLocaleString('en-US')}.${attribute ? ' This identifies the requested price extreme among the previously returned records only.' : ''} This is not a provider quote or a clinical recommendation.`;
+  if (operation === 'price' || attribute === 'cheaper' || attribute === 'expensive')
+    return `${item.title}: ${price}.${attribute ? ' This identifies the requested price extreme among the previously returned comparable records only.' : ''} This is not a current provider quote or a clinical recommendation.`;
   return `Here are the sourced catalog details for ${reference.displayName}.${item.provenance.sourceKind === 'synthetic' ? ' This is synthetic demo data.' : ''} Resolving this reference does not recommend the provider or treatment.`;
 }

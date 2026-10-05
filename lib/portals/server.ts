@@ -14,6 +14,8 @@ export class PortalError extends Error {
 }
 const messages: Record<string, string> = {
   PORTAL_REFERENCE_SOURCE_REQUIRED: "Choose a public HTTPS source, source category and actual collection time for this claim.",
+  PORTAL_PACKAGE_EVIDENCE_REQUIRED: "Review each provided package field against its relevant source or approved supporting document before approving or publishing.",
+  PORTAL_PACKAGE_CONDITIONS_REQUIRED: "Describe the limits or extra charges for every conditional package service.",
   PORTAL_REFERENCE_CLAIMS_REQUIRED: "Attach supporting sources to every populated field before submission. Reviews must use the attached source URL.",
   PORTAL_REFERENCE_REVIEW_REQUIRED: "Review every sourced field and resolve missing, stale or conflicting evidence before approval or publication.",
   PORTAL_REFERENCE_LOCATION_REQUIRED: "Choose the exact sourced location for this offering. Other branches do not inherit its availability.",
@@ -28,7 +30,7 @@ const messages: Record<string, string> = {
   PORTAL_PROFILE_REQUIRED:
     "Complete the required organization profile fields before submitting.",
   PORTAL_PACKAGE_REQUIRED:
-    "Add a treatment, description, price, currency and duration before submitting.",
+    "Choose a published treatment and add a description. Provide the documented price and currency, or select contact-provider or unpublished pricing. Duration may remain empty.",
   PORTAL_EVIDENCE_REQUIRED:
     "Approved, current evidence is required for this action.",
   PORTAL_PUBLIC_REFERENCE_REQUIRED:

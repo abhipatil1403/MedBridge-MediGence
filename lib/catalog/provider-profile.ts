@@ -2,6 +2,11 @@ import "server-only";
 import { z } from "zod";
 import { getPublicSupabaseClient } from "@/lib/supabase/server";
 import { packageServicesSchema } from "./package-services";
+export async function publishedPackageEvidence(id: string) {
+  const {data,error} = await getPublicSupabaseClient().rpc('public_package_evidence',{p_id:id});
+  if (error) throw new Error('Published package evidence is unavailable.');
+  return z.array(z.object({field:z.string(),status:z.string(),sourceUrl:z.string().nullable(),checkedAt:z.string(),expiresOn:z.string().nullable()})).parse(data);
+}
 export async function publishedReferenceClaims(kind: "hospital" | "doctor" | "package", id: string) {
   const {data,error} = await getPublicSupabaseClient().rpc("public_reference_claims",{p_kind:kind,p_id:id});
   if (error) throw new Error("Published field sources are unavailable.");

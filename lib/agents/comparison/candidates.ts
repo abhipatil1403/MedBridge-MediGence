@@ -6,6 +6,7 @@ import {
   type PlanningResultGroup,
 } from "../schemas";
 import { comparisonSummary, missingFields } from "./format";
+import { packagePrice, factsPrice } from '@/lib/catalog/pricing';
 
 /** Compare existing sourced records. No discovery, entity parsing, model call, or clinical ranking. */
 export function compareCandidates(
@@ -104,13 +105,7 @@ export function describePackageDifferences(packages: Finding[]) {
     .map(
       (f) =>
         `${f.title}: ${
-          typeof f.facts.listedPrice === "number" &&
-          typeof f.facts.currency === "string"
-            ? `listed estimate ${f.facts.currency} ${f.facts.listedPrice.toLocaleString("en-US")}`
-            : typeof f.facts.samplePriceUsd === "number" &&
-                f.facts.samplePriceUsd > 0
-              ? `listed sample USD ${f.facts.samplePriceUsd.toLocaleString("en-US")}`
-              : "price not documented"
+          packagePrice(factsPrice(f.facts))
         }${typeof f.facts.durationDays === "number" && f.facts.durationDays > 0 ? `; listed duration ${f.facts.durationDays} days` : ""}.`,
     )
     .join(" ");

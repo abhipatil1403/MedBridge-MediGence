@@ -13,10 +13,13 @@ import {
 } from "@/components/detail-parts";
 import { getPackageDetail } from "@/lib/catalog/detail-service";
 import { detailMetadata } from "@/lib/seo";
-import { Price } from '@/components/experience/price';
+import { PackagePrice } from '@/components/experience/package-price';
+import { priceTypeLabels } from '@/lib/catalog/pricing';
+import { LocalDate } from '@/components/experience/translation';
 import { SaveButton } from '@/components/experience/saved';
 import { CatalogProvenance } from "@/components/catalog-provenance";
-import { publishedRecordProfile } from "@/lib/catalog/provider-profile";
+import { publishedRecordProfile, publishedPackageEvidence } from "@/lib/catalog/provider-profile";
+import { fieldLabel } from '@/lib/catalog/field-label';
 import { packageServiceNames } from "@/lib/catalog/package-services";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -38,6 +41,7 @@ export default async function PackageDetailPage({ params }: Props) {
   if (!data) notFound();
   const { carePackage, hospital, treatment, country } = data;
   const profile = await publishedRecordProfile("package", carePackage.recordId);
+  const evidence = !carePackage.demo ? await publishedPackageEvidence(carePackage.recordId) : [];
   if (!carePackage.demo || profile?.serviceDetails) {
     return (
       <main
@@ -68,7 +72,7 @@ export default async function PackageDetailPage({ params }: Props) {
               href: `/treatment-plan?package=${slug}`,
               primary: true,
             },
-            { label: "Get coordination support", href: "/help" },
+            { label: "Ask about this package", href: `/help?package=${encodeURIComponent(slug)}` },
           ]}
         />
         <div className="detail-layout">
@@ -90,9 +94,10 @@ export default async function PackageDetailPage({ params }: Props) {
             </DetailSection>
             <DetailSection title="Listed price">
               <div className="package-price-block">
-                <p className="package-price-block__amount"><Price amount={carePackage.listedPrice??carePackage.samplePriceUsd} currency={carePackage.currency??'USD'}/></p>
-                <p className="package-price-block__source"><T>{carePackage.priceType === "package_price" ? "Package price" : carePackage.priceType === "starting_price" ? "Starting price" : carePackage.priceType === "published_price" ? "Published price" : "Provider-listed estimate"}</T> · {carePackage.currency ?? "USD"}<T>{carePackage.provenance?.origin === "admin_reference" ? " · collected by MedBridge" : ""}</T></p>
-                <p className="package-price-block__duration">{carePackage.durationDays} <T>{"listed days"}</T></p>
+                <p className="package-price-block__amount"><PackagePrice item={carePackage}/></p>
+                <p className="package-price-block__source"><T>{priceTypeLabels[carePackage.priceType ?? 'estimate'] ?? 'Price not published'}</T><T>{carePackage.provenance?.origin === "admin_reference" ? " · collected by MedBridge" : ""}</T></p>
+                <p className="package-price-block__duration">{carePackage.durationDays > 0 ? <><LocalNumber value={carePackage.durationDays}/>{' '}<T>{'listed days'}</T></> : <T>{'Duration not published'}</T>}</p>
+                {(carePackage.priceValidFrom || carePackage.priceValidUntil) && <p><T>{'Price validity'}</T>{': '}{carePackage.priceValidFrom ? <LocalDate value={carePackage.priceValidFrom}/> : <T>{'Start date not provided'}</T>}{' → '}{carePackage.priceValidUntil ? <LocalDate value={carePackage.priceValidUntil}/> : <T>{'End date not provided'}</T>}</p>}
                 <p className="package-price-block__confirmation"><T>{"Confirm the current quote, dates and eligibility with the provider."}</T></p>
               </div>
             </DetailSection>
@@ -129,7 +134,7 @@ export default async function PackageDetailPage({ params }: Props) {
                     ];
                   return (
                     <div key={key}>
-                      <dt>{name}</dt>
+                      <dt><T>{name}</T></dt>
                       <dd>
                         <T>{!service || service.status === "not_confirmed"
                           ? "Not confirmed in published package information."
@@ -146,14 +151,15 @@ export default async function PackageDetailPage({ params }: Props) {
               </dl>
               <p className="muted"><T>{"Accommodation and transport are not inferred from hospital stay or other services. Confirm any limits with the provider."}</T></p>
             </DetailSection>
+            {evidence.length > 0 && <details className="detail-section"><summary><T>{'Reviewed package evidence'}</T></summary><ul className="reference-public-sources">{evidence.map(item=><li key={item.field}><strong>{fieldLabel(item.field)}</strong>{' · '}<T>{item.status}</T>{' · '}<LocalDate value={item.checkedAt}/>{item.sourceUrl && <>{' · '}<a href={item.sourceUrl} target="_blank" rel="noreferrer"><T>{'Public source'}</T></a></>}</li>)}</ul><p><T>{'Publication review does not establish clinical quality or suitability.'}</T></p></details>}
           </div>
           <aside className="detail-aside">
             <h2><T>{"Review the full cost"}</T></h2>
             <p>
               <T>{"This listing is not a current quote, reservation or clinical recommendation. Additional costs may apply."}</T></p>
             <CatalogProvenance item={carePackage} kind="package" />
-            <Link className="button button--primary" href="/help">
-              <T>{"Get support"}</T></Link>
+            <Link className="button button--primary" href={`/help?package=${encodeURIComponent(slug)}`}>
+              <T>{"Ask about this package"}</T></Link>
           </aside>
         </div>
       </main>

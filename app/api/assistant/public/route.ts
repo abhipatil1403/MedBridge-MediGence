@@ -49,7 +49,7 @@ export async function POST(request:NextRequest){
     const access=/^Bearer (.+)$/.exec(request.headers.get('authorization')??'')?.[1];
     if(request.headers.has('authorization')&&!access)throw new AgentError('AUTH_REQUIRED','Sign in to continue.');
     if(access&&body.data.action==='send'&&!body.data.page) {
-      const forwarded=new NextRequest(request.url,{method:'POST',headers:request.headers,body:JSON.stringify({content:body.data.content,conversationId:body.data.conversationId})});
+      const forwarded=new NextRequest(request.url,{method:'POST',headers:request.headers,body:JSON.stringify({content:body.data.content,conversationId:body.data.conversationId,displayCurrency:body.data.displayCurrency})});
       return authenticatedTurn(forwarded);
     }
     if(access&&body.data.action==='send') {
@@ -59,7 +59,7 @@ export async function POST(request:NextRequest){
       await context.store.assertConversation(conversationId,user.id);
       // Resolve current published page context within the existing conversation turn lease.
       if(body.data.page)context.prepareTurn=async turn=>{await seedPageContext(body.data.page!,conversationId,turn);};
-      return json(await orchestrate({content:body.data.content,conversationId},context));
+      return json(await orchestrate({content:body.data.content,conversationId,displayCurrency:body.data.displayCurrency},context));
     }
     token??=randomBytes(32).toString('hex');lease=randomUUID();
     const acquired=await admin.rpc('experience_guest_session',{p_action:'acquire',p_hash:hash(token),p_ip_hash:ipHash(request),p_lease:lease});
@@ -79,7 +79,7 @@ export async function POST(request:NextRequest){
     const context:OrchestratorContext={...stores,userId:state.userId,caseAccess:{readContext:deny,readDocumentMetadata:deny},provider:configuredProvider(),tools:{...defaultToolDependencies,publicSession:true}};
     const page=body.data.page?`${body.data.page.kind}:${body.data.page.slug}`:undefined;
     if(page&&page!==state.page){await seedPageContext(body.data.page!,state.conversationId,context);state.page=page;}
-    const result=await orchestrate({content:body.data.content,conversationId:state.conversationId},context);
+    const result=await orchestrate({content:body.data.content,conversationId:state.conversationId,displayCurrency:body.data.displayCurrency},context);
     const saved=await admin.rpc('experience_guest_session',{p_action:'save',p_hash:hash(token),p_lease:lease,p_state:visitorSchema.parse(state) as unknown as Json});
     if(saved.error)throw new AgentError('DATABASE_FAILURE','The temporary conversation could not be saved. Please try again.');
     const response=json({...result,temporary:true});response.cookies.set(cookie,token,{httpOnly:true,secure:request.nextUrl.protocol==='https:',sameSite:'strict',path:'/',maxAge:86400});return response;

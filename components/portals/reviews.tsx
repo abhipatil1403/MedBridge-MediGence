@@ -5,6 +5,7 @@ import { LocalNumber } from '@/components/experience/translation';
 import { T } from '@/components/experience/translation';
 import { useEffect, useRef, useState } from "react";
 import { ReferenceClaims } from "./reference-claims";
+import { PackageReview } from './package-review';
 import { label, type Row } from "@/lib/portals/config";
 import {
   Action,
@@ -404,6 +405,7 @@ export function SubmissionDetail({
                 title={`Review: ${selected.name}`}
                 onClose={() => setSelected(undefined)}
               >
+                {selected.kind === 'package' && <PackageReview row={selected}/>}
                 {["submitted", "under_review"].includes(
                   String(data.submission.status),
                 ) && (

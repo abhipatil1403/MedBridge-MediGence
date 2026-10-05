@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 export const packageServiceNames = {
+  procedure: "Procedure / treatment",
+  hospitalStay: "Hospital stay",
+  rehabilitation: "Rehabilitation",
+  localTransport: "Local transportation",
+  visaAssistance: "Visa assistance",
   accommodation: "Accommodation",
   transfer: "Airport transfer",
   interpreter: "Interpreter",
@@ -13,6 +18,11 @@ export const packageServiceSchema = z.object({
   information: z.string().nullable(),
 });
 export const packageServicesSchema = z.object({
+  procedure: packageServiceSchema.optional(),
+  hospitalStay: packageServiceSchema.optional(),
+  rehabilitation: packageServiceSchema.optional(),
+  localTransport: packageServiceSchema.optional(),
+  visaAssistance: packageServiceSchema.optional(),
   accommodation: packageServiceSchema.optional(),
   transfer: packageServiceSchema.optional(),
   interpreter: packageServiceSchema.optional(),

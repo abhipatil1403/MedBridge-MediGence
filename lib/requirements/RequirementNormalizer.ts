@@ -2,13 +2,13 @@ import type { Requirement } from './RequirementTypes';
 
 /** Currency is preserved, never converted. Bounds retain strict/inclusive semantics. */
 export function extractBudget(content: string): Requirement | undefined {
-  const money = '(?:(\\$|USD|₹|INR|Rs\\.?|rupees)\\s*)?([\\d,]+(?:\\.\\d+)?)\\s*(lakh|lakhs|lac|crore|k)?\\s*(dollars|USD|INR|rupees)?';
+  const money = '(?:(\\$|USD|₹|INR|Rs\\.?|rupees|AED|AUD|CAD|EUR|GBP|MYR|€|£)\\s*)?([\\d,]+(?:\\.\\d+)?)\\s*(lakh|lakhs|lac|crore|k)?\\s*(dollars|USD|INR|rupees|AED|AUD|CAD|EUR|GBP|MYR)?';
   const range = new RegExp(`\\bbetween\\s+${money}\\s+and\\s+${money}`, 'i').exec(content);
   const bound = new RegExp(`(under|below|less than|within|at most|maximum(?: budget)?|up to|over|above|more than|at least|minimum(?: budget)?|(?:my\\s+)?budget(?:\\s+is)?(?:\\s+around|\\s+about)?|exactly)\\s*:?\\s*${money}`, 'i').exec(content)
     ?? new RegExp(`${money}\\s+budget\\b`, 'i').exec(content);
   if (!range && !bound) return undefined;
   const amount = (n: string, scale?: string) => Number(n.replaceAll(',', '')) * (/^la(?:kh|c)/i.test(scale ?? '') ? 100000 : /crore/i.test(scale ?? '') ? 10000000 : /^k$/i.test(scale ?? '') ? 1000 : 1);
-  const currency = (v: string) => /₹|\b(?:inr|rs\.?|rupees)\b/i.test(v) ? 'INR' : /\$|\b(?:usd|dollars)\b/i.test(v) ? 'USD' : 'unspecified';
+  const currency = (v: string): NonNullable<Requirement['currency']> => /€|\bEUR\b/i.test(v) ? 'EUR' : /£|\bGBP\b/i.test(v) ? 'GBP' : /\bAED\b/i.test(v) ? 'AED' : /\bAUD\b/i.test(v) ? 'AUD' : /\bCAD\b/i.test(v) ? 'CAD' : /\bMYR\b/i.test(v) ? 'MYR' : /₹|\b(?:inr|rs\.?|rupees)\b/i.test(v) ? 'INR' : /\$|\b(?:usd|dollars)\b/i.test(v) ? 'USD' : 'unspecified';
   if (range) {
     const a = amount(range[2], range[3]), b = amount(range[6], range[7]);
     const c1 = currency(`${range[1] ?? ''} ${range[4] ?? ''}`), c2 = currency(`${range[5] ?? ''} ${range[8] ?? ''}`);

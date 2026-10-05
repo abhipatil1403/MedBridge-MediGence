@@ -3,6 +3,8 @@ import { T } from '@/components/experience/translation';
 import { Localized } from '@/components/experience/localized';
 import Link from '@/components/catalog-link';
 import { Price } from '@/components/experience/price';
+import { PackagePrice } from '@/components/experience/package-price';
+import { factsPrice } from '@/lib/catalog/pricing';
 import type { Comparison, Finding, PlanningResultGroup } from '@/lib/agents/schemas';
 import { comparisonFields, factText } from '@/lib/agents/comparison/format';
 import { resultGroupLabel } from '@/lib/agents/treatment-planning/results';
@@ -20,7 +22,7 @@ function Values({ findings, field }: { findings: Finding[]; field: string }) {
   const records = findings.filter((finding) => field === 'name' || factText(finding, field) !== undefined);
   return records.length ? <ul>{records.map((finding) => <li key={finding.provenance.recordId}>
     {(field === 'name' || records.length > 1) && (finding.href ? <Link href={finding.href}>{finding.title}</Link> : <strong>{finding.title}</strong>)}
-    {field !== 'name' && (['samplePriceUsd','listedPrice'].includes(field)&&typeof finding.facts[field]==='number'?<Price amount={Number(finding.facts[field])} currency={field==='samplePriceUsd'?'USD':String(finding.facts.currency??'USD')}/>:supporting ? <details><summary><T>{"View"}</T>{' '}<T>{field}</T></summary><p>{valueLabel(finding)}</p></details> : <span>{valueLabel(finding)}</span>)}
+    {field !== 'name' && (field==='listedPrice' ? <PackagePrice item={factsPrice(finding.facts)}/> : field==='samplePriceUsd'&&typeof finding.facts[field]==='number'?<Price amount={Number(finding.facts[field])} currency="USD"/>:supporting ? <details><summary><T>{"View"}</T>{' '}<T>{field}</T></summary><p>{valueLabel(finding)}</p></details> : <span>{valueLabel(finding)}</span>)}
     {field === 'name' && <details><summary><T>{"Source"}</T></summary><small>{finding.provenance.sourceKind === 'synthetic' ? 'Demo data · Synthetic sample' : finding.provenance.label}
       {' · '}{finding.matchType} <T>{"· Record"}</T>{' '}{finding.provenance.recordId.slice(0, 8)} <T>{"· Retrieved"}</T>{' '}<LocalDate value={finding.provenance.retrievedAt}/></small></details>}
   </li>)}</ul> : <span><T>{"Not provided in published information."}</T></span>;

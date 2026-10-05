@@ -73,7 +73,7 @@ export function applyRequirements(response: AgentResponse, requirements: Require
   });
   const hasFeatures = requirements.some((r) => (packageAttributes as readonly string[]).includes(r.type));
   if (excludedIds.length && !result.findings.length && !result.question) result.summary = 'No additional catalog package is available for the retained requirements. I have kept your requirements; no alternative has been invented.';
-  else if (hasFeatures && !result.research && !result.compoundRequest && !result.referenceResolution && result.findings.length && !result.question && result.status !== 'failed') {
+  else if (hasFeatures && !result.research && !result.compoundRequest && !result.referenceResolution && !(result.type === 'comparison' && !result.comparison) && result.findings.length && !result.question && result.status !== 'failed') {
     const packages = result.findings.filter((f) => f.kind === 'packages');
     const evaluations = packages.flatMap((f) => f.requirementEvaluation!.evaluations);
     const gaps = [...new Map(evaluations.filter((e) => ['unknown', 'incomplete', 'not_met', 'related'].includes(e.status)).map((e) => [e.requirementId, e])).values()];

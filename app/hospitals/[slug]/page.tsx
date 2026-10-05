@@ -16,7 +16,7 @@ import { getHospitalDetail } from "@/lib/catalog/detail-service";
 import { detailMetadata } from "@/lib/seo";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { publishedProviderProfile } from "@/lib/catalog/provider-profile";
-import { Price } from '@/components/experience/price';
+import { PackagePrice } from '@/components/experience/package-price';
 import { SaveButton } from '@/components/experience/saved';
 import { CatalogProvenance } from "@/components/catalog-provenance";
 import { fieldLabel } from "@/lib/catalog/field-label";
@@ -229,7 +229,7 @@ export default async function HospitalDetailPage({ params }: Props) {
                 items={packages.map((item) => ({
                   label: item.name,
                   href: `/packages/${item.slug}`,
-                  meta: <Price amount={item.listedPrice??item.samplePriceUsd} currency={item.currency??'USD'}/>,
+                  meta: <PackagePrice item={item}/>,
                 }))}
               />
             </DetailSection>

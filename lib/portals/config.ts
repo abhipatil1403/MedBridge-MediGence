@@ -237,18 +237,31 @@ export const fields: Record<RecordKind, Field[]> = {
       catalog: "treatments",
     },
     { key: "description", label: "Description", type: "textarea" },
-    { key: "price", label: "Estimated package price", type: "number", min: 0 },
+    { key: "locationId", label: "Package location", type: "select", catalog: "provider_records", catalogParams: { kind: "location" }, help: "Choose this organization's exact branch. If omitted, the published organization location applies." },
+    { key: "priceType", label: "Pricing type", type: "select", options: ["package_price", "starting_price", "estimate", "published_price", "contact_provider", "not_published"], help: "Use the source's terminology. Leave amounts empty for contact-provider or unpublished pricing." },
+    { key: "price", label: "Original price / range minimum", type: "number", min: 0 },
+    { key: "priceMax", label: "Range maximum (only if documented)", type: "number", min: 0 },
     {
       key: "currency",
       label: "Currency",
       type: "select",
-      options: ["USD", "INR", "EUR", "GBP", "AED", "THB", "SGD", "MYR", "TRY"],
+      options: ["USD", "INR", "EUR", "GBP", "AED", "AUD", "CAD", "THB", "SGD", "MYR", "TRY"],
     },
     { key: "durationDays", label: "Duration (days)", type: "number", min: 1 },
+    { key: "priceSourceUrl", label: "Price source URL", type: "url" },
+    { key: "priceSourceName", label: "Price source name" },
+    { key: "priceCheckedAt", label: "Price source checked", type: "date" },
+    { key: "priceValidFrom", label: "Price valid from", type: "date" },
+    { key: "priceValidUntil", label: "Price valid until", type: "date" },
     { key: "inclusions", label: "Explicit inclusions", type: "list" },
     { key: "exclusions", label: "Explicit exclusions", type: "list" },
     ...(
       [
+        ["procedure", "Procedure / treatment"],
+        ["hospitalStay", "Hospital stay"],
+        ["rehabilitation", "Rehabilitation"],
+        ["localTransport", "Local transportation"],
+        ["visaAssistance", "Visa assistance"],
         ["accommodation", "Accommodation"],
         ["transfer", "Airport transfer"],
         ["interpreter", "Interpreter"],
@@ -421,6 +434,13 @@ export const recordInputSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
+    if (value.kind === "package") {
+      const { price, priceMax, priceType, currency, priceValidFrom, priceValidUntil } = value.data;
+      if (["contact_provider", "not_published"].includes(String(priceType)) && (price != null || priceMax != null)) ctx.addIssue({ code: "custom", path: ["data", "price"], message: "Leave numeric amounts empty when no price is published." });
+      if (typeof priceMax === "number" && (typeof price !== "number" || priceMax < price)) ctx.addIssue({ code: "custom", path: ["data", "priceMax"], message: "A price range must have a minimum and a maximum no lower than the minimum." });
+      if (price !== undefined && currency !== undefined && !/^[A-Z]{3}$/.test(String(currency))) ctx.addIssue({ code: "custom", path: ["data", "currency"], message: "Use the documented original currency." });
+      if (priceValidFrom && priceValidUntil && String(priceValidUntil) < String(priceValidFrom)) ctx.addIssue({ code: "custom", path: ["data", "priceValidUntil"], message: "Price validity end must follow its start." });
+    }
     if (value.recordId && !value.expectedRevision)
       ctx.addIssue({
         code: "custom",

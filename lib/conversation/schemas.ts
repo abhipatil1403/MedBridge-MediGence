@@ -10,6 +10,7 @@ export const entityReferenceSchema = z.object({
   resultGroup: z.string().max(100), groupId: z.string().max(200), position: z.number().int().positive(),
   sourceRunId: z.uuid(), createdAt: z.iso.datetime(), matchType: z.enum(['exact', 'related']),
   samplePrice: z.number().nonnegative().optional(), currency: z.string().optional(), durationDays: z.number().positive().optional(),
+  listedPrice: z.number().nonnegative().optional(), listedPriceMax: z.number().nonnegative().optional(), priceType:z.string().optional(),priceValidFrom:z.string().optional(),priceValidUntil:z.string().optional(),
 }).strict();
 export type EntityReference = z.infer<typeof entityReferenceSchema>;
 export const referenceContextSchema = z.object({ conversationId: z.uuid(), responseId: z.uuid(), createdAt: z.iso.datetime(),

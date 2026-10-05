@@ -1088,3 +1088,6 @@
 .portal-field select[multiple] {
   min-height: 120px;
 }
+.portal-package-fields { grid-column: 1 / -1; min-width: 0; border: 1px solid var(--border, #d7dfd5); border-radius: 12px; padding: 20px; }
+.portal-package-fields legend { padding: 0 8px; font-weight: 700; }
+.portal-package-review { margin-block: 20px; padding: 16px; background: var(--surface, #f5f7f3); border-radius: 12px; overflow-wrap: anywhere; }
