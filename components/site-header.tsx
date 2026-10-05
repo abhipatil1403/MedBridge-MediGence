@@ -4,6 +4,7 @@ import Link from '@/components/catalog-link';
 import { usePathname } from 'next/navigation';
 import { isActiveNavigation, navigationGroups } from '@/lib/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { MedBridgeLogo } from './medbridge-logo';
 import { PreferenceSelectors } from './experience/selectors';
 import { useTranslation } from './experience/translation';
 
@@ -24,7 +25,7 @@ export function SiteHeader() {
   },[group]);
   return <header className="site-header" ref={root}>
     <div className="site-header__inner container">
-      <Link className="brand" href="/" aria-label={t('MedBridge home')} onClick={close}><span className="brand__mark" aria-hidden="true"><span/><span/><span/></span><span>MEDBRIDGE</span></Link>
+      <Link className="brand" href="/" aria-label={t('MedBridge home')} onClick={close}><MedBridgeLogo priority/></Link>
       <nav className="desktop-nav" aria-label={t('Primary navigation')}>
         <Link href="/discover" aria-current={isActiveNavigation(pathname,'/discover')?'page':undefined} onClick={close}>{t('Discover')}</Link>
         {navigationGroups.map(section=><div className="navigation-group" key={section.label} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget))setGroup(null);}}>
@@ -35,11 +36,11 @@ export function SiteHeader() {
       </nav>
       <div className="header-preferences"><PreferenceSelectors/></div>
       <Link className="header-account" href="/account" aria-label={t('Account')} onClick={close}><UserRound size={19} aria-hidden="true"/></Link>
-      <Link className="header-workspace button button--primary" href="/assistant" onClick={close}>{t('MedBridge AI')}<ArrowUpRight size={16} aria-hidden="true"/></Link>
+      <Link className="header-workspace button button--primary" href="/assistant" onClick={close}>{t('Ask MedBridge AI')}<ArrowUpRight size={16} aria-hidden="true"/></Link>
       <button ref={toggle} className="menu-toggle" type="button" aria-expanded={drawerOpen} aria-controls="mobile-navigation" aria-label={t('Open navigation')} onClick={()=>{dialog.current?.showModal();setDrawerOpen(true);document.body.style.overflow='hidden';}}><Menu size={22} aria-hidden="true"/></button>
     </div>
     <dialog id="mobile-navigation" className="navigation-drawer" ref={dialog} aria-label={t('Mobile navigation')} onClose={()=>{setDrawerOpen(false);document.body.style.overflow='';toggle.current?.focus();}} onClick={e=>{if(e.target===e.currentTarget)close();}}>
-      <div className="drawer-surface"><div className="drawer-heading"><span className="brand">MEDBRIDGE</span><button type="button" onClick={close} aria-label={t('Close navigation')}><X size={24} aria-hidden="true"/></button></div>
+      <div className="drawer-surface"><div className="drawer-heading"><MedBridgeLogo/><button type="button" onClick={close} aria-label={t('Close navigation')}><X size={24} aria-hidden="true"/></button></div>
         <PreferenceSelectors/><Link className="button button--primary button--default" href="/assistant" onClick={close}>{t('MedBridge AI')}<ArrowUpRight size={18} aria-hidden="true"/></Link>
         <nav aria-label={t('Mobile navigation')}><Link href="/" onClick={close}>{t('Home')}</Link>{drawerGroups.map(section=><section key={section.label}><h2 className="eyebrow">{t(section.label)}</h2>{section.items.map(item=><Link key={item.href} href={item.href} onClick={close}>{t(item.label)}</Link>)}</section>)}</nav>
       </div>

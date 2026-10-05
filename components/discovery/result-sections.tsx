@@ -35,7 +35,7 @@ export function ResultSections({ results, limit = 4, idPrefix = '',catalog }: { 
         </div>
         <div className="result-section__items">
           {key === "treatments" && sections.treatments.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }) => <article className="result-row" key={item.slug}>
-            <div><span className="result-kicker"><T>{"Treatment ·"}</T>{' '}{item.specialty}</span><h3><Link href={`/treatments/${item.slug}`}>{item.name}</Link></h3><p>{item.description}</p><small>{reason}</small></div>
+            <div><span className="result-kicker"><T>{"Treatment ·"}</T>{' '}{item.specialty}</span><h3><Link href={`/treatments/${item.slug}`}>{item.name}</Link></h3><p>{item.description}</p><details><summary><T>{'Why this appears'}</T></summary><p>{reason}</p></details></div>
             <div>{catalog&&<p className="muted">{catalog.hospitals.filter(h=>h.treatmentSlugs.includes(item.slug)).length} <T>{'published providers'}</T>{' · '}{catalog.packages.filter(p=>p.treatmentSlug===item.slug).length} <T>{'published packages'}</T></p>}<Link className="result-action" href={`/treatments/${item.slug}`}><T>{"Explore treatment"}</T><ArrowRight size={16} aria-hidden="true" /></Link></div>
           </article>)}
           {key === "hospitals" && sections.hospitals.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }) => <article className="result-row" key={item.slug}>

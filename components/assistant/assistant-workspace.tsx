@@ -1,4 +1,6 @@
 'use client';
+import { MedBridgeLogo } from '@/components/medbridge-logo';
+import { useSubmittedRequest } from './use-submitted-request';
 import { LocalDate } from '@/components/experience/translation';
 import { useExperience } from '@/components/experience/provider';
 
@@ -29,11 +31,12 @@ type Conversation = { id: string; title: string; case_id: string | null; updated
 type Case = { id: string; title: string; status: string; agentConsent: boolean; canManageConsent: boolean };
 type Message = { id: string; role: string; content: string; metadata: { response?: AgentResponse; approvalStatus?: string }; created_at: string };
 
-export function AssistantWorkspace({ configured, initialRequest = '', initialConversation }: { configured: boolean; initialRequest?: string; initialConversation?: string }) {
+export function AssistantWorkspace({ configured, initialRequest = '', initialConversation, autoStart=false }: { configured: boolean; initialRequest?: string; initialConversation?: string;autoStart?:boolean }) {
   const historyDialog=useRef<HTMLDialogElement>(null);
   const {preferences,session:initialSession}=useExperience();
   const auth = useMemo(() => getBrowserSupabaseClient(), []);
   const [session, setSession] = useState<Session | null>(initialSession);
+  const [sessionReady,setSessionReady]=useState(false);
   const [email, setEmail] = useState('');
   const [linkSent, setLinkSent] = useState(false);
   const [content, setContent] = useState(initialRequest);
@@ -93,17 +96,25 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
       }
       activeUser.current = nextUser;
       setSession(next);
+      setSessionReady(true);
     }
     auth.auth.getSession().then(({ data }) => applySession(data.session));
     const { data: subscription } = auth.auth.onAuthStateChange((_event, next) => applySession(next));
     return () => subscription.subscription.unsubscribe();
   }, [auth, initialRequest, initialConversation]);
   useEffect(() => {
-    if (!session) return;
+    if (!sessionReady || !session) return;
     const key = `medbridge-active-conversation:${session.user.id}`;
     if (conversationId) localStorage.setItem(key, JSON.stringify({ id: conversationId, caseId }));
     else localStorage.removeItem(key);
-  }, [conversationId, caseId, session]);
+    const url = new URL(window.location.href);
+    if (conversationId) {
+      url.searchParams.set('conversation', conversationId);
+      url.searchParams.delete('q');
+      url.searchParams.delete('start');
+    } else url.searchParams.delete('conversation');
+    window.history.replaceState(window.history.state, '', url);
+  }, [conversationId, caseId, session, sessionReady]);
   useEffect(() => {
     if (!session || !configured) return;
     const timer = setTimeout(() => void refresh(conversationId), 0);
@@ -154,6 +165,7 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
     event.preventDefault();
     await submitRequest(content.trim());
   }
+  useSubmittedRequest(sessionReady&&Boolean(session)&&configured&&!busy,autoStart,initialRequest,submitRequest);
 
   async function changeConsent(selectedCase: Case) {
     setBusy(true); setNotice('');
@@ -206,7 +218,7 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
       <button type="button" className="assistant-signout" onClick={() => auth?.auth.signOut()}><T>{"Sign out"}</T></button></Localized></dialog></div>
 
     <Localized as="section" className="assistant-main" aria-label="Care conversation">
-      <div className="assistant-first-use"><p className="eyebrow">MEDBRIDGE AI</p><h1 className="ai-landing-title"><T>{'How can I help you explore your healthcare options?'}</T></h1><p><T>{'Search hospitals, doctors, treatments and packages, compare options, or organize your next step.'}</T></p></div>
+      <div className="assistant-first-use"><MedBridgeLogo compact/><p className="eyebrow">MEDBRIDGE AI</p><h1 className="ai-landing-title"><T>{'Where should we start?'}</T></h1><p><T>{'Tell me what you’re looking for. I can help you explore healthcare options, compare what is available and organize the next step.'}</T></p></div>
       <div className="assistant-main__intro"><span className="eyebrow">MEDBRIDGE AI</span><h1><T>{'Your conversation'}</T></h1>
         <p><T>{conversationId ? 'Findings, evidence and next steps, together.' : 'Tell MedBridge what you’re trying to figure out.'}</T></p></div>
 
@@ -247,6 +259,17 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
 
 export function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, onRequest, disabled }: { response: AgentResponse; approvalStatus?: string;
   onDecision: (actionId: string, decision: 'approved' | 'rejected') => void; onRetry?: () => void; onRequest?:(content:string)=>void; disabled: boolean }) {
+  const hospitals=response.findings.filter(item=>item.kind==='hospitals'),packages=response.findings.filter(item=>item.kind==='packages');
+  const followUps: {label:string;question:string}[]=[];
+  if(!response.question&&response.status!=='failed'&&!response.verification&&!response.approvalProposal){
+    if(packages.length){
+      if(packages.length>1)followUps.push({label:'Compare these packages',question:`Compare ${packages[0].title} and ${packages[1].title}.`});
+      followUps.push({label:'Check accommodation',question:`Does ${packages[0].title} include accommodation?`});
+    }else if(hospitals.length){
+      if(hospitals.length>1)followUps.push({label:'Compare these hospitals',question:`Compare ${hospitals[0].title} and ${hospitals[1].title}.`});
+      followUps.push({label:'Check available packages',question:`Show packages for ${hospitals[0].title}.`});
+    }
+  }
   return <div className="assistant-response">
     {Boolean(response.requirements?.length)&&<details><summary><T>{'Why these results?'}</T></summary><RequestUnderstanding response={response} /></details>}
     {response.coordination&&<CoordinationResults context={response.coordination}/>}
@@ -255,9 +278,9 @@ export function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, 
     {response.agent === 'document_coordination' ? <p>{response.summary}</p> : <FindingsSummary response={response} />}
     {response.verification && <VerificationResults result={response.verification} onRequest={onRequest} disabled={disabled} />}
     <div className="assistant-catalog-results">
-      {response.research && response.findings.length > 0 && <h3 className="assistant-section-title"><T>{"MEDBRIDGE CATALOG"}</T></h3>}
+      {response.research && response.findings.length > 0 && <h3 className="assistant-section-title"><T>{'Published options'}</T></h3>}
       {response.status === 'failed' && <div className="assistant-recovery">{onRetry && <button type="button" disabled={disabled} onClick={onRetry}><T>{"Retry this request"}</T></button>}
-        <Link href="/discover"><T>{"Continue with standard catalog search →"}</T></Link></div>}
+        <Link href="/discover"><T>{'Continue with search →'}</T></Link></div>}
       {response.comparison ? <ComparisonResults comparison={response.comparison} /> : response.resultGroups?.length ? <PlanningResultGroups groups={response.resultGroups} onRequest={onRequest} disabled={disabled} /> : <FindingCards findings={response.findings} onRequest={onRequest} disabled={disabled} />}</div>
     {response.hospitalMatches && <details className="assistant-evidence-review"><summary><T>{"Hospital matching evidence"}</T></summary><HospitalMatchResults matches={response.hospitalMatches} /></details>}
     {response.comparison && response.resultGroups?.length ? <details><summary><T>{"Options in this comparison"}</T></summary><PlanningResultGroups groups={response.resultGroups} onRequest={onRequest} disabled={disabled} /></details> : null}
@@ -274,7 +297,7 @@ export function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, 
           <button type="button" disabled={disabled} onClick={() => onDecision(response.approvalId!, 'approved')}><T>{"Approve this change"}</T></button>
           <button type="button" disabled={disabled} onClick={() => onDecision(response.approvalId!, 'rejected')}><T>{"Reject"}</T></button></div>
           : <p><T>{"Status:"}</T>{' '}{approvalStatus ?? 'pending'}</p>}</div>}
-    {response.nextSteps.length > 0 && !response.verification && <div className="assistant-next-steps"><h3><T>{'Your next step'}</T></h3><p>{response.nextSteps.find(step=>visibleText(step))}</p>{response.nextSteps.length>1&&<details><summary><T>{'More next steps'}</T></summary><ul>{response.nextSteps.slice(1).filter(step=>visibleText(step)).map(step=><li key={step}>{step}</li>)}</ul></details>}</div>}
+    {response.nextSteps.length > 0 && !response.verification && <div className="assistant-next-steps"><h3><T>{'Your next step'}</T></h3><p><T>{response.nextSteps.find(step=>visibleText(step))==='Review the sourced records and their exact match reasons.'?'Explore these options and check the details that matter to you.':response.nextSteps.find(step=>visibleText(step))??''}</T></p>{onRequest&&followUps.length>0&&<div className="ai-follow-ups">{followUps.slice(0,2).map(item=><button key={item.label} className="save-control" type="button" disabled={disabled} onClick={()=>onRequest(item.question)}><T>{item.label}</T> →</button>)}</div>}{response.nextSteps.length>1&&<details><summary><T>{'More next steps'}</T></summary><ul>{response.nextSteps.slice(1).filter(step=>visibleText(step)).map(step=><li key={step}>{step}</li>)}</ul></details>}</div>}
 
   </div>;
 }

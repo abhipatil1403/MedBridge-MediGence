@@ -4,8 +4,10 @@ import Link from '@/components/catalog-link';
 import type { Faq } from "@/types/catalog";
 import { PageHeader } from './page-header';
 
-export function DetailSection({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
-  return <section className="detail-section" id={id ?? title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}><h2><T>{title}</T></h2>{children}</section>;
+export function DetailSection({ id, title, children,disclosure=false }: { id?: string; title: string; children: React.ReactNode;disclosure?:boolean }) {
+  const anchor=id??title.toLowerCase().replace(/[^a-z0-9]+/g,'-');
+  if(disclosure)return <details className="detail-section detail-section--disclosure" id={anchor}><summary><T>{title}</T><span className="detail-confirmation-label"><T>{'Confirmation required'}</T></span></summary>{children}</details>;
+  return <section className="detail-section" id={anchor}><h2><T>{title}</T></h2>{children}</section>;
 }
 
 export function DetailNavigation({ items }: { items: readonly { label: string; href: string }[] }) {

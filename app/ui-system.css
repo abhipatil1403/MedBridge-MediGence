@@ -41,7 +41,6 @@ summary {min-height:44px;padding-block:10px;cursor:pointer;font-size:14px;font-w
 .site-header {background:var(--paper);border-bottom:1px solid #dce1d680;}
 .site-header__inner {min-height:88px;gap:32px;}
 .brand {font-size:16px;letter-spacing:.14em;}
-.brand__mark {width:34px;height:34px;}
 .desktop-nav {gap:28px;margin-left:auto;margin-right:22px;}
 .desktop-nav a,.navigation-group>button {min-height:44px;display:flex;align-items:center;font-size:14px;font-weight:500;}
 .desktop-nav a[aria-current=page],.navigation-group>button.is-active {color:var(--deep);text-decoration:underline;text-underline-offset:8px;}
@@ -313,7 +312,6 @@ summary {min-height:44px;padding-block:10px;cursor:pointer;font-size:14px;font-w
 }
 @media (max-width:550px) {
   .brand {font-size:14px;gap:10px;}
-  .brand__mark {width:30px;height:30px;}
   .page-header.page-header {padding-block:24px;}
   .page-header.page-header .page-header__lead {font-size:16px;}
   .invitation {padding-top:36px;}

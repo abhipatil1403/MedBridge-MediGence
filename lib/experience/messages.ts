@@ -9,8 +9,10 @@ import { finalMessages } from './messages-final';
 import { fieldMessages } from './messages-fields';
 import { runtimeMessages } from './messages-runtime';
 import { packageMessages } from './messages-packages';
+import { companionMessages } from './messages-companion';
 // Reviewed interface text only. Canonical names, provider content, evidence and citations never pass through this dictionary.
 export const messages: Record<string, readonly [string,string]> = {
+  ...companionMessages,
   ...packageMessages,
   ...catalogueMessages,
   ...workflowMessages,

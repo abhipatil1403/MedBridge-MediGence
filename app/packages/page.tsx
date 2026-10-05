@@ -7,9 +7,10 @@ export const metadata = {
   description:
     "Compare package estimates, currencies, inclusions and exclusions.",
 };
-export default function PackagesPage() {
+export default function PackagesPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
   return (
     <CatalogDirectory
+      searchParams={searchParams}
       type="packages"
       title="Explore packages"
       description="Inspect listed currencies, estimates, inclusions and exclusions. Confirm current prices with the provider."

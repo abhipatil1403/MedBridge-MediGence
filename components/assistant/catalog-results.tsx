@@ -23,13 +23,15 @@ function factLabel(key: string) { return key.replace(/([A-Z])/g, ' $1').replace(
 function factValue(value: unknown) { return String(value ?? 'Not recorded'); }
 
 export function FindingCards({ findings, onRequest, disabled }: { findings: Finding[] } & Actions) {
-  return findings.length > 0 && <div className="assistant-finding-grid">{findings.map(item => <article key={item.provenance.recordId} className={`assistant-finding assistant-finding--${item.kind}${item.kind === 'packages' ? ' assistant-finding--package' : ''}`} data-requirement-status={item.requirementEvaluation?.overallStatus}>
+  const renderFinding=(item:Finding)=><article key={item.provenance.recordId} className={`assistant-finding assistant-finding--${item.kind}${item.kind === 'packages' ? ' assistant-finding--package' : ''}`} data-requirement-status={item.requirementEvaluation?.overallStatus}>
     <div className="assistant-finding__type"><span><T>{names[item.kind] ?? 'Care option'}</T></span>{item.provenance.sourceKind === 'synthetic' && <StatusBadge status="demo" />}</div>
+    {item.kind==='doctors'&&<span className="doctor-monogram" aria-hidden="true">{item.title.replace(/^Dr\.?\s+/i,'').split(' ').slice(0,2).map(part=>part[0]).join('')}</span>}
     <h3>{item.href ? <Link href={item.href}>{item.title}</Link> : item.title}</h3>
     {item.facts.city && <p className="assistant-finding__location">{String(item.facts.city)}{item.facts.country ? `, ${factValue(item.facts.country).replaceAll('-', ' ')}` : ''}</p>}
-    {!(item.provenance.sourceKind === 'synthetic' && ['hospitals','doctors'].includes(item.kind)) && <p>{item.detail}</p>}
+    {!(item.provenance.sourceKind === 'synthetic' && ['hospitals','doctors'].includes(item.kind)) && <p className="assistant-finding__description">{item.kind==='packages'&&item.facts.hospitalName?String(item.facts.hospitalName):item.detail}</p>}
     {item.provenance.sourceKind === 'synthetic' && ['hospitals', 'doctors'].includes(item.kind) && <small><T>{"Synthetic provider record · Not a live provider"}</T></small>}
     {item.kind === 'packages' && <p className="assistant-package-facts"><PackagePrice compact item={factsPrice(item.facts)}/>{typeof item.facts.durationDays === 'number' && item.facts.durationDays > 0 ? ` · ${item.facts.durationDays} days` : ''}<small><T>{item.provenance.sourceKind==='synthetic'?'Sample price':priceTypeLabels[String(item.facts.priceType ?? 'estimate')] ?? 'Price not published'}</T>{' '}<T>{"· Not a provider quote"}</T></small></p>}
+    {item.kind==='packages'&&typeof item.facts.inclusions==='string'&&item.facts.inclusions&&<p className="assistant-package-inclusions"><T>{'Included'}</T>: {item.facts.inclusions.split('; ').slice(0,2).join(' · ')}</p>}
     <RequirementResults evaluation={item.requirementEvaluation} />
     <div className="assistant-finding__actions">{['hospitals','doctors','packages'].includes(item.kind)&&<SaveButton kind={item.kind==='hospitals'?'hospital':item.kind==='doctors'?'doctor':'package'} recordId={item.provenance.recordId}/>} {item.href && <Link href={item.href}><T>{"View details →"}</T></Link>}
       {onRequest && ['hospitals','doctors'].includes(item.kind)&&<details><summary><T>{'More options'}</T></summary><button type="button" disabled={disabled} onClick={()=>onRequest(`Verify ${item.title}`)}><T>{'Check provider information'}</T></button>{item.kind==='hospitals'&&<><button type="button" disabled={disabled} onClick={()=>onRequest(`Show packages for ${item.title}`)}><T>{'Explore packages'}</T></button><button type="button" disabled={disabled} onClick={()=>onRequest(`Organize documents for ${item.title}`)}><T>{'Organize documents'}</T></button></>}</details>}
@@ -38,5 +40,6 @@ export function FindingCards({ findings, onRequest, disabled }: { findings: Find
       <dl className="assistant-metadata">{Object.entries(item.facts).filter(([key]) => !/(?:Id|Slug)$/.test(key)).map(([key, value]) => <div key={key}><dt><T>{factLabel(key)}</T></dt><dd>{factValue(value)}</dd></div>)}</dl>
       <footer><T>{item.provenance.sourceKind === 'synthetic' ? 'Demo data' : item.provenance.sourceKind === 'external' ? 'External catalog data' : 'MedBridge data'}</T> · {item.provenance.label} <T>{"· Retrieved"}</T>{' '}<LocalDate value={item.provenance.retrievedAt}/></footer>
     </details>
-  </article>)}</div>;
+  </article>;
+  return findings.length>0&&<div className="assistant-finding-grid">{findings.slice(0,3).map(renderFinding)}{findings.length>3&&<details className="assistant-more-findings"><summary><T>{'More published options'}</T> · {findings.length-3}</summary>{findings.slice(3).map(renderFinding)}</details>}</div>;
 }

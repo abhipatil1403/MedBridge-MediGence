@@ -11,6 +11,6 @@ export function CompareForm({ treatments, countries, procedure = "knee-replaceme
     <label><T>{"Country A"}</T><select name="countryA" defaultValue={countryA} required>{countries.map((item) => <option key={item.slug} value={item.slug}>{item.name}</option>)}</select></label>
     <label><T>{"Country B"}</T><select name="countryB" defaultValue={countryB} required>{countries.map((item) => <option key={item.slug} value={item.slug}>{item.name}</option>)}</select></label>
     <button type="submit" disabled={unavailable} className="button button--primary button--default"><T>{"Compare countries"}</T></button>
-    {unavailable && <p><T>{"Not enough published catalog information is available for a destination comparison yet."}</T></p>}
+    {unavailable && <p><T>{"More published destinations are needed for a country comparison."}</T></p>}
   </form>;
 }

@@ -19,5 +19,6 @@ export function RequirementResults({ evaluation }: { evaluation?: ResultRequirem
       <ul>{evaluation.evaluations.filter((item) => item.status === 'not_applicable').map((item) => <li key={item.requirementId}>{item.label}: <T>{evaluation.resultType === 'hospitals' ? 'Evaluated at package level' : 'Not applicable'}</T></li>)}</ul>
     </details>}
   </Localized>;
-  return evaluation.overallStatus === 'fully_satisfies' ? <details className="assistant-requirement-summary"><summary><T>{"Requested criteria documented · view evidence"}</T></summary>{content}</details> : content;
+  const summary=evaluation.overallStatus==='fully_satisfies'?'Requested criteria documented · view evidence':evaluation.overallStatus==='does_not_satisfy'?'Required criteria not met':'Some requirements remain unconfirmed';
+  return <details className="assistant-requirement-summary" data-status={evaluation.overallStatus}><summary><T>{summary}</T></summary>{content}</details>;
 }

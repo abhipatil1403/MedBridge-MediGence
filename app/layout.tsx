@@ -12,11 +12,13 @@ import { PublicAssistant } from '@/components/experience/public-assistant';
 import { NavigationFeedback } from '@/components/navigation-feedback';
 import { Suspense } from 'react';
 import './production-ux.css';
+import './companion.css';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: { default: "MedBridge | A clearer path through care", template: "%s | MedBridge" },
-  description: "MedBridge is building a connected platform for healthcare discovery, treatment coordination, and recovery.",
+  description: "Ask MedBridge AI to explore sourced healthcare options, compare what is available and organize your next step.",
+  icons: {icon: {url:'/brand/medbridge-logo.webp',type:'image/webp'}, shortcut:'/brand/medbridge-logo.webp'},
   robots: { index: false, follow: false },
 };
 

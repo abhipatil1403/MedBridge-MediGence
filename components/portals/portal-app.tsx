@@ -1,4 +1,5 @@
 "use client";
+import { MedBridgeLogo } from '@/components/medbridge-logo';
 import { Localized } from '@/components/experience/localized';
 
 import { T } from '@/components/experience/translation';
@@ -6,7 +7,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Activity,
   ArrowUpRight,
   Bell,
   Building2,
@@ -200,7 +200,7 @@ export function PortalApp({
     return (
       <main id="main-content" className="portal-login">
         <Link className="portal-brand" href={publicUrl()}>
-          MedBridge
+          <MedBridgeLogo/>
         </Link>
         <div className="portal-login-card">
           <ShieldCheck size={32} />
@@ -225,13 +225,12 @@ export function PortalApp({
     (portal === "patient" ? "Support requests" : "Page unavailable");
   return (
     <PortalStateContext.Provider value={state}>
-      {portal==='patient'?<main id="main-content" tabIndex={-1} className="container patient-help-page"><header><p className="eyebrow">MEDBRIDGE SUPPORT</p><h1><T>{'My support requests'}</T></h1><p><T>{'Ask for help with your next step and follow the response here.'}</T></p></header>{notice&&<p role="status" className="personal-notice">{notice}</p>}<PatientSupport packageInquiry={packageInquiry}/></main>:
+      {portal==='patient'?<main id="main-content" tabIndex={-1} className="container patient-help-page"><header><MedBridgeLogo compact/><p className="eyebrow">MEDBRIDGE SUPPORT</p><h1><T>{'Get help'}</T></h1><p><T>{'Ask for help with your next step and follow the response here.'}</T></p></header>{notice&&<p role="status" className="personal-notice">{notice}</p>}<PatientSupport packageInquiry={packageInquiry}/></main>:
       <div className={`portal-shell portal-${portal}`}>
         <aside className={`portal-sidebar ${menu ? "is-open" : ""}`}>
           <div className="portal-sidebar-brand">
             <Link href={publicUrl()} className="portal-brand">
-              <Activity size={23} />
-              MedBridge
+              <MedBridgeLogo onDark/>
             </Link>
             <Localized as="button"
               className="portal-icon-button portal-mobile-only"
@@ -413,8 +412,7 @@ function PortalLogin({
   return (
     <main id="main-content" className={portal==='patient'?'portal-login patient-help-login':'portal-login'}>
       <Link className="portal-brand" href={publicUrl()}>
-        <Activity size={26} />
-        MedBridge
+        <MedBridgeLogo/>
       </Link>
       <div className="portal-login-card">
         <span className="portal-login-icon">

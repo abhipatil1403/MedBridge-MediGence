@@ -1,9 +1,10 @@
 import { T } from './experience/translation';
+import { MedBridgeLogo } from './medbridge-logo';
 type Kind='doctors'|'hospitals'|'treatments'|'packages'|'discover'|'compare'|'account'|'recover'|'assistant'|'help'|'home';
 const titles:Record<Kind,string>={doctors:'Find a specialist',hospitals:'Explore hospitals',treatments:'Explore treatments',packages:'Explore published packages',discover:'What are you looking for?',compare:'Compare healthcare options side by side.',account:'Your account',recover:'Lifetime Recover',assistant:'MedBridge AI',help:'My support requests',home:'A clearer path through care'};
 export function RouteSkeleton({kind='home',detail=false}:{kind?:Kind;detail?:boolean}){
   return <main id="main-content" className={`container route-skeleton route-skeleton--${kind}`} data-route-loading={kind} aria-busy="true" aria-label={`${titles[kind]} — loading`}>
-    <p className="sr-only" role="status"><T>{'Preparing your page'}</T></p>
+    <p className="sr-only" role="status"><T>{'Preparing your page'}</T></p>{['account','assistant','help','home'].includes(kind)&&<MedBridgeLogo compact/>}
     <div className="skeleton-breadcrumb" aria-hidden="true"><span className="skeleton-line"/><span className="skeleton-line"/></div>
     <header className="skeleton-heading">{!detail?<><p className="eyebrow">{kind==='assistant'?'MEDBRIDGE AI':kind.toUpperCase()}</p><h1><T>{titles[kind]}</T></h1></>:<><div className="skeleton-line skeleton-line--title"/><div className="skeleton-line skeleton-line--wide"/></>}</header>
     <div aria-hidden="true">

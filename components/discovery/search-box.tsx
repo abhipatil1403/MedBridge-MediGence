@@ -8,8 +8,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import type { SearchSuggestion } from "@/types/discovery";
 
-export function SearchBox({ initialQuery = "", label = "Describe your need", buttonLabel = "Search", prominent = false,resultType }: {
-  initialQuery?: string; label?: string; buttonLabel?: string; prominent?: boolean;resultType?:SearchSuggestion['type'];
+export function SearchBox({ initialQuery = "", label = "Describe your need", buttonLabel = "Search", prominent = false,resultType,destination='/discover' }: {
+  initialQuery?: string; label?: string; buttonLabel?: string; prominent?: boolean;resultType?:SearchSuggestion['type'];destination?:string;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
@@ -42,9 +42,9 @@ export function SearchBox({ initialQuery = "", label = "Describe your need", but
     const params = new URLSearchParams();
     if (value.trim()) params.set("q", value.trim());
     if ((resultType??type) && (resultType??type) !== "all") params.set("type", (resultType??type)!);
-    const destination=`/discover${params.size ? `?${params}` : ""}`;
-    if(window.location.pathname==='/discover')window.history.pushState(null,'',destination);
-    else router.push(destination);
+    const target=`${destination}${params.size ? `?${params}` : ""}`;
+    if(window.location.pathname==='/discover'&&destination==='/discover')window.history.pushState(window.history.state,'',target);
+    else router.push(target);
   }
 
   return <div className={prominent ? "search-box search-box--prominent" : "search-box"}>

@@ -1,4 +1,6 @@
 'use client';
+import { MedBridgeLogo } from '@/components/medbridge-logo';
+import { useSubmittedRequest } from '@/components/assistant/use-submitted-request';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import Link from 'next/link';
@@ -8,7 +10,7 @@ import { ResponseBlocks } from '@/components/assistant/assistant-workspace';
 import type { AgentResponse } from '@/lib/agents/schemas';
 import '@/app/assistant/assistant.css';
 type Message={id:string;role:string;content:string;metadata:{response?:AgentResponse;approvalStatus?:string}};
-export default function ChatPanel({onClose,page,open,mode='panel',initialRequest=''}:{onClose?:()=>void;page?:{kind:'hospital'|'doctor'|'package';slug:string};open:boolean;mode?:'panel'|'page';initialRequest?:string}) {
+export default function ChatPanel({onClose,page,open,mode='panel',initialRequest='',autoStart=false}:{onClose?:()=>void;page?:{kind:'hospital'|'doctor'|'package';slug:string};open:boolean;mode?:'panel'|'page';initialRequest?:string;autoStart?:boolean}) {
   const {session,api,preferences}=useExperience(),{t}=useTranslation();
   const owner=session?.user.id??'guest';
   const [history,setHistory]=useState<{owner:string;messages:Message[];conversationId?:string;guest:boolean}|null>(null),[draft,setDraft]=useState({owner,value:initialRequest}),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
@@ -18,6 +20,10 @@ export default function ChatPanel({onClose,page,open,mode='panel',initialRequest
   useEffect(()=>{currentOwner.current=owner;const timer=setTimeout(()=>{setContent(initialRequest);setNotice('');},0);return()=>clearTimeout(timer);},[owner,setContent,initialRequest]);
   const end=useRef<HTMLDivElement>(null);
   const current=history?.owner===owner?history:null;
+  const [expandedOwner,setExpandedOwner]=useState<string|null>(null);
+  const showHistory=mode==='page'||expandedOwner===owner;
+  const hasMessages=Boolean(current?.messages.length)&&showHistory;
+  useEffect(()=>{if(mode!=='panel')return;const timer=setTimeout(()=>setExpandedOwner(null),0);return()=>clearTimeout(timer);},[open,mode,owner]);
   const request=useCallback(async(init?:RequestInit,guest=false,id?:string)=>{
     if(session&&!guest)return api(`/api/assistant/public${!init&&id?`?conversationId=${id}`:''}`,init);
     const response=await fetch('/api/assistant/public',{...init,cache:'no-store',headers:{'Content-Type':'application/json',...init?.headers}});
@@ -40,6 +46,7 @@ export default function ChatPanel({onClose,page,open,mode='panel',initialRequest
   useEffect(()=>{if(!open)return;if(mode==='page'){const users=end.current?.parentElement?.querySelectorAll('.chat-message--user');users?.[users.length-1]?.scrollIntoView({block:'nearest'});}else end.current?.scrollIntoView({block:'nearest'});},[history,busy,open,mode]);
   async function send(text:string) {
     if(!text.trim()||busy)return;
+    setExpandedOwner(owner);
     const startOwner=owner,guest=current?.guest??!session;
     const before=current?.messages??[];
     const id=crypto.randomUUID();setBusy(true);setNotice('');setHistory({owner,messages:[...before,{id,role:'user',content:text,metadata:{}}],conversationId:current?.conversationId,guest});setContent('');
@@ -51,6 +58,7 @@ export default function ChatPanel({onClose,page,open,mode='panel',initialRequest
     }catch(e){if(currentOwner.current===startOwner){setNotice(e instanceof Error?e.message:'Please try again.');setContent(text);setHistory({owner,messages:before,conversationId:current?.conversationId,guest});}}
     finally{setBusy(false);}
   }
+  useSubmittedRequest(open&&Boolean(current)&&!busy,autoStart,initialRequest,send);
   async function adopt(){if(busy||!session)return;const account=owner;setBusy(true);setNotice('');try{const result=await request({method:'POST',body:JSON.stringify({content:'Keep this conversation in my account',action:'adopt'})},false) as {conversationId:string};if(currentOwner.current!==account)return;try{localStorage.setItem(`medbridge-active-conversation:${account}`,JSON.stringify({id:result.conversationId}));}catch{/* Imported history remains in the account. */}setHistory(previous=>previous?.owner===account?{...previous,conversationId:result.conversationId,guest:false}:previous);}catch(e){if(currentOwner.current===account)setNotice(e instanceof Error?e.message:'Please try again.');}finally{setBusy(false);}}
   async function reset(){if(busy)return;const account=owner;setBusy(true);try{if(current?.guest)await request({method:'POST',body:JSON.stringify({content:'New conversation',action:'reset'})},true);if(currentOwner.current!==account)return;if(session)try{localStorage.removeItem(`medbridge-active-conversation:${account}`);}catch{/* New account conversation can still start. */}setHistory({owner:account,messages:[],guest:!session});setNotice('');}catch(e){if(currentOwner.current===account)setNotice(e instanceof Error?e.message:'Please try again.');}finally{setBusy(false);}}
   async function decideApproval(actionId:string,decision:'approved'|'rejected'){
@@ -68,14 +76,14 @@ export default function ChatPanel({onClose,page,open,mode='panel',initialRequest
   }
   function submit(e:FormEvent){e.preventDefault();void send(content.trim());}
   const prompts=[['Find a hospital','Find hospitals for knee replacement in Mumbai.'],['Find a doctor','Find a cardiologist in Pune.'],['Explore treatments','Show published treatments.'],['Compare destinations','Compare knee replacement in India and Singapore.'],['Find packages','Show health checkup packages under ₹5 lakh.']];
-  return <div className={`chat-panel chat-panel--${mode}`} data-empty={!current?.messages.length}><header className="chat-header"><div>{mode==='page'?(current?.messages.length?<h1>MedBridge AI</h1>:null):<h2>MedBridge AI</h2>}{current?.messages.length?<p>{t('Medical decisions require a qualified professional.')}</p>:null}</div>{onClose&&<button onClick={onClose} type="button" aria-label={t('Close assistant')}><X size={22} aria-hidden="true"/></button>}</header>
+  return <div className={`chat-panel chat-panel--${mode}`} data-empty={!hasMessages}><header className="chat-header">{mode==='panel'&&<MedBridgeLogo compact/>}<div>{mode==='page'?(hasMessages?<h1>MedBridge AI</h1>:null):<h2>MedBridge AI</h2>}{hasMessages?<p>{t('Medical decisions require a qualified professional.')}</p>:null}</div>{onClose&&<button onClick={onClose} type="button" aria-label={t('Close assistant')}><X size={22} aria-hidden="true"/></button>}</header>
     <div className="chat-messages" role="log" aria-label="MedBridge AI conversation" aria-live="polite" aria-relevant="additions text" aria-busy={busy}>
-      {!current?.messages.length&&<div className="chat-empty">{mode==='page'?<><p className="eyebrow">MEDBRIDGE AI</p><h1 className="ai-landing-title">{t('How can I help you explore your healthcare options?')}</h1><p>{t('Search hospitals, doctors, treatments and packages, compare options, or organize your next step.')}</p></>:<><h3>{t('How can I help?')}</h3><p>{t('Search hospitals, doctors, treatments and packages, compare options, or organize your next step.')}</p></>}{page&&<p>{t('Ask about this provider or package')}</p>}</div>}
-      {current?.messages.map(message=><article key={message.id} className={`chat-message chat-message--${message.role}`}>{message.metadata.response?<ResponseBlocks response={message.metadata.response} approvalStatus={message.metadata.approvalStatus} disabled={busy} onRequest={text=>void send(text)} onDecision={(id,decision)=>void decideApproval(id,decision)} onRetry={()=>void send([...current.messages].reverse().find(m=>m.role==='user')?.content??'')}/>:<p>{message.content}</p>}</article>)}
+      {!hasMessages&&<div className="chat-empty">{mode==='page'?<><MedBridgeLogo compact/><p className="eyebrow">MEDBRIDGE AI</p><h1 className="ai-landing-title">{t('Where should we start?')}</h1><p>{t('Tell me what you’re looking for. I can help you explore healthcare options, compare what is available and organize the next step.')}</p></>:<><h3>{t('What can I help you find?')}</h3><p>{t('Tell me what you’re looking for. I can help you explore healthcare options, compare what is available and organize the next step.')}</p></>}{page&&<p>{t('Ask about this provider or package')}</p>}</div>}
+      {showHistory&&current?.messages.map(message=><article key={message.id} className={`chat-message chat-message--${message.role}`}>{message.metadata.response?<ResponseBlocks response={message.metadata.response} approvalStatus={message.metadata.approvalStatus} disabled={busy} onRequest={text=>void send(text)} onDecision={(id,decision)=>void decideApproval(id,decision)} onRetry={()=>void send([...current.messages].reverse().find(m=>m.role==='user')?.content??'')}/>:<p>{message.content}</p>}</article>)}
       {busy&&<p role="status" className="assistant-working">{t('MedBridge AI is checking published options…')}</p>}{notice&&<p role="alert" className="personal-notice">{t(notice)}</p>}<div ref={end}/>
-    </div><form className="chat-composer" onSubmit={submit}><label className="sr-only" htmlFor="public-assistant-input">{t(current?.messages.length?'Ask a follow-up':'What are you looking for?')}</label><textarea id="public-assistant-input" required maxLength={2000} value={content} onChange={e=>setContent(e.target.value)} disabled={busy} placeholder={t(current?.messages.length?'Ask a follow-up':'Find hospitals for knee replacement in Mumbai…')}/><div className="chat-composer__actions">{Boolean(current?.messages.length)&&<button type="button" className="save-control" onClick={()=>void reset()} disabled={busy}>{t('New conversation')}</button>}<button className="button button--primary button--default" disabled={busy||!content.trim()}>{t(current?.messages.length?'Send':'Ask MedBridge AI')} →</button></div>
-      {!current?.messages.length&&<div className="ai-prompts">{prompts.slice(0,mode==='page'?5:4).map(([label,text])=><button type="button" key={label} onClick={()=>setContent(text)}>{t(label)}</button>)}</div>}
+    </div><form className="chat-composer" onSubmit={submit}><label className="sr-only" htmlFor="public-assistant-input">{t(hasMessages?'Ask a follow-up':'What are you looking for?')}</label><textarea id="public-assistant-input" required maxLength={2000} value={content} onChange={e=>setContent(e.target.value)} disabled={busy} placeholder={t(hasMessages?'Ask a follow-up':'What are you looking for?')}/><div className="chat-composer__actions">{hasMessages&&<button type="button" className="save-control" onClick={()=>void reset()} disabled={busy}>{t('New conversation')}</button>}<button className="button button--primary button--default" disabled={busy||!content.trim()}>{t(hasMessages?'Send':'Ask MedBridge AI')} →</button></div>
+      {!hasMessages&&<div className="ai-prompts">{prompts.slice(0,mode==='page'?5:4).map(([label,text])=><button type="button" key={label} onClick={()=>setContent(text)}>{t(label)}</button>)}</div>}
       <small>{t('For discovery and coordination. Medical decisions require a qualified professional.')}</small>
       {current?.guest?<>{session?<button className="save-control" type="button" disabled={busy} onClick={()=>void adopt()}>{t('Keep this conversation in my account')}</button>:<Link href="/account">{t('Temporary conversation. Sign in to keep your plan and history.')}</Link>}</>:<Link href={current?.conversationId?`/assistant?conversation=${current.conversationId}`:'/assistant'}>{t('Open in MedBridge AI')}</Link>}
-    </form></div>;
+    </form>{mode==='panel'&&!showHistory&&Boolean(current?.messages.length)&&<div className="chat-resume"><button type="button" className="save-control" onClick={()=>setExpandedOwner(owner)}>{t('Continue previous conversation')}</button></div>}</div>;
 }

@@ -1,8 +1,9 @@
 'use client';
 import { InlineSkeleton } from '@/components/inline-skeleton';
 import Link from 'next/link';
-import {useRouter} from 'next/navigation';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Menu, X } from 'lucide-react';
+import { MedBridgeLogo } from '@/components/medbridge-logo';
 import { getBrowserSupabaseClient } from '@/lib/supabase/browser';
 import { useExperience } from './provider';
 import { useTranslation, LocalDate } from './translation';
@@ -13,10 +14,12 @@ type Profile={display_name:string|null;phone:string;country:string;city:string;l
 type Item={id:string;title?:string;query?:string;updated_at?:string;created_at?:string;status?:string;conversation_id?:string;kind?:'hospital'|'doctor'|'package';hospital_id?:string;doctor_id?:string;package_id?:string;record?:{name:string;slug:string}|null;read_at?:string|null;body?:string;resource_type?:string;resource_id?:string};
 const sections=[['profile','Profile'],['preferences','Preferences'],['saved','Saved'],['searches','Recent searches'],['conversations','Recent conversations'],['plans','My plans'],['notifications','Notifications'],['privacy','Privacy and settings']] as const;
 export function Account({section}:{section:string}) {
-  const router=useRouter();
+  const drawer=useRef<HTMLDialogElement>(null),drawerToggle=useRef<HTMLButtonElement>(null);
+  const [drawerOpen,setDrawerOpen]=useState(false);
   const {session,authReady,preferences,api}=useExperience(),{t}=useTranslation();
   const [state,setState]=useState<{owner:string;section:string;profile?:Profile;inApp?:boolean;items?:Item[];error?:boolean}|null>(null),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0);
   const owner=session?.user.id;
+  useEffect(()=>()=>{if(drawerOpen)document.body.style.overflow='';},[drawerOpen]);
   useEffect(()=>{const changed=()=>setRefresh(v=>v+1);window.addEventListener('medbridge-saves-changed',changed);return()=>window.removeEventListener('medbridge-saves-changed',changed);},[]);
   useEffect(()=>{
     let alive=true;
@@ -35,7 +38,8 @@ export function Account({section}:{section:string}) {
   async function importSaves(){setBusy(true);setNotice('');try{for(const item of guestSaves())await api('/api/account',{method:'POST',body:JSON.stringify({action:'save_item',input:{...item,saved:true}})});localStorage.removeItem(guestSavedKey);invalidateSaves(owner);setRefresh(v=>v+1);setNotice('Saved items imported.');}catch{setNotice('Some saves could not be imported. Unpublished items are unavailable.');}finally{setBusy(false);}}
   async function clear(){try{await api('/api/account',{method:'POST',body:JSON.stringify({action:'clear_searches',input:{}})});setRefresh(v=>v+1);}catch{setNotice('Please try again.');}}
   async function read(id:string){try{await api('/api/account',{method:'POST',body:JSON.stringify({action:'read_notification',input:{id}})});setRefresh(v=>v+1);}catch{setNotice('Please try again.');}}
-  return <div className="account-layout"><label className="account-section-select">{t('Account section')}<select value={section} onChange={e=>router.push(e.target.value.startsWith('/')?e.target.value:`/account?section=${e.target.value}`)}>{sections.map(([key,label])=><option key={key} value={key}>{t(label)}</option>)}<option value="/recover">{t('Recovery journey')}</option><option value="/help">{t('Help / Support')}</option></select><button type="button" className="save-control" onClick={()=>void getBrowserSupabaseClient()?.auth.signOut()}>{t('Sign out')}</button></label><nav className="account-nav" aria-label={t('Account')}>{sections.map(([key,label])=><Link href={`/account?section=${key}`} aria-current={section===key?'page':undefined} key={key}>{t(label)}</Link>)}<Link href="/recover">{t('Recovery journey')}</Link><Link href="/help">{t('Help / Support')}</Link><button className="save-control" onClick={()=>void getBrowserSupabaseClient()?.auth.signOut()}>{t('Sign out')}</button></nav>
+  const accountLinks=<>{sections.map(([key,label])=><Link href={`/account?section=${key}`} onClick={()=>drawer.current?.close()} aria-current={section===key?'page':undefined} key={key}>{t(label)}</Link>)}<Link href="/recover" onClick={()=>drawer.current?.close()}>{t('Recovery journey')}</Link><Link href="/help" onClick={()=>drawer.current?.close()}>{t('Get help')}</Link><button className="save-control" onClick={()=>{drawer.current?.close();void getBrowserSupabaseClient()?.auth.signOut();}}>{t('Sign out')}</button></>;
+  return <div className="account-layout"><button ref={drawerToggle} className="account-drawer-toggle" type="button" aria-haspopup="dialog" aria-expanded={drawerOpen} aria-controls="account-navigation" onClick={()=>{drawer.current?.showModal();setDrawerOpen(true);document.body.style.overflow='hidden';}}>{t(sections.find(([key])=>key===section)?.[1]??'Profile')}<Menu size={20} aria-hidden="true"/></button><dialog id="account-navigation" className="account-navigation-drawer" ref={drawer} aria-label={t('Account navigation')} onClose={()=>{setDrawerOpen(false);document.body.style.overflow='';drawerToggle.current?.focus();}} onClick={event=>{if(event.target===event.currentTarget)drawer.current?.close();}}><header><MedBridgeLogo/><strong>{t('Your account')}</strong><button className="save-control" type="button" aria-label={t('Close navigation')} onClick={()=>drawer.current?.close()}><X size={22} aria-hidden="true"/></button></header><nav aria-label={t('Account navigation')}>{accountLinks}</nav></dialog><nav className="account-nav" aria-label={t('Account')}>{accountLinks}</nav>
     <div>{notice&&<p role="status" className="personal-notice">{t(notice)}</p>}<section className="personal-panel"><h2>{t(sections.find(([key])=>key===section)?.[1]??'Profile')}</h2>
       {!data?<InlineSkeleton/>:data.error?<button className="save-control" onClick={()=>setRefresh(v=>v+1)}>{t('Try again')}</button>:['profile','preferences','privacy'].includes(section)?<>
         {section==='privacy'&&<><p>{t('Your profile, saved items, conversations and recovery journey are private to your account. Support receives only explicitly consented requests.')}</p><Link className="text-link" href="/help">{t('Manage support consent in Patient Help')}</Link></>}
