@@ -58,7 +58,7 @@ async function DirectoryResults({type,searchParams}:{type:Exclude<ResultType,'al
   ];
   return (
     <div data-directory-results={type}>
-      <DirectoryFilters type={type} facets={facets} filters={filters}/>
+      <details className="directory-filter-disclosure"><summary><T>{'Filters'}</T></summary><DirectoryFilters type={type} facets={facets} filters={filters}/></details>
       {type === "treatments" && (
         <Localized as="nav" className="category-index" aria-label="Treatment specialties">
           {categories.map((category) => (

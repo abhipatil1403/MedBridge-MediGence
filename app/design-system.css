@@ -1,0 +1,207 @@
+/* MedBridge product system. Open canvas → quiet surface → focused decision.
+   Public, conversation and operational compositions share tokens, not templates. */
+:root {
+  --paper:#faf9f5; --ink:#173e36; --deep:#16493d; --teal:#2d6a56; --muted:#596860;
+  --line:#dedfd6; --surface:#fffefa; --surface-soft:#edf2e9;
+  --radius-control:8px; --radius-surface:12px;
+  --space-section:80px; --space-cluster:32px; --text-meta:13px;
+  --shadow-input:0 8px 24px #183e3609;
+}
+body {font-family:Arial,Helvetica,sans-serif;}
+button,input,textarea,select {font-family:inherit;}
+h1,h2,h3 {text-wrap:balance;}
+.button {min-height:48px; font-weight:600; border-radius:var(--radius-control);}
+.button--outline {border-color:#b7c4b8;}
+small,.muted,.personal-muted {color:var(--muted);}
+.eyebrow {font-size:11px;letter-spacing:.13em;}
+/* Wayfinding: four destinations, one dedicated conversation action. */
+.site-header__inner {min-height:80px;gap:24px;}
+.site-header .medbridge-logo {width:48px;}
+.brand__name {font-size:14px;letter-spacing:.1em;}
+.desktop-nav {gap:24px;margin-right:0;}
+.desktop-nav a,.navigation-group>button {font-size:14px;color:var(--ink);}
+.header-preferences select {background:transparent;border-color:transparent;}
+.header-workspace {min-height:44px;}
+.navigation-popover {padding:12px;box-shadow:0 12px 30px #193e3610;}
+.navigation-popover a {min-height:44px;border-radius:6px;}
+.navigation-drawer .drawer-surface {padding:24px;}
+.navigation-drawer nav>section {padding-block:16px;border-top:1px solid var(--line);}
+.navigation-drawer nav h2 {margin-bottom:8px;}
+/* The opening question is the product, with a live composer immediately below. */
+.companion-hero {display:flex;flex-direction:column;gap:24px;padding-block:56px 40px;text-align:center;}
+.companion-hero>div {max-width:840px;}
+.companion-hero .eyebrow {margin-bottom:16px;}
+.companion-hero h1 {font-size:clamp(36px,4.2vw,60px);font-weight:500;letter-spacing:-.045em;max-width:22ch;margin:0 auto 16px;}
+.companion-hero__lead {max-width:60ch;font-size:17px;line-height:1.6;margin:0 auto;}
+.companion-hero .ai-entry {width:min(100%,800px);text-align:left;}
+.ai-entry {border-radius:16px;padding:24px 28px;box-shadow:var(--shadow-input);background:var(--surface);border-color:#b9cbbb;}
+.ai-entry label {font-size:14px;margin-bottom:8px;}
+.ai-entry textarea {min-height:88px;font-size:20px;line-height:1.5;}
+.ai-entry__foot {padding-top:12px;}
+.ai-entry__foot small {font-size:13px;max-width:40ch;}
+.ai-prompts {gap:8px;}
+.ai-prompts button {border-radius:6px;min-height:44px;background:transparent;border-color:var(--line);font-size:13px;}
+.companion-hero__trust {justify-content:center;margin:0;font-size:13px;}
+.companion-path {grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;padding:32px 0 40px;}
+.companion-path>a {display:grid;grid-template-columns:24px 1fr 20px;gap:16px;align-items:start;padding-top:24px;border-top:1px solid var(--line);}
+.companion-path>a>span {font-size:12px;color:var(--teal);}
+.companion-path h2 {font-size:20px;margin:0 0 8px;}
+.companion-path p {font-size:14px;margin:0;}
+.companion-path>a:hover h2 {text-decoration:underline;text-underline-offset:5px;}
+.product-example,.curated-providers,.curated-topics,.companion-recover,.companion-final {padding-block:var(--space-section);}
+.provider-selection {gap:0;}
+.provider-selection article {padding:28px;border:0;border-left:1px solid var(--line);background:transparent;border-radius:0;}
+.provider-selection article:first-child {padding-left:0;border-left:0;}
+.provider-selection h3 {font-size:24px;}
+.product-example__preview {border-radius:12px;}
+/* Original amounts remain primary, even after a conversion arrives. */
+.converted-price {display:inline-flex;flex-direction:column;gap:6px;max-width:100%;font-variant-numeric:tabular-nums;}
+.converted-price__amount {font-size:inherit;font-weight:600;color:var(--ink);}
+.converted-price__estimate {display:flex;flex-direction:column;font-size:13px;font-weight:400;line-height:1.6;color:var(--muted);}
+.exchange-details {display:block;}
+.exchange-details button {background:none;border:0;padding:8px 0;min-height:44px;font-size:12px;text-decoration:underline;text-underline-offset:4px;color:var(--muted);cursor:pointer;}
+.exchange-details__content {display:block;font-size:12px;max-width:44ch;overflow-wrap:anywhere;font-weight:400;}
+.package-price-display {max-width:100%;}
+/* Editorial discovery: roster, institutional rows, topic index and offers. */
+.directory-intro {padding-bottom:16px;border-bottom:1px solid var(--line);}
+.directory-page .page-header {padding:0;margin:0;}
+.directory-page .directory-intro {margin-bottom:0;}
+.directory-page .page-header h1 {font-size:clamp(32px,4vw,50px);font-weight:500;}
+.directory-page .page-header__lead {font-size:16px;max-width:55ch;}
+.directory-filter-disclosure {margin:0;}
+.directory-filter-disclosure>summary {display:none;}
+.directory-filter-disclosure::details-content {content-visibility:visible;}
+.directory-filters {border:0;padding:16px 0;margin-block:0;}
+.directory-page .result-section__head {display:none;}
+.directory-page .directory-page__toolbar {padding:8px 0;}
+.directory-page--doctors .result-section__items {display:flex;flex-direction:column;gap:0;}
+.directory-page--doctors .result-row {display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:24px;padding:28px 0;border-bottom:1px solid var(--line);}
+.directory-page--doctors .result-row>div:first-child {padding-left:80px;position:relative;grid-column:1;}
+.directory-page--doctors .doctor-monogram {position:absolute;left:0;top:4px;width:56px;height:56px;font-family:var(--font-editorial);font-size:20px;}
+.directory-page--doctors .result-row h3 {font-size:24px;margin:6px 0 8px;}
+.directory-page--hospitals .result-section__items {display:flex;flex-direction:column;gap:0;}
+.directory-page--hospitals .result-row {display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:40px;padding:32px 0;background:transparent;border-radius:0;border:0;border-bottom:1px solid var(--line);}
+.directory-page--hospitals .result-row h3 {font-size:clamp(23px,2.3vw,30px);max-width:32ch;}
+.directory-page--hospitals .result-row__actions {border-left:1px solid var(--line);padding-left:32px;align-items:start;justify-content:center;display:flex;flex-direction:column;gap:12px;}
+.directory-page--packages .result-section__items {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px;}
+.directory-page--packages .result-row {display:flex;flex-direction:column;align-items:stretch;gap:0;padding:0;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;}
+.directory-page--packages .result-row>div:first-child {padding:24px;}
+.directory-page--packages .result-row h3 {font-size:26px;}
+.directory-page--packages .package-decision {position:relative;display:grid;grid-template-columns:1fr auto;align-items:start;gap:10px;padding:20px 28px;background:#f0f2e9;border-top:1px solid var(--line);text-align:left;margin-top:auto;}
+.directory-page--packages .package-decision>span,.directory-page--packages .package-decision>strong {grid-column:1;}
+.directory-page--packages .package-decision>span:first-child {grid-column:2;grid-row:1/4;}
+.directory-page--packages .package-decision>.save-control {grid-column:2;grid-row:1/3;}
+.directory-page--packages .package-decision>.result-action {grid-column:1/-1;margin-top:12px;}
+.directory-page--packages .package-decision>strong {font-size:28px;}
+.treatment-category {display:grid;grid-template-columns:240px minmax(0,1fr);gap:32px;padding-block:32px;border-bottom:1px solid var(--line);}
+.treatment-category>h2 {font-family:var(--font-editorial);font-weight:400;font-size:30px;}
+.treatment-category .result-row {border:0;padding:0 0 20px;}
+/* Profile identity / decision / supporting information. */
+.detail-hero {display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:64px;padding:28px 0 40px;align-items:start;background:transparent;border:0;}
+.detail-hero .page-header {padding:0;margin:0;}
+.detail-hero .page-header h1 {font-size:clamp(34px,4vw,52px);font-weight:500;line-height:1.1;max-width:22ch;}
+.detail-hero .page-header__lead:empty {display:none;}
+.detail-hero__facts {list-style:none;display:flex;flex-direction:column;gap:8px;padding:0;margin:0;font-size:15px;color:var(--muted);}
+.detail-hero__facts li {display:block;border:0;padding:0;}
+.detail-hero__facts li:first-child {color:var(--ink);font-size:17px;}
+.detail-hero__decision {padding:24px;border-left:2px solid #afc6ab;}
+.detail-hero__actions {display:flex;flex-direction:column;align-items:stretch;gap:16px;padding:0;}
+.detail-hero__actions .text-link {font-weight:500;text-align:center;}
+.detail-page--doctor .profile-avatar {float:left;margin:40px 24px 0 0;width:80px;height:80px;font-family:var(--font-editorial);background:#e6ede1;}
+.detail-page--doctor .detail-hero {gap:40px;}
+.detail-page--doctor .detail-hero .page-header {overflow:hidden;}
+.detail-navigation {border-radius:0;background:transparent;border-bottom:1px solid var(--line);padding:8px 0;gap:24px;}
+.detail-navigation a {border:0;border-radius:0;background:transparent;min-height:44px;display:flex;align-items:center;}
+.detail-layout {grid-template-columns:minmax(0,1fr) 280px;gap:64px;padding-top:32px;}
+.detail-section {padding:24px 0 32px;border-color:var(--line);}
+.detail-section h2 {font-size:26px;font-weight:500;margin-bottom:20px;}
+.detail-section>p {max-width:68ch;}
+.detail-aside {padding:24px 0 0 24px;background:none;border:0;border-left:1px solid var(--line);border-radius:0;align-self:start;}
+.detail-aside h2 {font-size:20px;}
+.detail-aside p {font-size:14px;}
+.package-hero-price {padding:0;margin:0 0 24px;background:none;border:0;}
+.package-hero-price>strong {font-size:34px;display:block;}
+.price-caption {font-size:12px;font-weight:400;color:var(--muted);display:block;margin-bottom:8px;}
+.comparison-real-options {padding-block:24px 40px;}
+.comparison-real-options>div {gap:48px;}
+.comparison-real-options article {border-top:2px solid #b4c6a9;padding:24px 0;}
+.comparison-real-options h2 {font-size:24px;}
+.comparison-real-options h3 {font-size:28px;}
+.comparison-real-options .package-price-display {font-size:24px;}
+.comparison-package-inclusions {margin:20px 0;padding-left:20px;font-size:14px;}
+.comparison-package-inclusions li {padding-bottom:6px;}
+.auth-page .auth-card {border:0;border-radius:12px;background:#edf2e9;box-shadow:none;}
+.auth-page .auth-card h1 {font-weight:500;}
+.auth-page .auth-card__action {border-radius:8px;min-height:48px;padding:14px 20px;}
+.package-hero-price>p {font-size:13px;margin:12px 0 0;}
+.package-condition {color:#735029;font-size:13px;}
+.package-hero-price .package-condition {padding:12px;font-size:13px;line-height:1.6;}
+.package-hero-price .package-condition strong {font-size:13px;font-weight:600;display:inline;}
+.detail-links li {padding:16px 0;}
+.detail-links li a {font-size:18px;}
+.tag-list li {border:0;background:none;border-radius:0;padding:0 20px 0 0;font-size:16px;}
+/* Dedicated conversational canvas. */
+.assistant-page {padding-top:32px;}
+.chat-panel--page,.assistant-shell {max-width:1000px;margin:auto;}
+.chat-empty,.assistant-first-use {padding-block:48px 24px;}
+.chat-empty .ai-landing-title,.assistant-first-use .ai-landing-title {font-size:clamp(32px,4vw,48px);font-weight:500;max-width:22ch;line-height:1.13;}
+.chat-empty>p:last-child,.assistant-first-use>p:last-child {font-size:16px;max-width:50ch;margin-inline:auto;}
+.chat-panel--page[data-empty=true] {min-height:0;}
+.chat-panel--page[data-empty=true] .chat-messages {flex:none;padding:0;}
+.chat-panel--page[data-empty=true] .chat-empty {margin:0 auto;padding:32px 0 24px;}
+.chat-panel--page[data-empty=true] .chat-composer {margin:0 auto;}
+.chat-panel[data-empty=true] .chat-composer,.assistant-shell[data-empty=true] .assistant-composer {max-width:760px;margin-inline:auto;background:var(--surface);border:1px solid #b9cbbb;border-radius:16px;padding:24px;}
+.chat-panel[data-empty=true] .chat-composer textarea,.assistant-shell[data-empty=true] .assistant-composer textarea {min-height:96px;font-size:18px;}
+.assistant-page .assistant-finding--package,.chat-panel .assistant-finding--package {background:transparent;border-radius:0;border:0;border-left:2px solid #b4c6a9;padding:12px 0 12px 24px;margin:24px 0;}
+.assistant-finding h3 {font-size:22px;}
+.assistant-finding--package .package-price-display {font-size:22px;}
+/* Personal activity and continuity. */
+.account-page h1 {font-size:clamp(34px,4vw,48px);font-weight:500;letter-spacing:-.035em;}
+.account-empty {padding:32px 0;margin-top:24px;border-top:1px solid var(--line);}
+.account-empty h3 {font-size:24px;font-weight:500;}
+.account-empty p {max-width:54ch;color:var(--muted);}
+.account-empty>div {display:flex;gap:24px;flex-wrap:wrap;margin-top:24px;}
+.account-nav {border:0;background:none;padding:0 24px 0 0;border-right:1px solid var(--line);}
+.account-nav a {min-height:44px;}
+.account-layout .personal-panel {border:0;background:transparent;padding:0 0 32px;}
+.account-layout .personal-panel>section {padding:24px 0;border-top:1px solid var(--line);}
+.personal-list li {padding:20px 0;}
+.personal-form fieldset {border:0;border-top:1px solid var(--line);padding:20px 0;margin:16px 0;}
+.personal-form legend {font-size:18px;font-weight:500;padding-right:16px;}
+.personal-sign-in {display:grid;grid-template-columns:1fr 1fr;gap:64px;padding:40px;background:#edf2e9;border:0;border-radius:12px;}
+.personal-sign-in__intro .medbridge-logo {margin-bottom:20px;}
+.personal-sign-in h2 {font-size:26px;}
+.personal-sign-in__intro p {font-size:14px;max-width:45ch;}
+.personal-sign-in .personal-form {max-width:440px;}
+.recover-opening h1 {font-weight:500;max-width:24ch;font-size:clamp(36px,4vw,52px);}
+.recover-page>section.personal-panel:has(>details) {border:0;border-bottom:1px solid var(--line);padding:12px 0;margin-block:16px 24px;}
+.recover-page>section.personal-panel>details>summary {min-height:44px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;}
+.recover-page>section.personal-panel>details>summary::after {content:'+';font-size:20px;font-weight:400;}
+.recover-page>section.personal-panel>details[open]>summary::after {content:'−';}
+.skeleton-profile--hospitals {background:transparent;border-left:2px solid #b5c9b0;}
+.skeleton-profile--packages {background:transparent;gap:40px;}
+.skeleton-price {width:280px;flex:none;padding:20px;background:#edf2e9;}
+.recovery-steps {border:0;background:#edf2e9;border-radius:12px;}
+.recovery-timeline li {padding-left:20px;border-left:1px solid #a6bca0;margin-left:8px;}
+@media(max-width:1100px) {.site-header__inner{gap:14px}.desktop-nav{gap:16px}.detail-hero{gap:32px;grid-template-columns:minmax(0,1fr) 280px}.detail-layout{gap:32px}}
+@media(max-width:800px) {.desktop-nav,.header-preferences{display:none}.menu-toggle{display:flex}.site-header__inner{min-height:68px}}
+@media(max-width:767px) {
+  :root {--space-section:40px;--page-gutter:20px;}
+  .assistant-launcher {display:none;}
+  .site-header .medbridge-logo{width:36px}.brand__name{font-size:11px}.site-header__inner{gap:6px}.header-workspace{font-size:13px;padding-inline:10px}
+  .companion-hero{padding-block:32px;gap:20px;text-align:left}.companion-hero h1{font-size:36px;max-width:16ch;margin:0 0 16px}.companion-hero__lead{font-size:15px;margin:0}.companion-hero__trust{display:flex;font-size:12px;align-self:flex-start}
+  .ai-entry{padding:20px;border-radius:12px}.ai-entry textarea{font-size:18px;min-height:96px}.ai-entry__foot{flex-direction:row;align-items:center}.ai-entry__foot small{display:none}.ai-entry__foot .button{width:100%}.ai-prompts{gap:6px}.ai-prompts button{font-size:12px;padding:8px 10px}
+  .companion-path{grid-template-columns:1fr;gap:0;padding-block:0 24px}.companion-path>a{padding:20px 0;grid-template-columns:24px 1fr 20px}.companion-path h2{font-size:18px}.companion-path p{font-size:14px}
+  .provider-selection article,.provider-selection article:first-child{padding:24px 0;border-left:0;border-bottom:1px solid var(--line)}
+  .directory-intro{padding-bottom:20px}.directory-filter-disclosure>summary{display:flex;justify-content:space-between;border-bottom:1px solid var(--line)}.directory-filter-disclosure:not([open])::details-content{content-visibility:hidden}.directory-filter-disclosure>summary::after{content:'+'}.directory-filter-disclosure[open]>summary::after{content:'−'}
+  .directory-page--doctors .result-row{grid-template-columns:1fr auto;gap:16px;padding:24px 0}.directory-page--doctors .result-row>div:first-child{grid-column:1/-1;padding-left:64px}.directory-page--doctors .doctor-monogram{width:44px;height:44px}.directory-page--doctors .result-row h3{font-size:22px}.directory-page--doctors .result-row>.result-action{justify-self:end}
+  .directory-page--hospitals .result-row{grid-template-columns:1fr;gap:16px;padding:24px 0}.directory-page--hospitals .result-row__actions{border:0;padding:0;flex-direction:row;flex-wrap:wrap;justify-content:flex-start}.directory-page--hospitals .result-row h3{font-size:25px}
+  .directory-page--packages .result-section__items{grid-template-columns:1fr;gap:24px}.directory-page--packages .result-row>div:first-child{padding:20px}.directory-page--packages .package-decision{padding:20px}.directory-page--packages .package-decision>span:first-child{grid-column:1/-1;grid-row:4}.directory-page--packages .result-row h3{font-size:24px}
+  .treatment-category{grid-template-columns:1fr;gap:16px;padding-block:24px}.treatment-category>h2{font-size:25px;margin:0}
+  .detail-hero{grid-template-columns:1fr;gap:24px;padding-block:20px 24px}.detail-hero .page-header h1{font-size:34px}.detail-hero__decision{padding:20px;background:#edf2e9;border-left:0;border-radius:10px}.detail-hero__facts{font-size:14px}.detail-hero__facts li:first-child{font-size:16px}
+  .detail-page--doctor .profile-avatar{float:none;width:60px;height:60px;margin:20px 0 0}.detail-page--doctor .detail-hero{gap:24px}.detail-navigation{gap:20px;flex-wrap:nowrap;overflow:auto}.detail-navigation a{white-space:nowrap;flex:none}.detail-layout{grid-template-columns:1fr;gap:24px}.detail-aside{border-left:0;border-top:1px solid var(--line);padding:24px 0}.package-hero-price>strong{font-size:32px}
+  .chat-empty,.assistant-first-use{padding-block:32px 20px}.chat-panel[data-empty=true] .chat-composer,.assistant-shell[data-empty=true] .assistant-composer{padding:20px}.assistant-page .assistant-finding--package,.chat-panel .assistant-finding--package{padding-left:16px}
+  .account-nav{border:0}.account-layout .personal-panel{padding-top:8px}.comparison-preview{margin-block:24px}.comparison-real-options>div{gap:24px}.comparison-preview__facts{gap:0 16px}
+  .personal-sign-in{grid-template-columns:1fr;padding:24px;gap:24px}.personal-sign-in__intro p{font-size:13px}.personal-sign-in__intro .medbridge-logo{display:none}.skeleton-profile--packages{flex-direction:column}.skeleton-price{width:100%}
+}
+@media(prefers-reduced-motion:reduce) {*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}

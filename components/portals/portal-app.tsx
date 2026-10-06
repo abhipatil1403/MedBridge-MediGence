@@ -1,10 +1,11 @@
 "use client";
+import { trapDialogFocus } from "@/components/dialog-focus";
 import { MedBridgeLogo } from '@/components/medbridge-logo';
 import { Localized } from '@/components/experience/localized';
 
 import { T } from '@/components/experience/translation';
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowUpRight,
@@ -15,6 +16,7 @@ import {
   Menu,
   ShieldCheck,
   X,
+  MapPin, Users, FileText, MessageSquare, Stethoscope, ClipboardList, Settings,
 } from "lucide-react";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
@@ -33,9 +35,14 @@ import { CreateOrganization, ProviderContent } from "./provider";
 import { Cases } from "./cases";
 import { CommandForm } from "./command-form";
 import "./portal.css";
+import "./design.css";
 import { publicUrl } from "@/lib/portals/public-url";
 import {RouteSkeleton} from '@/components/route-skeleton';
 type PackageInquiry={title:string;description:string;hospitalId?:string};
+function PortalSectionIcon({section}:{section:string}) {
+  const Icon=section==='dashboard'?LayoutDashboard:section==='locations'?MapPin:section==='doctors'||section==='treatments'?Stethoscope:section==='team'||section==='users'||section==='staff'?Users:section==='messages'?MessageSquare:section==='documents'||section==='content'?FileText:section==='verification'||section==='audit'?ShieldCheck:section==='settings'?Settings:section==='notifications'?Bell:section==='organization'||section==='providers'?Building2:ClipboardList;
+  return <Icon size={18} aria-hidden="true"/>;
+}
 
 export function PortalApp({
   portal,
@@ -56,6 +63,12 @@ export function PortalApp({
   const [epoch, setEpoch] = useState(0);
   const [notice, setNotice] = useState("");
   const [menu, setMenu] = useState(false);
+  const menuDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (menu) { menuDialog.current?.showModal(); menuDialog.current?.querySelector<HTMLButtonElement>('button')?.focus(); document.body.style.overflow='hidden'; }
+    else menuDialog.current?.close();
+    return () => { document.body.style.overflow=''; };
+  }, [menu]);
   const section = path[0] ?? "dashboard";
   const sections =
     portal === "provider"
@@ -182,7 +195,7 @@ export function PortalApp({
     if(portal==='patient')return <RouteSkeleton kind="help"/>;else
     return (
       <main id="main-content" className="portal-login">
-        <p role="status"><T>{"Loading sign-in…"}</T></p>
+        <MedBridgeLogo compact/><div className="skeleton-input" aria-busy="true"/><p className="sr-only" role="status"><T>{"Preparing your page"}</T></p>
       </main>
     );
   if (!token || section === "login")
@@ -216,21 +229,17 @@ export function PortalApp({
     if(portal==='patient')return <RouteSkeleton kind="help"/>;else
     return (
       <main id="main-content" className="portal-login">
-        <p role="status"><T>{"Verifying portal access…"}</T></p>
+        <MedBridgeLogo compact/><div className="skeleton-input" aria-busy="true"/><p className="sr-only" role="status"><T>{"Preparing your page"}</T></p>
       </main>
     );
   if (!portalAllowed(portal, context.role)) return null;
   const title =
     sections.find(([key]) => key === section)?.[1] ??
     (portal === "patient" ? "Support requests" : "Page unavailable");
-  return (
-    <PortalStateContext.Provider value={state}>
-      {portal==='patient'?<main id="main-content" tabIndex={-1} className="container patient-help-page"><header><MedBridgeLogo compact/><p className="eyebrow">MEDBRIDGE SUPPORT</p><h1><T>{'Get help'}</T></h1><p><T>{'Ask for help with your next step and follow the response here.'}</T></p></header>{notice&&<p role="status" className="personal-notice">{notice}</p>}<PatientSupport packageInquiry={packageInquiry}/></main>:
-      <div className={`portal-shell portal-${portal}`}>
-        <aside className={`portal-sidebar ${menu ? "is-open" : ""}`}>
+  const navigation = (<aside className={`portal-sidebar`}>
           <div className="portal-sidebar-brand">
             <Link href={publicUrl()} className="portal-brand">
-              <MedBridgeLogo onDark/>
+              <MedBridgeLogo compact priority/><span className="portal-wordmark">MEDBRIDGE</span>
             </Link>
             <Localized as="button"
               className="portal-icon-button portal-mobile-only"
@@ -244,7 +253,7 @@ export function PortalApp({
             <T>{`${label(portal)} portal`}</T>
           </p>
           <nav aria-label={`${label(portal)} navigation`}>
-            {sections.map(([key, name], index) => (
+            {sections.map(([key, name]) => (
               <Link
                 key={key}
                 href={`/${portal}/${key}`}
@@ -252,15 +261,7 @@ export function PortalApp({
                 aria-current={key === section ? "page" : undefined}
                 onClick={() => setMenu(false)}
               >
-                {index === 0 ? (
-                  <LayoutDashboard size={18} />
-                ) : ["verification", "settings", "users"].includes(key) ? (
-                  <ShieldCheck size={18} />
-                ) : key === "notifications" ? (
-                  <Bell size={18} />
-                ) : (
-                  <Building2 size={18} />
-                )}
+                <PortalSectionIcon section={key}/>
                 <span><T>{name}</T></span>
               </Link>
             ))}
@@ -274,14 +275,13 @@ export function PortalApp({
               <LogOut size={16} />
               <T>{"Sign out"}</T></button>
           </div>
-        </aside>
-        {menu && (
-          <Localized as="button"
-            className="portal-nav-backdrop"
-            aria-label="Close navigation"
-            onClick={() => setMenu(false)}
-          />
-        )}
+        </aside>);
+  return (
+    <PortalStateContext.Provider value={state}>
+      {portal==='patient'?<main id="main-content" tabIndex={-1} className="container patient-help-page"><header><MedBridgeLogo compact/><p className="eyebrow">MEDBRIDGE SUPPORT</p><h1><T>{'Get help'}</T></h1><p><T>{'Ask for help with your next step and follow the response here.'}</T></p></header>{notice&&<p role="status" className="personal-notice">{notice}</p>}<PatientSupport packageInquiry={packageInquiry}/></main>:
+      <div className={`portal-shell portal-${portal}`}>
+        <div className="portal-desktop-navigation">{navigation}</div>
+        <dialog onKeyDown={trapDialogFocus} ref={menuDialog} className="portal-navigation-dialog" aria-label="Mobile navigation" onClose={() => setMenu(false)} onClick={event => { if(event.target===event.currentTarget)setMenu(false); }}>        {navigation}</dialog>
         <div className="portal-main">
           <header className="portal-topbar">
             <Localized as="button"

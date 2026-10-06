@@ -25,7 +25,7 @@ export default async function DoctorDetailPage({params}:Props){
  return <main id="main-content" tabIndex={-1} className="container detail-page detail-page--doctor" data-page-content>
   <Breadcrumbs currentPath={`/doctors/${slug}`} items={[{label:'Home',href:'/'},{label:'Doctors',href:'/doctors'},{label:doctor.name}]}/>
   <div className="profile-avatar" aria-hidden="true">{initials}</div>
-  <DetailHero type="PUBLISHED DOCTOR PROFILE" title={doctor.name} intro={doctor.description} facts={[doctor.specialty||'Specialty not provided',[doctor.city,country?.name??doctor.country].filter(Boolean).join(', '),hospital?.name??'Hospital affiliation not published']} actions={[{label:'Ask MedBridge AI about this doctor',href:`/assistant?q=${encodeURIComponent(`Show ${doctor.name}`)}`,primary:true}]}/>
+  <DetailHero type="PUBLISHED DOCTOR PROFILE" title={doctor.name} intro="" facts={[doctor.specialty||'Specialty not provided',[doctor.city,country?.name??doctor.country].filter(Boolean).join(', '),hospital?.name??'Hospital affiliation not published']} actions={[{label:'Ask MedBridge AI about this doctor',href:`/assistant?q=${encodeURIComponent(`Show ${doctor.name}`)}`,primary:true}]}/>
   <div className="inline-actions"><SaveButton kind="doctor" recordId={doctor.recordId}/></div>
   <DetailNavigation items={[{label:'About',href:'#about'},{label:'Specialty',href:'#specialty-and-hospital'},{label:'Treatments',href:'#treatments'},{label:'Consultation',href:'#consultation'},{label:'Evidence',href:'#evidence'}]}/>
   <div className="detail-layout"><div>
@@ -37,6 +37,6 @@ export default async function DoctorDetailPage({params}:Props){
    <DetailSection title="Consultation" disclosure={doctor.consultationMode==='not_confirmed'}><p><T>{'Availability requires confirmation'}</T></p><p><T>{'Consultation mode:'}</T>{' '}{doctor.consultationMode==='not_confirmed'?'Not confirmed in published information':doctor.consultationMode}</p><Link className="text-link" href="/help"><T>{'Get coordination support'}</T> →</Link></DetailSection>
    {related.length>0&&<DetailSection title="Related doctors"><DetailLinks items={related.map(item=>({label:item.name,href:`/doctors/${item.slug}`,meta:item.specialty}))}/></DetailSection>}
    <DetailSection id="evidence" title="Evidence and sources"><Suspense fallback={<div aria-busy="true" data-secondary-loading><div className="skeleton-line"/></div>}><CatalogProvenance item={doctor} kind="doctor"/></Suspense></DetailSection>
-  </div><aside className="detail-aside"><h2><T>{'Your next step'}</T></h2><p><T>{'Explore the published information and prepare questions for the provider.'}</T></p><Link className="button button--primary" href={`/assistant?q=${encodeURIComponent(`What should I confirm about ${doctor.name}?`)}`}><T>{'Ask MedBridge AI'}</T> ↗</Link><p className="muted"><T>{'No appointment is booked from this page.'}</T></p></aside></div>
+  </div><aside className="detail-aside"><h2><T>{'Your next step'}</T></h2><p><T>{'Explore the published information and prepare questions for the provider.'}</T></p><Link className="text-link" href={`/assistant?q=${encodeURIComponent(`What should I confirm about ${doctor.name}?`)}`}><T>{'Ask MedBridge AI'}</T> ↗</Link><p className="muted"><T>{'No appointment is booked from this page.'}</T></p></aside></div>
  </main>;
 }

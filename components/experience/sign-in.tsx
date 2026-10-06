@@ -2,6 +2,7 @@
 import { useState, type FormEvent } from 'react';
 import { getBrowserSupabaseClient } from '@/lib/supabase/browser';
 import { useTranslation } from './translation';
+import { MedBridgeLogo } from '@/components/medbridge-logo';
 export function SignIn() {
   const {t}=useTranslation();const [email,setEmail]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
   async function submit(e:FormEvent){
@@ -14,5 +15,5 @@ export function SignIn() {
       setNotice('Check your email and open the sign-in link. You do not need a code.');
     }catch(e){setNotice(e instanceof Error?e.message:'Please try again.');}finally{setBusy(false);}
   }
-  return <section className="personal-panel"><h2>{t('Sign in')} / {t('Create account')}</h2><form className="personal-form" onSubmit={submit}><label>{t('Email')}<input type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)} maxLength={254}/></label><button type="submit" className="button button--primary button--default" disabled={busy}>{t('Send sign-in link')}</button></form><p className="personal-muted">{t('Your email is verified when you open the link.')}</p>{notice&&<p role="status" className="personal-notice">{t(notice)}</p>}</section>;
+  return <section className="personal-panel personal-sign-in"><div className="personal-sign-in__intro"><MedBridgeLogo compact/><h2>{t('Sign in')} / {t('Create account')}</h2><p className="personal-muted">{t('Your profile, saved items, conversations and recovery journey are private to your account. Support receives only explicitly consented requests.')}</p></div><div><form className="personal-form" onSubmit={submit}><label>{t('Email')}<input type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)} maxLength={254}/></label><button type="submit" className="button button--primary button--default" disabled={busy}>{t('Send sign-in link')}</button></form><p className="personal-muted">{t('Your email is verified when you open the link.')}</p>{notice&&<p role="status" className="personal-notice">{t(notice)}</p>}</div></section>;
 }

@@ -15,7 +15,7 @@ import { RequirementEvaluator } from "@/lib/requirements/RequirementEvaluator";
 import { extractBudget } from "@/lib/requirements/RequirementNormalizer";
 import { pkg, snapshot, hospital, tools } from "./fixtures/comparison-harness";
 import { randomUUID } from "node:crypto";
-import { validProviderFile } from "@/app/api/portals/documents/route";
+import { validProviderFile } from "@/lib/portals/provider-file";
 import { attributeEvidence } from "@/lib/requirements/RequirementEvidence";
 import { SearchService } from "@/lib/discovery/search-service";
 

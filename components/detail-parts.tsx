@@ -22,9 +22,10 @@ export function DetailLinks({ items }: { items: readonly { label: string; href: 
   return <ul className="detail-links">{items.map((item) => <li key={item.href}><Link href={item.href}><span>{item.label}</span></Link>{item.meta && <small>{item.meta}</small>}</li>)}</ul>;
 }
 
-export function DetailHero({ type, title, intro, facts, actions }: {
+export function DetailHero({ type, title, intro, facts, actions, summary }: {
   type: string; title: string; intro: string; facts: readonly string[];
+  summary?: React.ReactNode;
   actions: readonly { label: string; href: string; primary?: boolean }[];
 }) {
-  return <div className="detail-hero"><PageHeader canonical eyebrow={type} title={title} description={intro}><div className="detail-hero__facts">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></PageHeader><div className="detail-hero__actions">{actions.map((action) => <Link key={action.href} className={action.primary ? "button button--primary button--default" : "button button--outline button--default"} href={action.href}><T>{action.label}</T></Link>)}</div></div>;
+  return <div className="detail-hero"><PageHeader canonical eyebrow={type} title={title} description={intro}><ul className="detail-hero__facts">{facts.map((fact) => <li key={fact}>{fact}</li>)}</ul></PageHeader><div className="detail-hero__decision">{summary}<div className="detail-hero__actions">{actions.map((action) => <Link key={action.href} className={action.primary ? "button button--primary button--default" : "text-link"} href={action.href}><T>{action.label}</T></Link>)}</div></div></div>;
 }

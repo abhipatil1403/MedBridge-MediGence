@@ -1,4 +1,5 @@
 "use client";
+import { trapDialogFocus } from "@/components/dialog-focus";
 import { Localized } from '@/components/experience/localized';
 
 import { T, LocalDateTime } from '@/components/experience/translation';
@@ -15,7 +16,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  LoaderCircle,
   Search,
   X,
 } from "lucide-react";
@@ -88,9 +88,7 @@ export function Status({ value }: { value: unknown }) {
 }
 export function Loading() {
   return (
-    <p className="portal-loading" role="status">
-      <LoaderCircle size={18} className="portal-spinner" />
-      <T>{"Loading your workspace…"}</T></p>
+    <div className="portal-resource-skeleton" aria-busy="true"><p className="sr-only" role="status"><T>{'Preparing your page'}</T></p><div aria-hidden="true">{[1,2,3,4].map(row=><div className="portal-skeleton-row" key={row}><div className="skeleton-line skeleton-line--wide"/><div className="skeleton-line"/></div>)}</div></div>
   );
 }
 export function ErrorPanel({ message }: { message: string }) {
@@ -167,7 +165,7 @@ export function Modal({
     return () => dialog?.close();
   }, []);
   return (
-    <dialog
+    <dialog onKeyDown={trapDialogFocus}
       ref={ref}
       className="portal-dialog"
       aria-labelledby={titleId}

@@ -1,4 +1,5 @@
 'use client';
+import { trapDialogFocus } from "@/components/dialog-focus";
 import { MedBridgeLogo } from '@/components/medbridge-logo';
 import { useSubmittedRequest } from './use-submitted-request';
 import { LocalDate } from '@/components/experience/translation';
@@ -210,7 +211,7 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
   const selectedCase = cases.find((item) => item.id === caseId);
   const latestRequest = [...messages].reverse().find((message) => message.role === 'user')?.content;
   return <div className="assistant-shell" data-empty={messages.length===0&&!busy}>
-    <div className="assistant-history-toggle"><button type="button" aria-haspopup="dialog" onClick={()=>historyDialog.current?.showModal()}><T>{'Conversations'}</T>{' · '}{conversations.length}</button><dialog ref={historyDialog} className="assistant-history-dialog" aria-labelledby="conversation-history-title"><button type="button" className="save-control" onClick={()=>historyDialog.current?.close()}><T>{'Close conversations'}</T></button>
+    <div className="assistant-history-toggle"><button type="button" aria-haspopup="dialog" onClick={()=>historyDialog.current?.showModal()}><T>{'Conversations'}</T>{' · '}{conversations.length}</button><dialog onKeyDown={trapDialogFocus} ref={historyDialog} className="assistant-history-dialog" aria-labelledby="conversation-history-title"><button type="button" className="save-control" onClick={()=>historyDialog.current?.close()}><T>{'Close conversations'}</T></button>
     <Localized as="aside" className="assistant-rail" aria-label="Conversations"><div className="assistant-rail__head"><p className="eyebrow"><T>{"YOUR WORKSPACE"}</T></p><h2 id="conversation-history-title"><T>{"Conversations"}</T></h2>
       <button type="button" disabled={busy} onClick={() => { setActivity(undefined); setConversationId(undefined); setCaseId(''); setMessages([]); setLatest(null); setCarePlan(undefined); setNotice(''); historyDialog.current?.close(); }}><T>{"New conversation"}</T></button></div>
       <details className="assistant-conversations" open><summary><T>{"Recent ·"}</T>{' '}{conversations.length}</summary><div className="assistant-rail__list">{conversations.length === 0 && <p className="editorial-note"><T>{"Your saved requests will appear here."}</T></p>}{conversations.map((item) => <button key={item.id} type="button" className={item.id === conversationId ? 'active' : ''}
@@ -218,7 +219,7 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
       <button type="button" className="assistant-signout" onClick={() => auth?.auth.signOut()}><T>{"Sign out"}</T></button></Localized></dialog></div>
 
     <Localized as="section" className="assistant-main" aria-label="Care conversation">
-      <div className="assistant-first-use"><MedBridgeLogo compact/><p className="eyebrow">MEDBRIDGE AI</p><h1 className="ai-landing-title"><T>{'Where should we start?'}</T></h1><p><T>{'Tell me what you’re looking for. I can help you explore healthcare options, compare what is available and organize the next step.'}</T></p></div>
+      <div className="assistant-first-use"><MedBridgeLogo compact/><p className="eyebrow">MEDBRIDGE AI</p><h1 className="ai-landing-title"><T>{'What are you trying to figure out?'}</T></h1><p><T>{'Tell me what you’re looking for. I can help you explore healthcare options, compare what is available and organize the next step.'}</T></p></div>
       <div className="assistant-main__intro"><span className="eyebrow">MEDBRIDGE AI</span><h1><T>{'Your conversation'}</T></h1>
         <p><T>{conversationId ? 'Findings, evidence and next steps, together.' : 'Tell MedBridge what you’re trying to figure out.'}</T></p></div>
 

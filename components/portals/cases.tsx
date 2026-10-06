@@ -32,7 +32,7 @@ export function Cases({
   const [filters, setFilters] = useState<Record<string, string>>({});
   return (
     <>
-      {portal!=='patient'&&<Panel title="Case filters">
+      {portal!=='patient'&&<details className="portal-case-filters"><summary><T>{'Case filters'}</T>{Object.values(filters).filter(Boolean).length>0&&<span> · {Object.values(filters).filter(Boolean).length}</span>}</summary>
         <div className="portal-form-grid">
           {[
             {
@@ -91,7 +91,7 @@ export function Cases({
             />
           </label>
         </div>
-      </Panel>}
+      </details>}
       <ResourceTable
         resource="support_cases"
         title={portal==='patient'?'Your requests':mode === "mine"

@@ -13,6 +13,7 @@ import { NavigationFeedback } from '@/components/navigation-feedback';
 import { Suspense } from 'react';
 import './production-ux.css';
 import './companion.css';
+import './design-system.css';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),

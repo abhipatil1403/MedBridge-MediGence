@@ -1,5 +1,8 @@
 /** Interface copy only; provider names, source statements and prices remain canonical. */
 export const companionMessages:Record<string,readonly [string,string]>={
+ 'Your journey, organized.':['आपकी यात्रा, व्यवस्थित।','तुमचा प्रवास, व्यवस्थित.'],
+ 'What are you trying to figure out?':['आप क्या समझना चाहते हैं?','तुम्हाला काय समजून घ्यायचे आहे?'],
+ 'Find healthcare options. Understand the details. Organize your next step.':['स्वास्थ्य सेवाओं के विकल्प खोजें। विवरण समझें। अपना अगला कदम व्यवस्थित करें।','आरोग्यसेवेचे पर्याय शोधा. तपशील समजून घ्या. तुमची पुढील पायरी व्यवस्थित करा.'],
  'Ask AI':['AI से पूछें','AI ला विचारा'],
  'Price within currency':['मुद्रा के भीतर मूल्य','चलनानुसार किंमत'],
  'Prices are ordered within each listed currency. Amounts in different currencies are not directly comparable.':['मूल्य प्रत्येक सूचीबद्ध मुद्रा में क्रम से दिखते हैं। अलग मुद्राओं की राशियों की सीधी तुलना नहीं की जा सकती।','किमती प्रत्येक नमूद चलनात क्रमाने दाखवल्या आहेत. वेगवेगळ्या चलनांतील रकमा थेट तुलनीय नाहीत.'],
@@ -83,4 +86,6 @@ export const companionMessages:Record<string,readonly [string,string]>={
  'Choose your next step':['अपना अगला कदम चुनें','तुमचे पुढचे पाऊल निवडा'],
  'Get help':['सहायता लें','मदत घ्या'],
  'Ask MedBridge AI about this treatment':['इस उपचार के बारे में MedBridge AI से पूछें','या उपचाराबद्दल MedBridge AI ला विचारा'],
+ 'Keep the options you want to return to.':['जिन विकल्पों पर लौटना चाहें, उन्हें सहेजें।','पुन्हा पाहायचे पर्याय जतन करा.'],
+ 'Save a published hospital, doctor or package while you explore. Your saved options will appear here.':['खोजते समय प्रकाशित अस्पताल, डॉक्टर या पैकेज सहेजें। आपके सहेजे विकल्प यहाँ दिखेंगे।','शोधताना प्रकाशित रुग्णालय, डॉक्टर किंवा पॅकेज जतन करा. तुमचे जतन केलेले पर्याय येथे दिसतील.'],
 };

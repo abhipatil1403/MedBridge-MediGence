@@ -1,6 +1,6 @@
 'use client';
 import { Heart } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { savedItemSchema } from '@/lib/experience/preferences';
 import { useExperience } from './provider';
 import { useTranslation } from './translation';
@@ -10,9 +10,13 @@ export function guestSaves():SavedRecord[] {
   try {const raw:unknown=JSON.parse(localStorage.getItem(guestSavedKey)||'[]');return Array.isArray(raw)?raw.slice(0,100).flatMap(item=>{const parsed=savedItemSchema.safeParse({...item,saved:true});return parsed.success?[{kind:parsed.data.kind,recordId:parsed.data.recordId}]:[];}):[];}catch{return [];}
 }
 const savedCache=new Map<string,Promise<SavedRecord[]>>();
+const subscribeHydration=()=>()=>{};
+const clientHydrated=()=>true;
+const serverHydrated=()=>false;
 export function invalidateSaves(userId?:string) {if(userId)savedCache.delete(userId);window.dispatchEvent(new Event('medbridge-saves-changed'));}
 export function SaveButton({kind,recordId}:{kind:SavedRecord['kind'];recordId:string}) {
   const {session,api,authReady}=useExperience(),{t}=useTranslation();
+  const hydrated=useSyncExternalStore(subscribeHydration,clientHydrated,serverHydrated);
   const owner=session?.user.id??'guest';
   const [state,setState]=useState<{owner:string;items:SavedRecord[]}>({owner:'',items:[]}),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
   useEffect(()=>{
@@ -42,5 +46,5 @@ export function SaveButton({kind,recordId}:{kind:SavedRecord['kind'];recordId:st
     }catch{setNotice('This item could not be saved. Please try again.');}
     finally{setBusy(false);}
   }
-  return <span><button type="button" className="save-control" aria-pressed={saved} disabled={!authReady||busy} onClick={()=>void toggle()}><Heart size={16} fill={saved?'currentColor':'none'} aria-hidden="true"/>{t(`${saved?'Saved':'Save'} ${kind}`)}</button>{notice&&<small role="status" className="save-notice">{t(notice)}</small>}</span>;
+  return <span><button type="button" className="save-control" aria-pressed={saved} disabled={!hydrated||!authReady||busy} onClick={()=>void toggle()}><Heart size={16} fill={saved?'currentColor':'none'} aria-hidden="true"/>{t(`${saved?'Saved':'Save'} ${kind}`)}</button>{notice&&<small role="status" className="save-notice">{t(notice)}</small>}</span>;
 }
