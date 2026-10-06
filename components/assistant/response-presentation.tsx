@@ -26,7 +26,7 @@ export function FindingsSummary({ response }: { response: AgentResponse }) {
   for (const finding of response.findings) counts.set(finding.kind, (counts.get(finding.kind) ?? 0) + 1);
   const nouns: Record<string, [string, string]> = { hospitals: ['hospital', 'hospitals'], doctors: ['doctor', 'doctors'], packages: ['package', 'packages'], treatments: ['treatment', 'treatments'], services: ['service', 'services'], countries: ['destination', 'destinations'] };
   return <Localized as="section" className="assistant-findings-summary" aria-label="Findings summary">
-    {response.findings.length > 0 ? <h3>{[...counts].map(([kind, count],index) => <span key={kind}>{index>0?' · ':''}<LocalNumber value={count}/>{' '}<T>{(nouns[kind] ?? ['option', 'options'])[count === 1 ? 0 : 1]}</T>{' '}<T>{'found'}</T></span>)}</h3> : !response.research && <p>{response.summary}</p>}
+    {response.findings.length > 0 ? <h3><T>{'I found'}</T>{' '}{[...counts].map(([kind, count],index) => <span key={kind}>{index>0?' · ':''}<LocalNumber value={count}/>{' '}<T>{(nouns[kind] ?? ['option', 'options'])[count === 1 ? 0 : 1]}</T></span>)}</h3> : !response.research && <p>{response.summary}</p>}
     {response.findings.length > 0 && response.summarySource === 'model' && <p>{response.summary}<small><T>{"Coordination explanation generated from the sources below."}</T></small></p>}
     {response.compoundRequest?.operations.filter(operation => ['incomplete','skipped'].includes(operation.status) && operation.note).map(operation => <p className="assistant-result-notice" role="status" key={operation.id}>{operation.note}</p>)}
   </Localized>;

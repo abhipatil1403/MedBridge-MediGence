@@ -81,7 +81,8 @@ export function useResource<T>(
 }
 export function Status({ value }: { value: unknown }) {
   return (
-    <span className={`portal-status status-${String(value ?? "draft")}`}>
+    <span className={`portal-status status-${String(value ?? "draft")}`} data-status={String(value ?? "draft")}>
+      <span className="portal-status-dot" aria-hidden="true"/>
       <T>{label(String(value ?? "draft"))}</T>
     </span>
   );

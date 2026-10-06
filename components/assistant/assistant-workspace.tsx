@@ -264,7 +264,7 @@ export function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, 
   const followUps: {label:string;question:string}[]=[];
   if(!response.question&&response.status!=='failed'&&!response.verification&&!response.approvalProposal){
     if(packages.length){
-      if(packages.length>1)followUps.push({label:'Compare these packages',question:`Compare ${packages[0].title} and ${packages[1].title}.`});
+      if(packages.length>1)followUps.push({label:'Explore the second package',question:'Tell me more about the second one.'});
       followUps.push({label:'Check accommodation',question:`Does ${packages[0].title} include accommodation?`});
     }else if(hospitals.length){
       if(hospitals.length>1)followUps.push({label:'Compare these hospitals',question:`Compare ${hospitals[0].title} and ${hospitals[1].title}.`});
@@ -272,11 +272,11 @@ export function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, 
     }
   }
   return <div className="assistant-response">
-    {Boolean(response.requirements?.length)&&<details><summary><T>{'Why these results?'}</T></summary><RequestUnderstanding response={response} /></details>}
     {response.coordination&&<CoordinationResults context={response.coordination}/>}
     {response.workflow === 'case_intake' && response.caseSummary && <CaseSummaryContent summary={response.caseSummary} />}
     {response.caseHandoff && <p><T>{"Using the reviewed case for catalog coordination. Reported medical information is separate from search requirements and does not establish treatment suitability. No case has been submitted to a provider."}</T></p>}
     {response.agent === 'document_coordination' ? <p>{response.summary}</p> : <FindingsSummary response={response} />}
+    {Boolean(response.requirements?.length)&&<details><summary><T>{'Why these results?'}</T></summary><RequestUnderstanding response={response} /></details>}
     {response.verification && <VerificationResults result={response.verification} onRequest={onRequest} disabled={disabled} />}
     <div className="assistant-catalog-results">
       {response.research && response.findings.length > 0 && <h3 className="assistant-section-title"><T>{'Published options'}</T></h3>}

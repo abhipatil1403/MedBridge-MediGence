@@ -1,5 +1,7 @@
 /** Interface copy only; provider names, source statements and prices remain canonical. */
 export const companionMessages:Record<string,readonly [string,string]>={
+ 'I found':['मुझे मिले','मला आढळले'],
+ 'Explore the second package':['दूसरे पैकेज का विवरण देखें','दुसऱ्या पॅकेजचे तपशील पाहा'],
  'Package comparison':['पैकेज की तुलना','पॅकेजची तुलना'],
  'A clearer way forward.':['आगे का रास्ता अधिक स्पष्ट।','पुढचा मार्ग अधिक स्पष्ट.'],
  'A path you can make your own.':['एक रास्ता, जिसे आप अपना बना सकते हैं।','तुमचा स्वतःचा मार्ग.'],

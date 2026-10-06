@@ -1,7 +1,8 @@
+import { BookOpen } from 'lucide-react';
 import { LocalDate } from '@/components/experience/translation';
 import { T } from '@/components/experience/translation';
 import Link from '@/components/catalog-link';
-import { PackagePrice } from '@/components/experience/package-price';
+import { LocationObject, PriceBlock, ServiceCapsules } from '@/components/visual/semantic';
 import { factsPrice, priceTypeLabels } from '@/lib/catalog/pricing';
 import { SaveButton } from '@/components/experience/saved';
 import type { Finding, PlanningResultGroup } from '@/lib/agents/schemas';
@@ -27,15 +28,16 @@ export function FindingCards({ findings, onRequest, disabled }: { findings: Find
     <div className="assistant-finding__type"><span><T>{names[item.kind] ?? 'Care option'}</T></span>{item.provenance.sourceKind === 'synthetic' && <StatusBadge status="demo" />}</div>
     {item.kind==='doctors'&&<span className="doctor-monogram" aria-hidden="true">{item.title.replace(/^Dr\.?\s+/i,'').split(' ').slice(0,2).map(part=>part[0]).join('')}</span>}
     <h3>{item.href ? <Link href={item.href}>{item.title}</Link> : item.title}</h3>
-    {item.facts.city && <p className="assistant-finding__location">{String(item.facts.city)}{item.facts.country ? `, ${factValue(item.facts.country).replaceAll('-', ' ')}` : ''}</p>}
+    {item.facts.city && <LocationObject city={String(item.facts.city)} country={item.facts.country ? factValue(item.facts.country).replaceAll('-', ' ') : undefined}/>}
     {!(item.provenance.sourceKind === 'synthetic' && ['hospitals','doctors'].includes(item.kind)) && <p className="assistant-finding__description">{item.kind==='packages'&&item.facts.hospitalName?String(item.facts.hospitalName):item.detail}</p>}
     {item.provenance.sourceKind === 'synthetic' && ['hospitals', 'doctors'].includes(item.kind) && <small><T>{"Synthetic provider record · Not a live provider"}</T></small>}
-    {item.kind === 'packages' && <p className="assistant-package-facts"><PackagePrice compact item={factsPrice(item.facts)}/>{typeof item.facts.durationDays === 'number' && item.facts.durationDays > 0 ? ` · ${item.facts.durationDays} days` : ''}<small><T>{item.provenance.sourceKind==='synthetic'?'Sample price':priceTypeLabels[String(item.facts.priceType ?? 'estimate')] ?? 'Price not published'}</T>{' '}<T>{"· Not a provider quote"}</T></small></p>}
-    {item.kind==='packages'&&typeof item.facts.inclusions==='string'&&item.facts.inclusions&&<p className="assistant-package-inclusions"><T>{'Included'}</T>: {item.facts.inclusions.split('; ').slice(0,2).join(' · ')}</p>}
+    {item.kind === 'packages' && <div className="assistant-package-facts"><PriceBlock compact item={factsPrice(item.facts)} sample={item.provenance.sourceKind==='synthetic'}/>{typeof item.facts.durationDays === 'number' && item.facts.durationDays > 0 ? ` · ${item.facts.durationDays} days` : ''}<small><T>{item.provenance.sourceKind==='synthetic'?'Sample price':priceTypeLabels[String(item.facts.priceType ?? 'estimate')] ?? 'Price not published'}</T>{' '}<T>{"· Not a provider quote"}</T></small></div>}
+    {item.kind==='packages'&&typeof item.facts.inclusions==='string'&&item.facts.inclusions&&<ServiceCapsules status="included" values={item.facts.inclusions.split('; ').slice(0,2)}/>}
     <RequirementResults evaluation={item.requirementEvaluation} />
     <div className="assistant-finding__actions">{['hospitals','doctors','packages'].includes(item.kind)&&<SaveButton kind={item.kind==='hospitals'?'hospital':item.kind==='doctors'?'doctor':'package'} recordId={item.provenance.recordId}/>} {item.href && <Link href={item.href}><T>{"View details →"}</T></Link>}
       {onRequest && ['hospitals','doctors'].includes(item.kind)&&<details><summary><T>{'More options'}</T></summary><button type="button" disabled={disabled} onClick={()=>onRequest(`Verify ${item.title}`)}><T>{'Check provider information'}</T></button>{item.kind==='hospitals'&&<><button type="button" disabled={disabled} onClick={()=>onRequest(`Show packages for ${item.title}`)}><T>{'Explore packages'}</T></button><button type="button" disabled={disabled} onClick={()=>onRequest(`Organize documents for ${item.title}`)}><T>{'Organize documents'}</T></button></>}</details>}
     </div>
+    <div className="evidence-strip"><BookOpen size={14} aria-hidden="true"/><T>{item.provenance.sourceKind === 'synthetic' ? 'Demo data' : item.provenance.sourceKind === 'external' ? 'External catalog data' : 'MedBridge data'}</T></div>
     <details className="assistant-finding__evidence"><summary><T>{"View evidence and full details"}</T></summary><p>{item.matchReason}</p>
       <dl className="assistant-metadata">{Object.entries(item.facts).filter(([key]) => !/(?:Id|Slug)$/.test(key)).map(([key, value]) => <div key={key}><dt><T>{factLabel(key)}</T></dt><dd>{factValue(value)}</dd></div>)}</dl>
       <footer><T>{item.provenance.sourceKind === 'synthetic' ? 'Demo data' : item.provenance.sourceKind === 'external' ? 'External catalog data' : 'MedBridge data'}</T> · {item.provenance.label} <T>{"· Retrieved"}</T>{' '}<LocalDate value={item.provenance.retrievedAt}/></footer>

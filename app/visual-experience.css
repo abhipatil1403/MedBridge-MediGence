@@ -388,3 +388,142 @@ html { scroll-behavior:auto; }
 @media(prefers-reduced-motion:reduce) {
   *,*::before,*::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; }
 }
+
+/* Final refinement: factual capsules, decision prices, evidence margins and journey nodes. */
+.fact-capsules { display:flex; flex-wrap:wrap; gap:6px; padding:0; margin:12px 0; list-style:none; }
+.fact-capsules li { display:inline-flex; max-width:100%; padding:5px 9px; border:1px solid #c6d2c0; background:#edf1e6; border-radius:4px; font-size:12px; line-height:1.45; color:#244c3c; overflow-wrap:anywhere; }
+.location-object { display:inline-flex; align-items:baseline; gap:6px; font-size:13px; color:#526354; line-height:1.6; }
+.location-object svg { flex:none; align-self:center; }
+.evidence-strip { display:flex; align-items:center; gap:7px; color:#526354; font-size:12px; line-height:1.5; padding-block:10px; }
+.evidence-strip svg { flex:none; }
+.profile-affiliation { color:#59685c; font-size:13px; line-height:1.5; margin:0 0 8px; }
+.price-block { display:flex; flex-direction:column; gap:9px; min-width:0; padding-block:4px; }
+.price-block__label { font-size:12px; color:#526354; font-weight:500; }
+.price-block .package-price-display { font-size:clamp(28px,2.4vw,36px); letter-spacing:-.035em; font-weight:550; line-height:1.2; }
+.price-block .package-price-display small,.price-block .package-price-display details { font-size:12px; letter-spacing:0; line-height:1.5; font-weight:400; }
+.service-group { margin-block:14px; }
+.service-group__label { display:flex; gap:6px; align-items:center; font-size:12px; color:#355947; font-weight:600; margin-bottom:7px; }
+.service-capsules { display:flex; flex-wrap:wrap; gap:6px; padding:0; margin:0; list-style:none; }
+.service-capsules li { padding:6px 9px; border:1px solid #ccd7c8; background:#f2f5ed; border-radius:5px; font-size:13px; line-height:1.5; max-width:100%; overflow-wrap:anywhere; }
+.service-group--excluded .service-group__label { color:#665c50; }
+.service-group--excluded .service-capsules li { background:#f3efe8; border-color:#dcd4c8; }
+.service-group--conditional .service-group__label { color:#725927; }
+.service-group--conditional .service-capsules li { background:#f6f0df; border-color:#dfd1ac; }
+.service-group--not_confirmed .service-capsules li { background:transparent; border-style:dashed; }
+.treatment-signals { display:flex; flex-wrap:wrap; align-items:center; gap:18px 28px; padding-block:18px 4px; }
+.treatment-signals>div { display:flex; align-items:baseline; gap:7px; color:#526354; font-size:12px; }
+.treatment-signals>div>span:first-child { font-size:26px; color:#123f35; font-variant-numeric:tabular-nums; }
+.treatment-signals>.location-object { flex-basis:100%; }
+.directory-page--treatments .result-row--treatment { padding-block:28px; }
+.result-row--package-object h3 { margin:8px 0 12px; }
+.directory-page--packages .result-row--package-object>div:first-child { padding:28px; }
+.directory-page--packages .package-decision { display:flex; flex-direction:column; align-items:flex-start; gap:12px; padding:24px 28px; background:#e9eedf; border-top:1px solid #cad6bf; }
+.directory-page--packages .package-decision .price-block { width:100%; padding-bottom:16px; border-bottom:1px solid #c4d2b8; }
+.directory-page--packages .package-decision .price-block .package-price-display { font-size:34px; }
+.directory-page--packages .package-decision .evidence-strip { padding-block:0; }
+.directory-page--packages .package-decision>small { font-size:12px; max-width:46ch; line-height:1.6; }
+.directory-page--packages .package-decision>a { margin-top:auto; min-height:44px; display:flex; align-items:center; }
+.home-network__lead .fact-capsules { margin-bottom:0; }
+.home-network__lead .evidence-strip { margin-bottom:10px; }
+.home-network__lead .save-control { margin-left:16px; }
+.home-network__support .fact-capsules { margin-block:10px 4px; }
+.home-pricing__collection .price-block { border-block:1px solid #668672; padding-block:20px; margin-block:20px; }
+.home-pricing__collection .price-block__label { color:#d5dfcf; }
+.home-pricing__collection .service-group__label { color:#dfe7d8; }
+.home-pricing__collection .service-capsules li { color:#f4f5ed; background:#ffffff08; border-color:#65846f; }
+.home-pricing__collection h3 { min-height:0; margin-bottom:16px; }
+.home-hero .ai-entry { border-color:#8ca88e; box-shadow:0 8px 24px #123f350d; }
+.home-hero .ai-entry:focus-within { border-color:#123f35; box-shadow:0 0 0 3px #cfdcc8,0 12px 30px #123f3510; }
+.home-hero .ai-prompts,.assistant-page .ai-prompts,.ai-follow-ups { display:flex; flex-wrap:wrap; gap:8px; overflow:visible; white-space:normal; }
+.home-hero .ai-prompts button,.assistant-page .ai-prompts button,.ai-follow-ups .save-control { display:inline-flex; align-items:center; gap:6px; max-width:100%; min-height:44px; padding:8px 12px; font-size:13px; border:1px solid #cad5c4; border-radius:24px; background:#f4f6ef; text-align:left; white-space:normal; }
+.home-hero .ai-prompts button:hover,.assistant-page .ai-prompts button:hover,.ai-follow-ups .save-control:hover { background:#e4eddb; border-color:#7a967c; }
+.journey-art__stage { border-left:2px solid #a3b78b; padding-left:12px; }
+.journey-art__stage>span:first-child { font-variant-numeric:tabular-nums; }
+.detail-hero__facts .fact-capsules { margin:0; }
+.detail-page--package .package-hero-price .price-block { margin-bottom:18px; border-bottom:1px solid #bfcbb6; padding-bottom:22px; }
+.detail-page--package .package-hero-price .package-price-display { font-size:clamp(34px,3vw,44px); }
+.package-service-facts>div { padding:16px; border-left:3px solid #bac9b0; background:#f2f4ed; margin-bottom:10px; }
+.package-service-facts>div[data-service-status=conditional] { border-color:#b99a5f; background:#f6f1e6; }
+.package-service-facts>div[data-service-status=excluded] { border-color:#c3b6a4; background:#f3efe8; }
+.source-object { border-left:3px solid #9aaf94; padding:4px 0 4px 20px; }
+.source-object>p:first-child { font-weight:550; color:#294e3b; }
+.reference-public-sources li { padding-block:14px; }
+.comparison-package-matrix { overflow:visible; }
+.comparison-caption { color:#59685c; font-size:13px; margin-block:18px; }
+.comparison-factor { display:grid; grid-template-columns:minmax(120px,.55fr) repeat(2,minmax(0,1fr)); border-top:1px solid #ced7c6; padding:20px 0; gap:24px; }
+.comparison-factor>h3 { font-size:14px; line-height:1.6; padding:0; margin:0; }
+.comparison-value { min-width:0; font-size:14px; line-height:1.6; }
+.comparison-value__identity { display:block; color:#42604a; font-size:12px; font-weight:550; margin-bottom:12px; }
+.comparison-value>p { margin:0; }
+.comparison-factor--price { background:#eaf0e2; margin-inline:-20px; padding:24px 20px; border:0; }
+.comparison-factor--price .price-block__label { display:none; }
+.comparison-factor .service-group__label { display:none; }
+.comparison-factor .service-group { margin:0; }
+.comparison-service { padding-left:10px; border-left:2px solid #becab5; }
+.comparison-service[data-service-status=conditional] { border-color:#b99a5f; }
+.comparison-service>strong { font-size:13px; font-weight:500; }
+.assistant-page .assistant-finding .price-block { padding-block:14px; border-block:1px solid #cad7bf; margin-block:10px; }
+.assistant-page .assistant-finding .price-block .package-price-display { font-size:30px; }
+.assistant-page .assistant-finding .service-capsules li { font-size:13px; }
+.assistant-page .assistant-finding .assistant-package-facts { margin:0; }
+.assistant-page .assistant-finding .assistant-package-facts>small { display:block; font-size:12px; line-height:1.6; }
+.assistant-page .assistant-findings-summary h3 { font-weight:500; font-size:24px; }
+.personal-record-object>svg { color:#708965; flex:none; }
+.personal-record-object>div { flex:1; }
+.recovery-overview { position:relative; gap:0; background:#edf1e6; padding:24px 20px; border-radius:4px 28px 4px 4px; }
+.recovery-overview>div { padding:0 20px; border-left:2px solid #b8c8ad; }
+.recovery-overview>div:first-child { border-left-color:#315f46; }
+.recovery-overview>div>span { font-size:12px; color:#526354; }
+.recovery-overview>div>strong { font-size:19px; line-height:1.4; margin-top:8px; }
+.recover-grid .personal-list li[data-task-status] { border-left:2px solid #b7c7ae; padding-left:14px; }
+.recover-grid .personal-list li[data-task-status=completed] { border-left-color:#49765b; }
+.recover-grid .personal-list li[data-task-status=completed] strong { color:#56715b; }
+.portal-status { display:inline-flex; gap:6px; align-items:center; }
+.portal-status-dot { width:6px; height:6px; border-radius:50%; background:currentColor; flex:none; }
+.portal-provider .portal-page-heading { border-left:3px solid #77926c; padding-left:20px; }
+.portal-support .portal-page-heading { border-left:3px solid #b3965e; padding-left:20px; }
+.portal-admin .portal-page-heading { border-left:3px solid #315e4c; padding-left:20px; }
+.portal-table th { font-size:12px; color:#556a58; }
+.desktop-nav button[aria-current=true] { color:#123f35; box-shadow:inset 0 -2px #315e4c; }
+.header-account:hover { background:#e7eddf; }
+@media(max-width:767px) {
+  .fact-capsules li { font-size:12px; padding:6px 8px; }
+  .location-object,.profile-affiliation,.evidence-strip { font-size:13px; }
+  .home-network__lead .save-control { margin-left:0; }
+  .directory-page--packages .result-row--package-object>div:first-child { padding:24px 20px; }
+  .directory-page--packages .package-decision { padding:24px 20px; }
+  .comparison-factor { grid-template-columns:1fr; gap:16px; padding-block:24px; }
+  .comparison-factor>h3 { font-size:16px; }
+  .comparison-value { padding:0 0 0 12px; border-left:2px solid #c6d3bc; }
+  .comparison-value__identity { font-size:13px; margin-bottom:8px; }
+  .comparison-factor--price { margin-inline:0; padding:20px; border-radius:4px; }
+  .comparison-factor .price-block .package-price-display { font-size:30px; }
+  .recovery-overview { padding:20px; gap:20px; }
+  .recovery-overview>div { padding-left:14px; }
+  .treatment-signals { gap:12px 22px; }
+  .source-object { padding-left:14px; }
+  .home-hero .ai-prompts { margin-inline:0; }
+}
+@media(prefers-reduced-motion:reduce) {
+  *,*::before,*::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; }
+}
+
+.account-nav>a,.account-navigation-drawer nav>a { display:flex; align-items:center; gap:10px; }
+
+.price-block .converted-price__amount { font-size:clamp(28px,2.4vw,36px); color:#123f35; font-weight:550; }
+.home-pricing__collection .price-block .converted-price__amount { color:#f3f5eb; }
+.directory-page--packages .package-decision>span { font-size:13px; line-height:1.6; }
+
+.comparison-heading { display:grid; grid-template-columns:minmax(120px,.55fr) repeat(2,minmax(0,1fr)); gap:24px; padding-block:20px; font-size:15px; }
+.comparison-heading>span { font-size:12px; color:#59685c; }
+.footer-navigation h2 { letter-spacing:.025em; }
+.footer-navigation nav a:hover { text-decoration:underline; text-underline-offset:4px; }
+@media(min-width:768px) { .comparison-value__identity { display:none; } }
+@media(max-width:767px) { .comparison-heading { display:none; } }
+
+.price-block .package-price-display .converted-price { font-size:inherit; }
+.detail-page--package .price-block .converted-price__amount { font-size:clamp(34px,3vw,44px); }
+.detail-navigation { flex-wrap:wrap; overflow:visible; white-space:normal; }
+.detail-navigation a { white-space:normal; }
+
+.assistant-page .chat-panel .chat-composer>small { display:block; color:#526354; font-size:12px; line-height:1.6; margin-top:14px; }

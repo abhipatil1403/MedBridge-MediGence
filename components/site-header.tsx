@@ -29,7 +29,7 @@ export function SiteHeader() {
       <Link className="brand" href="/" aria-label={t('MedBridge home')} onClick={close}><MedBridgeLogo priority/><span className="brand__name">MEDBRIDGE</span></Link>
       <nav className="desktop-nav" aria-label={t('Primary navigation')}>
         {navigationGroups.filter(section=>section.label==='Explore').map(section=><div className="navigation-group" key={section.label} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget))setGroup(null);}}>
-          <button ref={el=>{buttons.current[section.label]=el;}} type="button" aria-expanded={group===section.label} aria-controls={`nav-${section.label}`} onClick={()=>setGroup(group===section.label?null:section.label)}>{t(section.label)}<ChevronDown size={14} aria-hidden="true"/></button>
+          <button ref={el=>{buttons.current[section.label]=el;}} type="button" aria-current={section.items.some(item=>isActiveNavigation(pathname,item.href))?'true':undefined} aria-expanded={group===section.label} aria-controls={`nav-${section.label}`} onClick={()=>setGroup(group===section.label?null:section.label)}>{t(section.label)}<ChevronDown size={14} aria-hidden="true"/></button>
           {group===section.label&&<div className="navigation-popover" id={`nav-${section.label}`}>{section.items.filter(item=>item.href!=='/compare').map(item=><Link key={item.href} href={item.href} onClick={close}>{t(item.label)}<ArrowUpRight size={14} aria-hidden="true"/></Link>)}</div>}
         </div>)}
         <Link href="/packages" aria-current={isActiveNavigation(pathname,'/packages')?'page':undefined} onClick={close}>{t('Packages')}</Link>

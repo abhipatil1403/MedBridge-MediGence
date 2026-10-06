@@ -3,6 +3,7 @@ import { Localized } from '@/components/experience/localized';
 import Link from '@/components/catalog-link';
 import type { Faq } from "@/types/catalog";
 import { PageHeader } from './page-header';
+import { FactCapsules } from '@/components/visual/semantic';
 import { IdentityArt } from '@/components/visual/identity-art';
 
 export function DetailSection({ id, title, children,disclosure=false }: { id?: string; title: string; children: React.ReactNode;disclosure?:boolean }) {
@@ -29,5 +30,5 @@ export function DetailHero({ type, title, intro, facts, actions, summary, identi
   identityKind?: 'hospital';
   actions: readonly { label: string; href: string; primary?: boolean }[];
 }) {
-  return <div className={`detail-hero${identityKind?' detail-hero--institution':''}`}>{identityKind&&<IdentityArt name={title}/>}<PageHeader canonical eyebrow={type} title={title} description={intro}><ul className="detail-hero__facts">{facts.map((fact) => <li key={fact}>{fact}</li>)}</ul></PageHeader><div className="detail-hero__decision">{summary}<div className="detail-hero__actions">{actions.map((action) => <Link key={action.href} className={action.primary ? "button button--primary button--default" : "text-link"} href={action.href}><T>{action.label}</T></Link>)}</div></div></div>;
+  return <div className={`detail-hero${identityKind?' detail-hero--institution':''}`}>{identityKind&&<IdentityArt name={title}/>}<PageHeader canonical eyebrow={type} title={title} description={intro}><div className="detail-hero__facts"><FactCapsules values={facts.filter(Boolean)}/></div></PageHeader><div className="detail-hero__decision">{summary}<div className="detail-hero__actions">{actions.map((action) => <Link key={action.href} className={action.primary ? "button button--primary button--default" : "text-link"} href={action.href}><T>{action.label}</T></Link>)}</div></div></div>;
 }

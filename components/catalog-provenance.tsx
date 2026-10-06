@@ -8,7 +8,7 @@ export async function CatalogProvenance({ item, kind }: { item: CatalogRecord; k
   const source = item.provenance;
   if (!source) return null;
   const claims = source.origin === "admin_reference" && kind ? await publishedReferenceClaims(kind, item.recordId) : [];
-  return <div className="catalog-provenance">
+  return <div className="catalog-provenance source-object">
     <p><T>{source.origin === "admin_reference" ? "MedBridge reference information · collected from public sources" : source.origin === "provider_published" ? "Provider-submitted information" : "Reviewed catalog information"}</T>
       {source.sourceName && ` · ${source.sourceName}`}</p>
     {source.sourceUrl && <a href={source.sourceUrl} target="_blank" rel="noreferrer"><T>{"Public source"}</T></a>}

@@ -1,22 +1,33 @@
+import type { ReactNode } from 'react';
 import Link from '@/components/catalog-link';
-import { T } from '@/components/experience/translation';
-import { Localized } from '@/components/experience/localized';
-import { PackagePrice } from '@/components/experience/package-price';
+import { T, LocalNumber } from '@/components/experience/translation';
+import { LocationObject, PriceBlock, ServiceCapsules } from './semantic';
 import { packageServiceNames } from '@/lib/catalog/package-services';
 import type { Package } from '@/types/catalog';
 
-/** Compare published fields without selecting a winner or inferring suitability. */
+/** Factor labels and option identity remain readable when columns stack. */
 export function PackageComparison({ items }: { items: readonly Package[] }) {
-  // Native toggles can change `open` before React hydrates; retain that user choice.
-  return <details className="comparison-package-matrix" suppressHydrationWarning><summary><T>{'Compare these packages'}</T></summary>
-    <Localized as="div" className="comparison-package-matrix__scroll" role="region" tabIndex={0} aria-label="Package comparison">
-      <table><caption><T>{'Published information for planning questions only'}</T></caption><thead><tr><th scope="col"><T>{'Factor'}</T></th>{items.map(item=><th scope="col" key={item.recordId}>{item.name}</th>)}</tr></thead><tbody>
-        <tr><th scope="row"><T>{'Original provider price'}</T></th>{items.map(item=><td key={item.recordId}><PackagePrice item={item} compact/></td>)}</tr>
-        {(['inclusions','exclusions'] as const).map(key=><tr key={key}><th scope="row"><T>{key==='inclusions'?"What's included":"What's excluded"}</T></th>{items.map(item=><td key={item.recordId}>{item[key].length?<><ul>{item[key].slice(0,5).map(fact=><li key={fact}>{fact}</li>)}</ul>{item[key].length>5&&<Link href={`/packages/${item.slug}`}><T>{'View package'}</T> →</Link>}</>:<T>{'Not provided in published package information.'}</T>}</td>)}</tr>)}
-        <tr><th scope="row"><T>{'Duration'}</T></th>{items.map(item=><td key={item.recordId}>{item.durationDays>0?<>{item.durationDays} <T>{'days'}</T></>:<T>{'Duration not published'}</T>}</td>)}</tr>
-        {(['accommodation','transfer','rehabilitation'] as const).map(key=><tr key={key}><th scope="row"><T>{packageServiceNames[key]}</T></th>{items.map(item=>{const service=item.serviceDetails?.[key];return <td key={item.recordId}><T>{service?.status==='included'?'Included in the published package.':service?.status==='excluded'?'Excluded from the published package.':service?.status==='conditional'?'Conditional; confirm the published limits with the provider.':'Not confirmed in published package information.'}</T>{service?.information&&<p>{service.information}</p>}</td>;})}</tr>)}
-        <tr><th scope="row"><T>{'Evidence and sources'}</T></th>{items.map(item=><td key={item.recordId}><Link className="text-link" href={`/packages/${item.slug}#evidence`}><T>{'View package'}</T> →</Link></td>)}</tr>
-      </tbody></table>
-    </Localized><p><T>{'This listing is not a current quote, reservation or clinical recommendation. Additional costs may apply.'}</T></p>
+  function factor(label: string, value: (item: Package) => ReactNode, emphasis = false) {
+    return <section className={`comparison-factor${emphasis ? ' comparison-factor--price' : ''}`} key={label}>
+      <h3><T>{label}</T></h3>{items.map(item => <div className="comparison-value" role="group" aria-label={item.name} key={item.recordId}>
+        <strong className="comparison-value__identity">{item.name}</strong>{value(item)}
+      </div>)}
+    </section>;
+  }
+  return <details className="comparison-package-matrix" suppressHydrationWarning>
+    <summary><T>{'Compare these packages'}</T></summary>
+    <p className="comparison-caption"><T>{'Published information for planning questions only'}</T></p>
+    <div className="comparison-factors"><div className="comparison-heading"><span><T>{'Factor'}</T></span>{items.map(item=><strong key={item.recordId}>{item.name}</strong>)}</div>
+      {factor('Original provider price', item => <PriceBlock compact item={item} sample={item.demo}/>, true)}
+      {factor('Provider', item => <p>{item.hospitalName}</p>)}
+      {factor('Location', item => <LocationObject city={item.city} country={item.country}/>)}
+      {(['inclusions', 'exclusions'] as const).map(key => factor(key === 'inclusions' ? "What's included" : "What's excluded", item => item[key].length ? <><ServiceCapsules values={item[key].slice(0,5)} status={key === 'inclusions' ? 'included' : 'excluded'}/>{item[key].length > 5 && <Link href={`/packages/${item.slug}`}><T>{'View package'}</T> →</Link>}</> : <p><T>{'Not provided in published package information.'}</T></p>))}
+      {factor('Duration', item => <p>{item.durationDays > 0 ? <><LocalNumber value={item.durationDays}/> <T>{'days'}</T></> : <T>{'Duration not published'}</T>}</p>)}
+      {(['accommodation', 'transfer', 'rehabilitation'] as const).map(key => factor(packageServiceNames[key], item => {
+        const service = item.serviceDetails?.[key];
+        return <div className="comparison-service" data-service-status={service?.status ?? 'not_confirmed'}><strong><T>{service?.status === 'included' ? 'Included in the published package.' : service?.status === 'excluded' ? 'Excluded from the published package.' : service?.status === 'conditional' ? 'Conditional; confirm the published limits with the provider.' : 'Not confirmed in published package information.'}</T></strong>{service?.information && <p>{service.information}</p>}</div>;
+      }))}
+      {factor('Evidence and sources', item => <Link className="text-link" href={`/packages/${item.slug}#evidence`}><T>{'View evidence and full details'}</T> →</Link>)}
+    </div><p><T>{'This listing is not a current quote, reservation or clinical recommendation. Additional costs may apply.'}</T></p>
   </details>;
 }
