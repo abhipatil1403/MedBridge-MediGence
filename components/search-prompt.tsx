@@ -3,6 +3,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/components/experience/translation';
 import { ArrowUpRight } from 'lucide-react';
+import { BridgeGlyph } from '@/components/visual/journey-art';
 
 export const starterPrompts = [
   ['Find a hospital', 'Find hospitals for knee replacement in Mumbai.'],
@@ -23,8 +24,8 @@ export function SearchPrompt({ id, label = 'What are you looking for?', compact 
     router.push(`/assistant?${new URLSearchParams({q:question.trim(),start:'1'})}`);
   }
   return <form className={`ai-entry${compact?' ai-entry--compact':''}`} onSubmit={submit}>
-    <label htmlFor={id}>{t(label)}</label>
-    <textarea ref={input} id={id} name="q" rows={compact?2:3} maxLength={2000} required placeholder={t('What are you looking for?')} value={question} onChange={event=>setQuestion(event.target.value)} />
+    <label htmlFor={id} className="ai-entry__identity"><BridgeGlyph/>{t(label)}</label>
+    <textarea ref={input} id={id} name="q" rows={compact?2:3} maxLength={2000} required placeholder={t('Tell MedBridge what you need…')} value={question} onChange={event=>setQuestion(event.target.value)} />
     <div className="ai-entry__foot"><small>{t('Start in your own words. We’ll help with the next step.')}</small><button className="button button--primary" type="submit" disabled={submitted||!question.trim()}>{t(submitted?'Opening MedBridge AI…':'Ask MedBridge AI')}<ArrowUpRight size={18} aria-hidden="true"/></button></div>
     {suggestions&&<div className="ai-prompts" aria-label={t('Suggested requests')}>{starterPrompts.map(([label,prompt])=><button type="button" key={label} onClick={()=>{setQuestion(prompt);input.current?.focus();}}>{t(label)}</button>)}</div>}
   </form>;

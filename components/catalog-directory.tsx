@@ -113,7 +113,7 @@ async function DirectoryResults({type,searchParams}:{type:Exclude<ResultType,'al
           ))}
         </div>
       ) : (
-        <ResultSections results={displayResults} limit={100} catalog={catalog}/>
+        <><p className="directory-order-note"><T>{'Shown in your selected order, not ranked by clinical quality.'}</T></p><ResultSections results={displayResults} limit={100} catalog={catalog} spotlight={type==='hospitals'||type==='doctors'}/></>
       )}
     </div>
   );

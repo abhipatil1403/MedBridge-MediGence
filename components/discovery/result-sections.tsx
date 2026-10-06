@@ -6,6 +6,7 @@ import { PackagePrice } from '@/components/experience/package-price';
 import { priceTypeLabels } from '@/lib/catalog/pricing';
 import { SaveButton } from '@/components/experience/saved';
 import type {CatalogSnapshot} from '@/types/catalog';
+import { IdentityArt } from '@/components/visual/identity-art';
 
 const labels = { treatments: "Treatments", hospitals: "Hospitals", doctors: "Doctors", packages: "Packages", countries: "Countries", services: "Services" } as const;
 type SectionKey = keyof typeof labels;
@@ -17,7 +18,7 @@ function detailsHref(filters: DiscoveryResults["filters"], type: SectionKey) {
   return `/discover?${params}`;
 }
 
-export function ResultSections({ results, limit = 4, idPrefix = '',catalog }: { results: DiscoveryResults; limit?: number; idPrefix?: string;catalog?:CatalogSnapshot }) {
+export function ResultSections({ results, limit = 4, idPrefix = '',catalog, spotlight = false }: { results: DiscoveryResults; limit?: number; idPrefix?: string;catalog?:CatalogSnapshot;spotlight?:boolean }) {
   const { sections, filters } = results;
   const keys: SectionKey[] = ["treatments", "hospitals", "doctors", "packages", "countries", "services"];
   if (results.understanding.intent === "hospital") keys.unshift(...keys.splice(keys.indexOf("hospitals"), 1));
@@ -38,11 +39,13 @@ export function ResultSections({ results, limit = 4, idPrefix = '',catalog }: { 
             <div><span className="result-kicker"><T>{"Treatment ·"}</T>{' '}{item.specialty}</span><h3><Link href={`/treatments/${item.slug}`}>{item.name}</Link></h3><p>{item.description}</p><details><summary><T>{'Why this appears'}</T></summary><p>{reason}</p></details></div>
             <div>{catalog&&<p className="muted">{catalog.hospitals.filter(h=>h.treatmentSlugs.includes(item.slug)).length} <T>{'published providers'}</T>{' · '}{catalog.packages.filter(p=>p.treatmentSlug===item.slug).length} <T>{'published packages'}</T></p>}<Link className="result-action" href={`/treatments/${item.slug}`}><T>{"Explore treatment"}</T><ArrowRight size={16} aria-hidden="true" /></Link></div>
           </article>)}
-          {key === "hospitals" && sections.hospitals.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }) => <article className="result-row" key={item.slug}>
+          {key === "hospitals" && sections.hospitals.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }, index) => <article className={`result-row${spotlight&&index===0?' result-row--identity':''}`} key={item.slug}>
+            {spotlight&&index===0&&<IdentityArt name={item.name}/>}
             <div><span className="result-kicker">{item.city}, {item.country}</span><h3><Link href={`/hospitals/${item.slug}`}>{item.name}</Link></h3><p>{item.specialties.slice(0, 3).join(" · ")}</p><small><T>{item.demo?'Synthetic provider · not verified':item.provenance?.origin==='admin_reference'?'MedBridge reference information':'Published provider · inspect field evidence'}</T></small><details><summary><T>{"Why this appears"}</T></summary><p>{reason}</p><p>{item.sampleBedCount>0?`${item.demo?'Sample':'Provider-listed'} beds: ${item.sampleBedCount}. `:''}{item.verification}.</p></details></div>
             <div className="result-row__actions"><Link className="result-action" href={`/hospitals/${item.slug}`}><T>{"View hospital"}</T><ArrowRight size={16} aria-hidden="true" /></Link><SaveButton kind="hospital" recordId={item.recordId}/>{catalog&&catalog.packages.some(p=>p.hospitalSlug===item.slug)&&<Link href={`/hospitals/${item.slug}#packages`}>{catalog.packages.filter(p=>p.hospitalSlug===item.slug).length} <T>{'published packages'}</T> →</Link>}</div>
           </article>)}
-          {key === "doctors" && sections.doctors.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }) => <article className="result-row" key={item.slug}>
+          {key === "doctors" && sections.doctors.slice(0, filters.type === "all" ? limit : undefined).map(({ item, reason }, index) => <article className={`result-row${spotlight&&index===0?' result-row--identity':''}`} key={item.slug}>
+            {spotlight&&index===0&&<IdentityArt name={item.name} kind="doctor"/>}
             <div><span className="doctor-monogram" aria-hidden="true">{item.name.split(' ').filter(part=>!['Demo','Clinician','Dr.','Dr'].includes(part)).slice(0,2).map(part=>part[0]).join('')}</span><span className="result-kicker">{item.specialty}</span><h3><Link href={`/doctors/${item.slug}`}>{item.name}</Link></h3><p>{item.city}, {item.country}<br />{item.hospitalName}</p><small><T>{item.demo?'Synthetic clinician · no live appointments':item.provenance?.origin==='admin_reference'?'MedBridge reference profile · confirm availability':'Published clinician · availability requires confirmation'}</T></small><details><summary><T>{"Profile context"}</T></summary><p>{reason} {item.sampleExperienceYears>0?`${item.demo?'Sample':'Provider-listed'} experience: ${item.sampleExperienceYears} years · `:''}{item.consultationMode === "not_confirmed" ? "Consultation mode not confirmed" : item.consultationMode}.</p></details></div>
             <SaveButton kind="doctor" recordId={item.recordId}/><Link className="result-action" href={`/doctors/${item.slug}`}><T>{"View profile"}</T><ArrowRight size={16} aria-hidden="true" /></Link>
           </article>)}

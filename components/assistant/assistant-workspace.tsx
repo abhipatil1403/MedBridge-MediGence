@@ -1,6 +1,6 @@
 'use client';
 import { trapDialogFocus } from "@/components/dialog-focus";
-import { MedBridgeLogo } from '@/components/medbridge-logo';
+import { AIWelcome } from '@/components/visual/ai-welcome';
 import { useSubmittedRequest } from './use-submitted-request';
 import { LocalDate } from '@/components/experience/translation';
 import { useExperience } from '@/components/experience/provider';
@@ -219,7 +219,7 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
       <button type="button" className="assistant-signout" onClick={() => auth?.auth.signOut()}><T>{"Sign out"}</T></button></Localized></dialog></div>
 
     <Localized as="section" className="assistant-main" aria-label="Care conversation">
-      <div className="assistant-first-use"><MedBridgeLogo compact/><p className="eyebrow">MEDBRIDGE AI</p><h1 className="ai-landing-title"><T>{'What are you trying to figure out?'}</T></h1><p><T>{'Tell me what you’re looking for. I can help you explore healthcare options, compare what is available and organize the next step.'}</T></p></div>
+      <div className="assistant-first-use"><AIWelcome/></div>
       <div className="assistant-main__intro"><span className="eyebrow">MEDBRIDGE AI</span><h1><T>{'Your conversation'}</T></h1>
         <p><T>{conversationId ? 'Findings, evidence and next steps, together.' : 'Tell MedBridge what you’re trying to figure out.'}</T></p></div>
 
@@ -232,10 +232,10 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
             disabled={busy} onRequest={text=>{void submitRequest(text);}} /> : <p>{message.content}</p>}
         </article>)}
 
-        {busy && <div className="assistant-working" role="status"><T>{'MedBridge AI is checking published options…'}</T></div>}
+        {busy && <div className="assistant-working" role="status"><T>{'Working…'}</T></div>}
       </div>
       <form className="assistant-composer" onSubmit={send}><label htmlFor="assistant-input"><T>{messages.length ? 'Ask a follow-up' : 'What are you looking for?'}</T></label>
-        <textarea id="assistant-input" value={content} onChange={(event) => setContent(event.target.value)} placeholder={messages.length ? 'Ask about these options, evidence or next steps…' : 'Treatment, location, budget — start in your own words…'} rows={3} maxLength={2000} disabled={busy} required />
+        <Localized as="textarea" id="assistant-input" value={content} onChange={(event) => setContent(event.target.value)} placeholder={messages.length ? 'Ask about these options, evidence or next steps…' : 'Treatment, location, budget — start in your own words…'} rows={3} maxLength={2000} disabled={busy} required />
         <div><small><T>{"For discovery and coordination. A clinician must assess symptoms and treatment decisions."}</T></small><button className="button button--primary" type="submit" disabled={busy || !content.trim()}><T>{busy ? 'Working…' : messages.length?'Send':'Ask MedBridge AI'}</T>{' →'}</button></div>
         {notice && <p className="assistant-error" role="alert">{notice}</p>}</form>
       {messages.length === 0 && <div className="assistant-empty"><p className="eyebrow"><T>{"A FEW STARTING POINTS"}</T></p>
