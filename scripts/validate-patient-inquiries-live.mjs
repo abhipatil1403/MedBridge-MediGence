@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID,createHash } from 'node:crypto';
 import { createServer } from 'node:http';
+import {writeFileSync} from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 if(process.env.MEDBRIDGE_INQUIRY_LIVE_TEST!=='1')throw new Error('Explicit disposable inquiry test opt-in required.');
 const origin=process.env.MEDBRIDGE_TEST_ORIGIN??'http://127.0.0.1:3000';
@@ -14,7 +15,9 @@ function check(ok,label){assert.ok(ok,label);console.log(`PASS ${++passed}: ${la
 function good(result){assert.equal(result.status,200,result.data?.error);return result.data;}
 function db(result){if(result.error)throw new Error(`Database gate failed: ${result.error.message}`);return result.data;}
 async function actor(role){const password=`QA-${randomUUID()}`;const created=db(await admin.auth.admin.createUser({email:`inquiry-qa-${role}-${randomUUID()}@qa.invalid`,password,email_confirm:true}));
-  const client=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,options);const login=db(await client.auth.signInWithPassword({email:created.user.email,password}));actors[role]={id:created.user.id,session:login.session,client};
+  const client=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,options);actors[role]={id:created.user.id,client};
+  if(process.env.MEDBRIDGE_INQUIRY_QA_MANIFEST)writeFileSync(process.env.MEDBRIDGE_INQUIRY_QA_MANIFEST,JSON.stringify({origin,createdAt:new Date().toISOString(),actors:Object.entries(actors).map(([role,a])=>({role,id:a.id}))},null,2));
+  const login=db(await client.auth.signInWithPassword({email:created.user.email,password}));actors[role].session=login.session;
   if(role==='support'||role==='manager')db(await admin.from('staff_roles').insert({user_id:created.user.id,role:role==='manager'?'support_manager':'support_agent',active:true}));
   return actors[role];
 }
@@ -107,6 +110,8 @@ try{
   if(process.argv.includes('--browser')){
     const uiInput={...create,input:{...create.input,operationId:randomUUID(),title:'QA ONLY — browser inquiry validation'}};const uiCase=good(await api('patient','/api/inquiries',uiInput));caseIds.push(uiCase.id);
     const paths={patient:`/account?section=requests&request=${uiCase.id}`,support:'/support/cases',manager:'/support/cases',create:`/request-assistance?kind=hospital&entityId=${hospital.id}&source=hospital_detail`,package:`/request-assistance?kind=package&entityId=${pkg.id}&source=package_detail`,recover:`/recover?journey=${journey.id}`};
+    // Callback fragments are temporary credentials. Wait for the final application
+    // route before requesting browser state/screenshots; never record callback URLs.
     let finish;const done=new Promise(resolve=>{finish=resolve;});broker=createServer((request,response)=>{
       if(request.url==='/finish'&&request.method==='POST'){response.writeHead(200);response.end('QA cleanup started.');finish();return;}
       if(request.url==='/info'){response.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});response.end(JSON.stringify({paths,requestId:uiCase.id,origin}));return;}
@@ -122,6 +127,14 @@ try{
   if(broker?.listening)await new Promise(resolve=>broker.close(resolve));
   const ids=Object.values(actors).map(a=>a.id);
   if(ids.length){
+    // Disable every QA actor before optional resource cleanup. A failed file cleanup
+    // must never leave an elevated test account active.
+    const deactivation=await Promise.allSettled([
+      ...ids.flatMap(id=>[
+        admin.from('portal_accounts').upsert({user_id:id,active:false}).then(db),
+        admin.auth.admin.updateUserById(id,{ban_duration:'876000h'}).then(db),
+      ]),admin.from('staff_roles').update({active:false}).in('user_id',ids).then(db),
+    ]);
     const cases=db(await admin.from('support_cases').select('id').in('patient_id',ids));const ownedCases=cases.map(c=>c.id);
     if(ownedCases.length){
       db(await admin.from('support_cases').update({status:'closed',consent_revoked_at:new Date().toISOString(),share_with_provider:false}).in('id',ownedCases));
@@ -130,12 +143,11 @@ try{
       const documents=db(await admin.from('support_case_documents').select('id,owner_id,case_id,mime_type').in('case_id',ownedCases));
       const paths=documents.map(d=>{assert.ok(ids.includes(d.owner_id)&&ownedCases.includes(d.case_id));return `${d.owner_id}/${d.case_id}/${d.id}.${d.mime_type==='application/pdf'?'pdf':d.mime_type==='image/png'?'png':'jpg'}`;});
       if(paths.length)db(await admin.storage.from('care-documents').remove(paths));
-      if(documents.length)db(await admin.from('support_case_documents').update({status:'withdrawn',withdrawn_at:new Date().toISOString()}).in('case_id',ownedCases));
+      if(documents.length)db(await admin.from('support_case_documents').update({status:'withdrawn'}).in('case_id',ownedCases));
       db(await admin.from('portal_notifications').delete().eq('resource_type','support_case').in('resource_id',ownedCases));
     }
-    db(await admin.from('staff_roles').update({active:false}).in('user_id',ids));
     const journeys=db(await admin.from('recovery_journeys').select('id').in('owner_id',ids));if(journeys.length)db(await admin.from('recovery_journeys').update({stage:'archived'}).in('owner_id',ids));
-    for(const id of ids){db(await admin.from('portal_accounts').upsert({user_id:id,active:false}));db(await admin.auth.admin.updateUserById(id,{ban_duration:'876000h'}));}
+    if(deactivation.some(result=>result.status==='rejected'))throw new Error('One or more QA account deactivations failed; recover cleanup using the optional QA manifest.');
   }
   console.log('Disposable accounts disabled, QA cases closed, file grants revoked and QA Storage objects removed. Immutable audit retained. No public provider or human record changed.');
 }
