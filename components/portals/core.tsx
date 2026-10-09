@@ -162,8 +162,9 @@ export function Modal({
   const close = () => (dirty ? setConfirm(true) : onClose());
   useEffect(() => {
     const dialog = ref.current;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialog?.showModal();
-    return () => dialog?.close();
+    return () => { dialog?.close(); if (opener?.isConnected) opener.focus(); };
   }, []);
   return (
     <dialog onKeyDown={trapDialogFocus}
