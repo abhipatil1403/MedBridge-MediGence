@@ -2419,6 +2419,8 @@ export type Database = {
           id: string;
           case_id: string;
           actor_id: string;
+          sender_role: string | null;
+          sender_organization_id: string | null;
           body: string;
           visibility: string;
           created_at: string;
@@ -2427,6 +2429,8 @@ export type Database = {
           id?: string;
           case_id: string;
           actor_id: string;
+          sender_role?: string | null;
+          sender_organization_id?: string | null;
           body: string;
           visibility: string;
           created_at?: string;
@@ -2435,6 +2439,8 @@ export type Database = {
           id?: string;
           case_id?: string;
           actor_id?: string;
+          sender_role?: string | null;
+          sender_organization_id?: string | null;
           body?: string;
           visibility?: string;
           created_at?: string;
@@ -2504,6 +2510,9 @@ export type Database = {
           provider_response_status: string;
           provider_responded_by: string | null;
           provider_responded_at: string | null;
+          provider_response_message_id: string | null;
+          provider_information_requested_at: string | null;
+          provider_information_answered_at: string | null;
           recovery_journey_id: string | null;
         };
         Insert: {
@@ -2538,6 +2547,9 @@ export type Database = {
           provider_response_status?: string;
           provider_responded_by?: string | null;
           provider_responded_at?: string | null;
+          provider_response_message_id?: string | null;
+          provider_information_requested_at?: string | null;
+          provider_information_answered_at?: string | null;
           recovery_journey_id?: string | null;
         };
         Update: {
@@ -2572,6 +2584,9 @@ export type Database = {
           provider_response_status?: string;
           provider_responded_by?: string | null;
           provider_responded_at?: string | null;
+          provider_response_message_id?: string | null;
+          provider_information_requested_at?: string | null;
+          provider_information_answered_at?: string | null;
           recovery_journey_id?: string | null;
         };
         Relationships: [];

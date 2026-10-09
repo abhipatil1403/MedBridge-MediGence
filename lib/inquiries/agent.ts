@@ -1,7 +1,7 @@
 import { z } from 'zod';
 export const inquiryAgentSchema=z.object({
   selectedId:z.uuid().nullable(),
-  requests:z.array(z.object({id:z.uuid(),title:z.string().max(180),status:z.string().max(40),providerStatus:z.string().max(40),updatedAt:z.string(),supportConsentActive:z.boolean(),providerAuthorized:z.boolean(),linkedListing:z.object({kind:z.string(),name:z.string().max(300),href:z.string().regex(/^\/(hospitals|doctors|packages)\/[a-z0-9-]+$/)}),outstanding:z.array(z.object({title:z.string().max(180),purpose:z.string().max(800),status:z.string().max(40)})).max(30)}).strict()).max(20),
+  requests:z.array(z.object({id:z.uuid(),title:z.string().max(180),status:z.string().max(40),providerStatus:z.string().max(40),nextStep:z.string().max(600).optional(),updatedAt:z.string(),supportConsentActive:z.boolean(),providerAuthorized:z.boolean(),linkedListing:z.object({kind:z.string(),name:z.string().max(300),href:z.string().regex(/^\/(hospitals|doctors|packages)\/[a-z0-9-]+$/)}),outstanding:z.array(z.object({title:z.string().max(180),purpose:z.string().max(800),status:z.string().max(40)})).max(30)}).strict()).max(20),
 }).strict();
 export type InquiryAgentContext=z.infer<typeof inquiryAgentSchema>;
 export function inquiryIntent(content:string,previous?:InquiryAgentContext){

@@ -76,7 +76,11 @@ select pg_temp.iq_assert((select count(*)=1 from public.support_cases where id=(
 select pg_temp.iq_assert((select count(*)=0 from public.support_case_documents),'case consent does not share any document');
 select pg_temp.iq_assert(position('INTERNAL_QA_NEVER_EXPOSE' in public.inquiry_context((select id from iq where k='case'))::text)=0,'provider context excludes internal notes');
 select pg_temp.iq_assert(not(public.portal_case_context((select id from iq where k='case'))->'patient' ? 'email'),'legacy context RPC cannot expose patient email for a new inquiry');
-select public.inquiry_command('provider_response',pg_temp.iq_input('{"status":"responded","body":"A real persisted local QA provider response."}'));
+select pg_temp.iq_denied(format('select public.inquiry_command(''provider_response'',%L)',pg_temp.iq_input('{"status":"accepted_for_coordination","body":"Unconfirmed acceptance must fail."}')::text),'PORTAL_CONFIRMATION_REQUIRED');
+insert into iq(k,v) values('provider_reply',pg_temp.iq_input('{"status":"responded","body":"A real persisted local QA provider response.","confirmed":true}'));
+select public.inquiry_command('provider_response',(select v from iq where k='provider_reply'));
+select public.inquiry_command('provider_response',(select v from iq where k='provider_reply'));
+select pg_temp.iq_assert((select count(*)=1 from public.support_case_messages where body='A real persisted local QA provider response.'),'provider response retry creates one message');
 reset role;
 insert into public.staff_roles(user_id,role) select id,'support_agent' from iq where k='provider';
 set local role authenticated;
@@ -85,6 +89,8 @@ select pg_temp.iq_assert(position('INTERNAL_QA_NEVER_EXPOSE' in public.inquiry_c
 select pg_temp.iq_denied(format('select public.inquiry_command(''update'',%L)',pg_temp.iq_input(jsonb_build_object('status','resolved','expectedRevision',(select revision from public.support_cases where id=(select id from iq where k='case')),'resolution','Unauthorized dual-role closure.'))::text),'PORTAL_DENIED');
 select set_config('request.jwt.claim.sub',(select id::text from iq where k='patient'),true);
 select pg_temp.iq_assert(public.inquiry_context((select id from iq where k='case'))->'case'->>'provider_response_status'='responded','patient sees persisted provider response and timestamp');
+select pg_temp.iq_assert(public.inquiry_context((select id from iq where k='case'))->'providerCoordination'->'latestResponse'->>'body'='A real persisted local QA provider response.','patient receives the exact persisted latest provider response');
+select pg_temp.iq_assert(exists(select 1 from jsonb_array_elements(public.inquiry_context((select id from iq where k='case'))->'messages') m where m->>'body'='A real persisted local QA provider response.' and m->>'sender'='Provider'),'later Support role does not relabel a recorded provider response');
 select public.inquiry_command('share_document',pg_temp.iq_input(jsonb_build_object('documentId',(select id from iq where k='file'),'recipient','provider','organizationId',(select id from iq where k='org'),'purpose','Coordinate this exact request.','confirmed',true)));
 select set_config('request.jwt.claim.sub',(select id::text from iq where k='provider'),true);
 select pg_temp.iq_assert((select count(*)=1 from public.support_case_documents),'provider sees only the explicitly shared file');

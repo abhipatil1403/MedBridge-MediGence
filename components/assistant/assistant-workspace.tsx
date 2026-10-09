@@ -1,4 +1,5 @@
 'use client';
+import { providerStatusLabel } from '@/lib/inquiries/schemas';
 import { trapDialogFocus } from "@/components/dialog-focus";
 import { AIWelcome } from '@/components/visual/ai-welcome';
 import { useSubmittedRequest } from './use-submitted-request';
@@ -272,7 +273,7 @@ export function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, 
     }
   }
   return <div className="assistant-response">
-    {response.inquiries&&<section className="inquiry-ai-results"><h3>Your care requests</h3>{!response.inquiries.requests.length&&<p>No saved inquiries in your account. Choose Request assistance from a published listing to start.</p>}<ul className="personal-list">{response.inquiries.requests.map(r=><li key={r.id}><div><Link href={`/account?section=requests&request=${r.id}`}>{r.title}</Link><p>{r.status.replaceAll('_',' ')} · Provider: {r.providerStatus.replaceAll('_',' ')}</p><small>{r.providerAuthorized?'Provider access authorized':'Provider access not authorized'} · Support consent {r.supportConsentActive?'active':'withdrawn'}</small><p><Link href={r.linkedListing.href}>{r.linkedListing.name}</Link></p>{r.outstanding.map((d,i)=><p key={i}><strong>{d.title}</strong> · {d.purpose} · {d.status.replaceAll('_',' ')}</p>)}</div></li>)}</ul><Link className="text-link" href="/account?section=requests">Open My Requests →</Link></section>}
+    {response.inquiries&&<section className="inquiry-ai-results"><h3>Your care requests</h3>{!response.inquiries.requests.length&&<p>No saved inquiries in your account. Choose Request assistance from a published listing to start.</p>}<ul className="personal-list">{response.inquiries.requests.map(r=><li key={r.id}><div><Link href={`/account?section=requests&request=${r.id}`}>{r.title}</Link><p>{r.status.replaceAll('_',' ')} · Provider: {providerStatusLabel(r.providerStatus)}</p><p>{r.nextStep}</p><small>{r.providerAuthorized?'Provider access authorized':'Provider access not authorized'} · Support consent {r.supportConsentActive?'active':'withdrawn'}</small><p><Link href={r.linkedListing.href}>{r.linkedListing.name}</Link></p>{r.outstanding.map((d,i)=><p key={i}><strong>{d.title}</strong> · {d.purpose} · {d.status.replaceAll('_',' ')}</p>)}</div></li>)}</ul><Link className="text-link" href="/account?section=requests">Open My Requests →</Link></section>}
     {response.coordination&&<CoordinationResults context={response.coordination}/>}
     {response.workflow === 'case_intake' && response.caseSummary && <CaseSummaryContent summary={response.caseSummary} />}
     {response.caseHandoff && <p><T>{"Using the reviewed case for catalog coordination. Reported medical information is separate from search requirements and does not establish treatment suitability. No case has been submitted to a provider."}</T></p>}

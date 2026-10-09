@@ -40,7 +40,7 @@ export function ServiceCapsules({ values, status }: { values: readonly string[];
 
 export function PackageServicePreview({ item }: { item: Package }) {
   const conditional = Object.entries(packageServiceNames).filter(([key]) => item.serviceDetails?.[key as keyof typeof packageServiceNames]?.status === 'conditional').map(([, name]) => name);
-  return <div className="package-service-preview"><ServiceCapsules values={item.inclusions.slice(0, 2)} status="included"/>{conditional.length > 0 && <ServiceCapsules values={conditional} status="conditional"/>}</div>;
+  return <div className="package-service-preview">{!item.inclusions.length&&!conditional.length&&<p className="package-service-preview__unavailable"><T>{'Service information not published. Confirm with provider.'}</T></p>}<ServiceCapsules values={item.inclusions.slice(0, 2)} status="included"/>{conditional.length > 0 && <ServiceCapsules values={conditional} status="conditional"/>}</div>;
 }
 
 export function TreatmentSignals({ item, catalog }: { item: Treatment; catalog: CatalogSnapshot }) {

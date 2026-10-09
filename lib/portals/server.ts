@@ -13,6 +13,7 @@ export class PortalError extends Error {
   }
 }
 const messages: Record<string, string> = {
+  PORTAL_CONFIRMATION_REQUIRED: 'Review and explicitly confirm this provider response before sending it.',
   INQUIRY_INPUT_INVALID: 'Check the request fields and try again.',
   INQUIRY_RETRY_CONFLICT: 'This retry contains different information. Review and submit a new operation.',
   INQUIRY_ENTITY_UNAVAILABLE: 'This listing is no longer available for assistance.',

@@ -1,7 +1,7 @@
 import { describe,it,expect,vi } from 'vitest';
 vi.mock('server-only',()=>({}));
 import { randomUUID } from 'node:crypto';
-import { inquiryCommandSchema } from '@/lib/inquiries/schemas';
+import { inquiryCommandSchema,inquiryNextStep,providerStatusLabel,type InquiryContext } from '@/lib/inquiries/schemas';
 import { inquiryIntent,inquiryAgentSchema,type InquiryAgentContext } from '@/lib/inquiries/agent';
 import { executeTool,toolRegistry } from '@/lib/agents/tools';
 import { validateUpload } from '@/lib/documents/coordination';
@@ -10,6 +10,19 @@ const caseId=randomUUID(),otherId=randomUUID();
 const context:InquiryAgentContext={selectedId:caseId,requests:[{id:caseId,title:'Coordination question',status:'waiting_patient',providerStatus:'not_requested',updatedAt:new Date().toISOString(),supportConsentActive:true,providerAuthorized:false,linkedListing:{kind:'hospital',name:'Published listing',href:'/hospitals/published-listing'},outstanding:[{title:'Coordination summary',purpose:'Answer this administrative question.',status:'requested'}]}]};
 const create={action:'create',input:{operationId:randomUUID(),entityKind:'hospital',entityId:randomUUID(),expectedPublishedRevision:1,source:'hospital_detail',title:'Assistance request',objective:'Clarify this coordination question.',consent:true,reviewed:true}};
 describe('reviewed inquiry inputs',()=>{
+  it('requires explicit confirmation of operational acceptance',()=>expect(inquiryCommandSchema.safeParse({action:'provider_response',input:{operationId:randomUUID(),caseId,status:'accepted_for_coordination',body:'We can continue coordination.'}}).success).toBe(false));
+  it('allows a confirmed further-review response without implying acceptance',()=>expect(inquiryCommandSchema.safeParse({action:'provider_response',input:{operationId:randomUUID(),caseId,status:'further_review',body:'Our team needs further coordination.',confirmed:true}}).success).toBe(true));
+  it('describes further review and inability in patient next steps',()=>{
+    const base={case:{status:'in_progress',share_with_provider:true,provider_response_status:'further_review'},organization:{id:otherId,name:'Authorized team'},documentRequests:[]} as unknown as InquiryContext;
+    expect(inquiryNextStep(base)).toContain('requires further coordination');
+    expect(inquiryNextStep({...base,case:{...base.case,provider_response_status:'unable_to_coordinate'}})).toContain('cannot proceed');
+    expect(providerStatusLabel('accepted_for_coordination')).toBe('Provider confirmed it can continue coordination');
+  });
+  it('explains private versus provider-visible information replies',()=>{
+    const base={case:{status:'waiting_patient',share_with_provider:true,provider_response_status:'information_requested'},organization:{id:otherId,name:'Authorized team'},documentRequests:[]} as unknown as InquiryContext;
+    expect(inquiryNextStep(base)).toContain('authorized provider when replying');
+    expect(inquiryNextStep({...base,case:{...base.case,status:'in_progress',share_with_provider:false},providerCoordination:{available:false,latestResponse:null,informationAnsweredAt:null,informationRequestedAt:null}})).toContain('no provider response is confirmed');
+  });
   it('accepts reviewed, consented published entity context',()=>expect(inquiryCommandSchema.parse(create)).toEqual(create));
   it.each(['consent','reviewed'])('rejects missing %s',field=>{const input:Record<string,unknown>={...create.input};delete input[field as keyof typeof input];expect(inquiryCommandSchema.safeParse({...create,input}).success).toBe(false);});
   it('rejects caller-supplied patient, actor and org ownership',()=>expect(inquiryCommandSchema.safeParse({...create,input:{...create.input,patientId:otherId,organizationId:otherId}}).success).toBe(false));
