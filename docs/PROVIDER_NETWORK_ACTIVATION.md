@@ -67,7 +67,8 @@ complete without that participant.
 
 ## Data and permission changes
 
-Migration `20261009110000_provider_network_activation.sql` adds authority-request history,
+Migrations `20261009110000_provider_network_activation.sql` and
+`20261009111000_provider_connectivity_resolution.sql` add authority-request history,
 canonical operational ownership and idempotent operation receipts. Existing organizations,
 membership, document, review, publication, inquiry, notification and audit tables are reused.
 No organization is grandfathered into approval. Private evidence/contact prose is confined
@@ -106,3 +107,9 @@ existing production TEST workspace remains unapproved and unconnected. Technical
 may ship after its gates pass, but the real-provider milestone must not be marked complete.
 Exact deployed SHA and production-gate results are recorded in the release report delivered
 with this change; a documentation commit cannot contain its own commit SHA.
+
+The first hosted inquiry regression run exposed a PL/pgSQL record/table alias ambiguity
+in the no-owner Support readiness branch. The follow-up migration fixes that name
+resolution, with an explicit reference-only connectivity regression. A second fresh
+installation, all 19 database scripts and migration reapplication passed after the fix.
+No permissions were broadened. Failed-run QA actors were disabled and sessions revoked.

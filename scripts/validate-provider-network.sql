@@ -17,6 +17,7 @@ insert into net(k,v) select 'baseline_hospitals',to_jsonb(count(*)) from public.
 \ir pg-network-reference-fixtures.sql
 insert into net(k,v) values('reference',pg_temp.qa_network_reference((select id from net where k='admin'))),('unrelated_reference',pg_temp.qa_network_reference((select id from net where k='admin')));
 insert into net(k,id) select 'hospital',(v->>'hospitalId')::uuid from net where k='reference';
+select pg_temp.n_assert(private.provider_connectivity('hospital',(select (v->>'hospitalId')::uuid from net where k='unrelated_reference'))='no_owner','reference-only listing has an executable honest no-owner Support state');
 set local role authenticated;
 select set_config('request.jwt.claim.sub',(select id::text from net where k='provider'),true);
 insert into net(k,id) select 'org',(public.portal_command('create_organization','{"name":"LOCAL NETWORK Provider","providerType":"hospital","sourceKind":"first_party"}')->>'id')::uuid;
