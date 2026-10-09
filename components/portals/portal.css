@@ -174,7 +174,7 @@
   font-size: 10px;
   letter-spacing: 1.6px;
   font-weight: 750;
-  color: #51846d;
+  color: var(--portal-muted);
   text-transform: uppercase;
   margin: 0;
 }
@@ -334,7 +334,7 @@
   width: 100%;
   padding: 11px 12px;
   min-height: 42px;
-  border: 1px solid #d9e3db;
+  border: 1px solid #687861;
   border-radius: 7px;
   background: #fff;
   font-size: 13px;
@@ -385,7 +385,7 @@
   border: 1px solid #d9e3db;
   border-radius: 7px;
   padding-left: 12px;
-  color: #71917d;
+  color: var(--portal-muted);
 }
 .portal-table-tools .portal-search input {
   border: 0;
@@ -410,7 +410,7 @@
 }
 .portal-table-scroll th {
   background: #f5f8f5;
-  color: #65816e;
+  color: var(--portal-muted);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.6px;
@@ -454,7 +454,7 @@
   gap: 15px;
   align-items: center;
   margin-top: 17px;
-  color: #7a8d80;
+  color: var(--portal-muted);
   font-size: 11px;
 }
 .portal-pagination > div {
@@ -464,7 +464,7 @@
 .portal-status {
   display: inline-block;
   background: #f0f3f1;
-  color: #64746b;
+  color: var(--portal-muted);
   border: 1px solid #e0e7e2;
   padding: 4px 8px;
   border-radius: 5px;
