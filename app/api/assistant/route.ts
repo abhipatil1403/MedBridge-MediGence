@@ -6,7 +6,7 @@ import { recoveryContext } from '@/lib/experience/recovery';
 import { readOwnInquiries } from '@/lib/inquiries/server';
 import { coordinationSchema } from '@/lib/experience/coordination-schema';
 import { recordRequest } from '@/lib/operations/server';
-import { failureCategory, type FailureCategory } from '@/lib/operations/contracts';
+import { executionOutcome, failureCategory, type FailureCategory } from '@/lib/operations/contracts';
 import { configuredProvider } from '@/lib/agents/cloudflare-provider';
 import { AgentError } from '@/lib/agents/errors';
 import { createAdminClient, createUserClient, isAgentConfigured, SupabaseAgentStore, SupabaseCaseAccess, verifyUser } from '@/lib/agents/persistence';
@@ -95,8 +95,8 @@ export async function POST(request: NextRequest) {
       provider: configuredProvider(event=>{if(event.attempt>0){retryCount++;if(!event.category)modelRetryRecovered=true;}if(event.category&&modelFailures.length<32)modelFailures.push(event.category);}),
       tools:{...defaultToolDependencies,inquiryRead:async(id,caseId)=>{if(id!==user.id)throw new AgentError('INQUIRY_ACCESS_DENIED','This request is unavailable.');return readOwnInquiries(userDb,user.id,caseId);},verificationStore:new SupabaseVerificationStore(admin,userDb),recoveryRead:async(id)=>{if(id!==user.id)throw new AgentError('TOOL_SCOPE_DENIED','This coordination context is unavailable.');return coordinationSchema.parse(await recoveryContext(userDb,user.id));}},
     });
-    const category=response.status==='failed'?failureCategory(response.tasks.find(t=>t.errorCode)?.errorCode):undefined;
-    await recordRequest(user.id,{correlationId,executionId:response.runId,kind:'ai',action:'execute',outcome:response.status==='failed'?'failed':response.status==='completed'?'completed':'partially_completed',category,durationMs:Math.min(300000,Math.round(performance.now()-started)),retryCount:Math.min(32,retryCount),modelFailures,recovered:modelRetryRecovered&&response.status==='completed'});
+    const observed=executionOutcome(response);
+    await recordRequest(user.id,{correlationId,executionId:response.runId,kind:'ai',action:'execute',...observed,durationMs:Math.min(300000,Math.round(performance.now()-started)),retryCount:Math.min(32,retryCount),modelFailures,recovered:modelRetryRecovered&&observed.outcome==='completed'});
     return NextResponse.json(response, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) { if(actor)await recordRequest(actor,{correlationId,kind:'ai',action:'execute',outcome:'failed',category:failureCategory(error instanceof AgentError?error.code:'REQUEST_FAILED'),durationMs:Math.min(300000,Math.round(performance.now()-started)),retryCount:Math.min(32,retryCount),modelFailures,recovered:false}); return errorResponse(error); }
 }

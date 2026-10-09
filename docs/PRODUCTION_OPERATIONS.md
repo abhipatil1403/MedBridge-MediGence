@@ -94,7 +94,7 @@ All overview counts are measured at `asOf`; rolling windows start at `windowStar
 | Unassigned | Eligible active inquiries with no assigned Support user; may overlap provider/patient waiting counts. |
 | Support/provider/patient waiting | Current attention category: provider/patient waiting states take precedence; otherwise assignment determines unassigned versus Support. |
 | Overdue | Current eligible inquiries whose last meaningful activity meets/exceeds the relevant threshold. Queue is capped at 50 matching records, ordered overdue then oldest. |
-| Failed requests | Last 24 hours, latest 30 failed metadata events from the instrumented inquiry/assistant POST routes. These are observed requests, not a complete hosting log or all historical failures. |
+| Failed requests | Last 24 hours, latest 30 failed or partially completed metadata events with a failure category from the instrumented inquiry/assistant POST routes. These are observed requests, not a complete hosting log or all historical failures. |
 | Notifications | In-app rows created in the last 24 hours, split by current `read_at` within that same cohort. Unread does not mean queued, sent, delivered or failed externally. |
 | AI runs | Runs created in the last 24 hours: final persisted statuses; unfinished after five minutes is an investigation signal, not a confirmed timeout. Durations use actual persisted start/end timestamps when available. |
 | Model retry recovery | Instrumented request completed after an observed successful additional model attempt. Historical retry outcomes before this release are not measured. |
@@ -135,6 +135,8 @@ and all anonymous access are revoked. Active Admins may read; privileged command
 recheck current authorization and confirmation. Support receives only its existing
 authorized attention queue. Disabled accounts/roles are denied.
 
+Follow-up `20261010101000_partial_execution_visibility.sql` includes actual partial failures and execution limits in the existing private overview, preserving successful sourced results.
+
 Existing settings hold policy/latest health; existing append-only audit records hold
 commands, measured checks and metadata. Generic settings cannot forge operations keys.
 Health/telemetry writers are service-role only. Existing audit immutability and private
@@ -171,7 +173,7 @@ documents removed. They never become public provider/catalog fixtures.
 
 ## Validation and performance evidence
 
-Release gates: 954 automated tests passed, 39 opt-in integration tests skipped in the
+Release gates: 959 automated tests passed, 39 opt-in integration tests skipped in the
 default suite; one actual Cloudflare model test passed separately. A fresh PostgreSQL
 install, all 20 SQL validation scripts and migration reapplication passed. Eight
 concurrent identical commands produced one incident, one audit and one notification

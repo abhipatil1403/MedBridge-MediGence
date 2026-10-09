@@ -17,6 +17,14 @@ export function failureCategory(code: unknown): FailureCategory {
   if (/UNAVAILABLE|TOOL_FAILURE|REQUEST_FAILED/.test(value)) return 'integration_unavailable';
   return 'unknown';
 }
+/** Project actual execution state; successful findings never erase a failed/limited step. */
+export function executionOutcome(response:{status:string;tasks:Array<{errorCode?:string}>;activity?:{state:string;warnings:string[];steps:Array<{status:string;error?:string}>}}) {
+  const code=response.tasks.find(task=>task.errorCode)?.errorCode??response.activity?.steps.find(step=>step.status==='failed')?.error;
+  const limited=response.activity?.warnings.some(warning=>/^(?:Tool call|Execution safety|Planning safety|Execution time|Repeated proposals|Failure recovery|Repeated tool) limit reached[.;]/.test(warning));
+  const category=limited?'execution_limit':code?failureCategory(code):response.status==='failed'?'unknown':undefined;
+  const outcome=response.status==='failed'?'failed':response.activity?.state==='partially_completed'||category?'partially_completed':response.status==='completed'?'completed':'partially_completed';
+  return {outcome,category} as {outcome:'completed'|'partially_completed'|'failed';category:FailureCategory|undefined};
+}
 export const transientFailures = new Set<FailureCategory>(['timeout','rate_limit','database_unavailable','integration_unavailable','persistence']);
 export const recoveryLimit = 3;
 export function retryDelayMs(attempt: number) { return Math.min(120000, 30000 * 2 ** Math.max(0, attempt - 1)); }

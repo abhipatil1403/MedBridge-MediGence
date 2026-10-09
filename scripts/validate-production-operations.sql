@@ -107,6 +107,12 @@ select set_config('request.jwt.claim.sub',(select id::text from ops where k='adm
 select pg_temp.o_assert(public.operations_overview()->'health'->>'status'='ready','verified server probe is visible to Admin');
 select pg_temp.o_denied('update public.operational_incidents set severity=''low''','permission denied');
 reset role;
+select public.operations_record_request((select id from ops where k='patient'),jsonb_build_object('correlationId',gen_random_uuid(),'kind','ai','action','execute','outcome','partially_completed','category','execution_limit','durationMs',120000,'retryCount',0,'modelFailures','[]'::jsonb,'recovered',false));
+set local role authenticated;
+select set_config('request.jwt.claim.sub',(select id::text from ops where k='admin'),true);
+select pg_temp.o_assert(exists(select 1 from jsonb_array_elements(public.operations_overview()->'failures') e where e->>'outcome'='partially_completed' and e->>'category'='execution_limit'),'partial execution limits remain visible alongside preserved results');
+select pg_temp.o_assert((public.operations_overview()->'ai'->>'requestFailures')::integer>=1,'request failure count includes actual partial failures');
+reset role;
 update public.portal_accounts set active=false where user_id=(select id from ops where k='admin');
 insert into public.portal_accounts(user_id,active) values((select id from ops where k='admin'),false) on conflict(user_id) do update set active=false;
 set local role authenticated;

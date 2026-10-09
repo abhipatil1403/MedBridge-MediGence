@@ -2,10 +2,20 @@ import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
 vi.mock('server-only',()=>({}));
 import { CloudflareProvider } from '@/lib/agents/cloudflare-provider';
-import { defaultPolicy, failureCategory, inquiryAttention, operationsCommandSchema, requestEventSchema, retryAllowed, retryDelayMs } from '@/lib/operations/contracts';
+import { defaultPolicy, executionOutcome, failureCategory, inquiryAttention, operationsCommandSchema, requestEventSchema, retryAllowed, retryDelayMs } from '@/lib/operations/contracts';
 import { probeReadiness, ReadinessCache } from '@/lib/operations/health';
 const id='11111111-1111-4111-8111-111111111111';
 describe('operational reliability',()=>{
+ it.each(['Tool call limit reached; some requested work remains incomplete.','Execution safety limit reached; some work remains incomplete.','Planning safety limit reached; further work could not be completed.'])('retains an actual partial execution limit: %s',warning=>{
+  expect(executionOutcome({status:'completed',tasks:[],activity:{state:'partially_completed',warnings:[warning],steps:[]}})).toEqual({outcome:'partially_completed',category:'execution_limit'});
+ });
+ it('retains failed task categories when useful results complete',()=>{
+  expect(executionOutcome({status:'completed',tasks:[{errorCode:'TOOL_INPUT_INVALID'}]})).toEqual({outcome:'partially_completed',category:'tool_validation'});
+ });
+ it('does not infer an execution limit from incomplete catalog evidence or clarification',()=>{
+  expect(executionOutcome({status:'completed',tasks:[],activity:{state:'partially_completed',warnings:['The model reported remaining catalog work.'],steps:[]}})).toEqual({outcome:'partially_completed',category:undefined});
+  expect(executionOutcome({status:'awaiting_user_input',tasks:[]})).toEqual({outcome:'partially_completed',category:undefined});
+ });
  it('only reports readiness from a real successful probe, without external claims',async()=>{
   const r=await probeReadiness(async()=>({storage:true}),true);
   expect(r).toMatchObject({status:'ready',database:'available',storage:'private_bucket_present',ai:'configured_not_probed',externalDelivery:'not_configured',externalMonitoring:'not_configured',attempts:1});
