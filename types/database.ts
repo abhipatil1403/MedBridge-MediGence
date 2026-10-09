@@ -2141,6 +2141,8 @@ export type Database = {
           completed_at: string | null;
           created_at: string;
           updated_at: string;
+          support_case_id: string | null;
+          support_event_id: string | null;
         };
         Insert: {
           id?: string;
@@ -2153,6 +2155,8 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          support_case_id?: string | null;
+          support_event_id?: string | null;
         };
         Update: {
           id?: string;
@@ -2165,6 +2169,8 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          support_case_id?: string | null;
+          support_event_id?: string | null;
         };
         Relationships: [];
       };
@@ -2321,6 +2327,63 @@ export type Database = {
         };
         Relationships: [];
       };
+      support_case_documents: {
+        Row: {
+          id: string;
+          case_id: string;
+          owner_id: string;
+          request_id: string | null;
+          replaces_id: string | null;
+          filename: string;
+          mime_type: string;
+          size_bytes: number;
+          checksum: string;
+          status: string;
+          uploaded_at: string | null;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          review_note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          case_id: string;
+          owner_id: string;
+          request_id?: string | null;
+          replaces_id?: string | null;
+          filename: string;
+          mime_type: string;
+          size_bytes: number;
+          checksum: string;
+          status?: string;
+          uploaded_at?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          review_note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          case_id?: string;
+          owner_id?: string;
+          request_id?: string | null;
+          replaces_id?: string | null;
+          filename?: string;
+          mime_type?: string;
+          size_bytes?: number;
+          checksum?: string;
+          status?: string;
+          uploaded_at?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          review_note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       support_case_events: {
         Row: {
           id: string;
@@ -2378,6 +2441,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      support_case_provider_consents: {
+        Row: {
+          id: string;
+          case_id: string;
+          owner_id: string;
+          organization_id: string;
+          purpose: string;
+          granted_at: string;
+          revoked_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          case_id: string;
+          owner_id: string;
+          organization_id: string;
+          purpose: string;
+          granted_at?: string;
+          revoked_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          case_id?: string;
+          owner_id?: string;
+          organization_id?: string;
+          purpose?: string;
+          granted_at?: string;
+          revoked_at?: string | null;
+        };
+        Relationships: [];
+      };
       support_cases: {
         Row: {
           id: string;
@@ -2403,6 +2496,15 @@ export type Database = {
           created_at: string;
           updated_at: string;
           hospital_id: string | null;
+          doctor_id: string | null;
+          package_id: string | null;
+          inquiry_source: string;
+          entity_snapshot: Json;
+          resolution_summary: string | null;
+          provider_response_status: string;
+          provider_responded_by: string | null;
+          provider_responded_at: string | null;
+          recovery_journey_id: string | null;
         };
         Insert: {
           id?: string;
@@ -2428,6 +2530,15 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           hospital_id?: string | null;
+          doctor_id?: string | null;
+          package_id?: string | null;
+          inquiry_source?: string;
+          entity_snapshot?: Json;
+          resolution_summary?: string | null;
+          provider_response_status?: string;
+          provider_responded_by?: string | null;
+          provider_responded_at?: string | null;
+          recovery_journey_id?: string | null;
         };
         Update: {
           id?: string;
@@ -2453,6 +2564,138 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           hospital_id?: string | null;
+          doctor_id?: string | null;
+          package_id?: string | null;
+          inquiry_source?: string;
+          entity_snapshot?: Json;
+          resolution_summary?: string | null;
+          provider_response_status?: string;
+          provider_responded_by?: string | null;
+          provider_responded_at?: string | null;
+          recovery_journey_id?: string | null;
+        };
+        Relationships: [];
+      };
+      support_document_grants: {
+        Row: {
+          id: string;
+          document_id: string;
+          case_id: string;
+          owner_id: string;
+          recipient: string;
+          organization_id: string | null;
+          purpose: string;
+          granted_at: string;
+          revoked_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          case_id: string;
+          owner_id: string;
+          recipient: string;
+          organization_id?: string | null;
+          purpose: string;
+          granted_at?: string;
+          revoked_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          document_id?: string;
+          case_id?: string;
+          owner_id?: string;
+          recipient?: string;
+          organization_id?: string | null;
+          purpose?: string;
+          granted_at?: string;
+          revoked_at?: string | null;
+        };
+        Relationships: [];
+      };
+      support_document_requests: {
+        Row: {
+          id: string;
+          case_id: string;
+          requested_by: string;
+          requesting_party: string;
+          title: string;
+          purpose: string;
+          visibility: string;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          case_id: string;
+          requested_by: string;
+          requesting_party: string;
+          title: string;
+          purpose: string;
+          visibility: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          case_id?: string;
+          requested_by?: string;
+          requesting_party?: string;
+          title?: string;
+          purpose?: string;
+          visibility?: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      support_message_reads: {
+        Row: {
+          case_id: string;
+          user_id: string;
+          read_at: string;
+        };
+        Insert: {
+          case_id: string;
+          user_id: string;
+          read_at?: string;
+        };
+        Update: {
+          case_id?: string;
+          user_id?: string;
+          read_at?: string;
+        };
+        Relationships: [];
+      };
+      support_operation_receipts: {
+        Row: {
+          actor_id: string;
+          operation_id: string;
+          action: string;
+          input_hash: string;
+          case_id: string;
+          result: Json;
+          created_at: string;
+        };
+        Insert: {
+          actor_id: string;
+          operation_id: string;
+          action: string;
+          input_hash: string;
+          case_id: string;
+          result: Json;
+          created_at?: string;
+        };
+        Update: {
+          actor_id?: string;
+          operation_id?: string;
+          action?: string;
+          input_hash?: string;
+          case_id?: string;
+          result?: Json;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -2711,7 +2954,12 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      inquiry_command: { Args: { p_action: string; p_input: Json }; Returns: Json };
       public_catalog_snapshot: { Args: Record<string, never>; Returns: Json };
+      inquiry_context: { Args: { p_case_id: string }; Returns: Json };
+      inquiry_target: { Args: { p_kind: string; p_id: string }; Returns: Json };
+      inquiry_document_delivery: { Args: { p_document_id: string }; Returns: Json };
+      inquiry_commit_upload: { Args: { p_actor: string; p_document: string }; Returns: Json };
       experience_command: { Args: { p_action: string; p_input?: Json }; Returns: Json };
       experience_guest_session: { Args: { p_action: string; p_hash: string; p_ip_hash?: string | null; p_lease?: string | null; p_state?: Json | null }; Returns: Json };
       experience_import_visitor: { Args: { p_hash: string; p_lease: string; p_user: string }; Returns: string };

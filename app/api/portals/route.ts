@@ -184,7 +184,7 @@ export async function GET(request: NextRequest) {
             .from("support_cases")
             .select("id", { count: "exact", head: true })
             .eq("assigned_to", context.userId)
-            .not("status", "in", "(resolved,closed)"),
+            .not("status", "in", "(resolved,closed,cancelled)"),
           db
             .from("support_tasks")
             .select("id", { count: "exact", head: true })
@@ -349,7 +349,7 @@ export async function GET(request: NextRequest) {
               .from("support_cases")
               .select("id", { count: "exact", head: true })
               .eq("assigned_to", userId)
-              .not("status", "in", "(resolved,closed)"),
+              .not("status", "in", "(resolved,closed,cancelled)"),
             db
               .from("support_tasks")
               .select("id", { count: "exact", head: true })
@@ -510,8 +510,7 @@ export async function GET(request: NextRequest) {
         query = query.eq("patient_id", z.uuid().parse(params.get("patientId")));
       if (params.get("sharedDocuments") === "true")
         query = query
-          .eq("share_documents", true)
-          .not("document_workspace_id", "is", null);
+          .or("and(share_documents.eq.true,document_workspace_id.not.is.null),inquiry_source.neq.legacy");
       for (const [parameter, column] of [
         ["priority", "priority"],
         ["caseType", "case_type"],

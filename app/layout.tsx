@@ -2,6 +2,7 @@ import { T } from '@/components/experience/translation';
 import type { Metadata } from "next";
 import { PublicChrome } from "@/components/public-chrome";
 import "./globals.css";
+import '@/components/inquiries/inquiries.css';
 import "./product.css";
 import "./ui-system.css";
 import './experience.css';

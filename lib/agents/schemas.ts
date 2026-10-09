@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { inquiryAgentSchema,type InquiryAgentContext } from '@/lib/inquiries/agent';
 import { currencies } from '@/lib/experience/preferences';
 import { coordinationSchema, type CoordinationContext } from '@/lib/experience/coordination-schema';
 import { verificationResultSchema, type VerificationResult } from '@/lib/verification/schemas';
@@ -16,7 +17,7 @@ import type { PatientCase, CaseSummary, CaseHandoff } from '@/lib/case/CaseTypes
 export const agentIdSchema = z.enum(['discovery', 'treatment_planning', 'hospital_matching', 'comparison', 'research', 'document_coordination', 'provider_verification']);
 export type AgentId = z.infer<typeof agentIdSchema>;
 export const toolNameSchema = z.enum([
-  'get_recovery_context',
+  'get_inquiry_context','get_recovery_context',
   'verify_provider_information','refresh_provider_verification','get_provider_verification_status','get_provider_verification_history','compare_provider_evidence',
   'get_document_requirements', 'get_document_package', 'upload_document', 'match_document_to_requirement', 'remove_document', 'prepare_document_package', 'add_document_requirement',
   'research_healthcare_information', 'search_treatments', 'search_hospitals', 'search_doctors', 'search_packages', 'search_countries', 'search_services',
@@ -77,6 +78,7 @@ export interface Finding {
 }
 
 export interface ToolResult {
+  inquiries?: InquiryAgentContext;
   coordination?: CoordinationContext;
   verification?: VerificationResult;
   documents?: DocumentWorkspace;
@@ -96,7 +98,7 @@ export const findingSchema = z.object({ sourceKind: z.literal('medbridge_catalog
   requirementEvaluation: resultRequirementEvaluationSchema.optional(),
   href: z.string().optional(), facts: z.record(z.string(), z.union([z.string(), z.number(), z.null()])),
   matchType: z.enum(['exact', 'related']), matchReason: z.string().min(1), provenance: provenanceSchema });
-export const toolResultSchema = z.object({ coordination: coordinationSchema.optional(), verification: verificationResultSchema.optional(), documents: documentWorkspaceSchema.optional(), research: researchResultSchema.optional(), analysis: z.object({ kind: z.literal('derived'), recordIds: z.array(z.guid()).max(30), summary: z.string().max(1600), complete: z.boolean(), missingInformation: z.array(z.string().max(300)).max(30) }).strict().optional(), findings: z.array(findingSchema).max(30), note: z.string().optional(),
+export const toolResultSchema = z.object({ inquiries:inquiryAgentSchema.optional(),coordination: coordinationSchema.optional(), verification: verificationResultSchema.optional(), documents: documentWorkspaceSchema.optional(), research: researchResultSchema.optional(), analysis: z.object({ kind: z.literal('derived'), recordIds: z.array(z.guid()).max(30), summary: z.string().max(1600), complete: z.boolean(), missingInformation: z.array(z.string().max(300)).max(30) }).strict().optional(), findings: z.array(findingSchema).max(30), note: z.string().optional(),
   comparison: z.record(z.string(), z.unknown()).optional(), caseContext: z.record(z.string(), z.unknown()).optional(),
   requestedInformation: z.string().optional(), approvalRequired: z.string().optional() }).strict();
 
@@ -224,6 +226,7 @@ export interface AgentTaskView {
 }
 
 export interface AgentResponse {
+  inquiries?: InquiryAgentContext;
   coordination?: CoordinationContext;
   verification?: VerificationResult;
   documents?: DocumentWorkspace;
@@ -265,6 +268,7 @@ export interface AgentResponse {
 }
 
 export const assistantResponseSchema = z.object({
+  inquiries:inquiryAgentSchema.optional(),
   coordination: coordinationSchema.optional(),
   verification: verificationResultSchema.optional(),
   documents: documentWorkspaceSchema.optional(),

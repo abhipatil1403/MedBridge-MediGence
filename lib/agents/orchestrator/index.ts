@@ -1,4 +1,5 @@
 import { withResearchRecovery } from '@/lib/research/recovery';
+import { inquiryIntent } from '@/lib/inquiries/agent';
 import { prepareVerification } from '@/lib/verification/agent';
 import { prepareResearchExecution, wantsExternalResearch } from '@/lib/research/agent';
 import { randomUUID } from 'node:crypto';
@@ -60,6 +61,16 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
     const [active, recent] = await Promise.all([hasPlanningSchema ? context.planningStore.load(conversationId, context.userId) : undefined, context.planningStore.recentMessages(conversationId)]);
     context = { ...context, conversation: validatedConversationContext(conversationId, recent, active) };
     const boundary = requestBoundary(request.content);
+    const previousInquiry=persistedResponses(recent,conversationId).at(-1)?.inquiries;
+    const inquiry=inquiryIntent(request.content,previousInquiry);
+    if(inquiry&&boundary!=='clinical'){
+      return validateResponse(await runAgent({...request,conversationId},{...context,execution:{
+        plan:{agent:'treatment_planning',understanding:'You requested your saved care coordination inquiries.',steps:inquiry.ambiguous?[]:[{objective:'Read your own saved inquiry context',tool:'get_inquiry_context',input:JSON.stringify(inquiry.caseId?{caseId:inquiry.caseId}:{})}],missingInformation:inquiry.ambiguous?'Choose one request to review.':null},
+        diagnostics:{workflow:'reference_patient_inquiry'},allowModelFollowUps:false,
+        synthesis:{summary:inquiry.ambiguous?'Choose one request in My Requests to review its status.':'Your recorded inquiry status and outstanding document requests are shown below. No message, consent, upload, status change or cancellation has been performed. Open the request to review and confirm your next action.',nextSteps:['Open My Requests to review messages and confirm an action.'],question:inquiry.ambiguous?'Which request should we review?':null},
+        finalize:async(response,results)=>({...response,inquiries:results.find(r=>r.tool==='get_inquiry_context')?.result.inquiries}),
+      }}));
+    }
     if (boundary) {
       const guarded = safetyPlan(request.content);
       const boundaryPlan = boundary === 'external' && guarded ? guarded : { agent: 'discovery' as const,

@@ -3,6 +3,7 @@ import { SupabaseVerificationStore } from '@/lib/verification/store';
 import { defaultToolDependencies } from '@/lib/agents/tools';
 import { z } from 'zod';
 import { recoveryContext } from '@/lib/experience/recovery';
+import { readOwnInquiries } from '@/lib/inquiries/server';
 import { coordinationSchema } from '@/lib/experience/coordination-schema';
 import { configuredProvider } from '@/lib/agents/cloudflare-provider';
 import { AgentError } from '@/lib/agents/errors';
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
       store: new SupabaseAgentStore(admin, userDb),
       planningStore: new SupabasePlanningStore(admin, userDb),
       provider: configuredProvider(),
-      tools:{...defaultToolDependencies,verificationStore:new SupabaseVerificationStore(admin,userDb),recoveryRead:async(id)=>{if(id!==user.id)throw new AgentError('TOOL_SCOPE_DENIED','This coordination context is unavailable.');return coordinationSchema.parse(await recoveryContext(userDb,user.id));}},
+      tools:{...defaultToolDependencies,inquiryRead:async(id,caseId)=>{if(id!==user.id)throw new AgentError('INQUIRY_ACCESS_DENIED','This request is unavailable.');return readOwnInquiries(userDb,user.id,caseId);},verificationStore:new SupabaseVerificationStore(admin,userDb),recoveryRead:async(id)=>{if(id!==user.id)throw new AgentError('TOOL_SCOPE_DENIED','This coordination context is unavailable.');return coordinationSchema.parse(await recoveryContext(userDb,user.id));}},
     });
     return NextResponse.json(response, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) { return errorResponse(error); }

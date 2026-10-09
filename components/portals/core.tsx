@@ -350,6 +350,7 @@ export function ResourceTable({
                       "escalated",
                       "resolved",
                       "closed",
+                      "cancelled",
                     ]
                   : resource === "support_tasks"
                     ? ["open", "in_progress", "completed", "cancelled"]

@@ -57,6 +57,12 @@ for (const [table, fields] of Object.entries(byTable).sort(([a], [b]) => a.local
   lines.push('        };', '        Relationships: [];', '      };');
 }
 lines.push('    };', '    Views: Record<string, never>;', '    Functions: {',
+  '      inquiry_command: { Args: { p_action: string; p_input: Json }; Returns: Json };',
+  '      public_catalog_snapshot: { Args: Record<string, never>; Returns: Json };',
+  '      inquiry_context: { Args: { p_case_id: string }; Returns: Json };',
+  '      inquiry_target: { Args: { p_kind: string; p_id: string }; Returns: Json };',
+  '      inquiry_document_delivery: { Args: { p_document_id: string }; Returns: Json };',
+  '      inquiry_commit_upload: { Args: { p_actor: string; p_document: string }; Returns: Json };',
   '      experience_command: { Args: { p_action: string; p_input?: Json }; Returns: Json };',
   '      experience_guest_session: { Args: { p_action: string; p_hash: string; p_ip_hash?: string | null; p_lease?: string | null; p_state?: Json | null }; Returns: Json };',
   '      experience_import_visitor: { Args: { p_hash: string; p_lease: string; p_user: string }; Returns: string };',

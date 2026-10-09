@@ -13,6 +13,13 @@ export class PortalError extends Error {
   }
 }
 const messages: Record<string, string> = {
+  INQUIRY_INPUT_INVALID: 'Check the request fields and try again.',
+  INQUIRY_RETRY_CONFLICT: 'This retry contains different information. Review and submit a new operation.',
+  INQUIRY_ENTITY_UNAVAILABLE: 'This listing is no longer available for assistance.',
+  INQUIRY_PROVIDER_UNAVAILABLE: 'This listing has no connected provider team. Support coordination remains available.',
+  INQUIRY_RESOLUTION_REQUIRED: 'Describe the resolution before closing this request.',
+  INQUIRY_DOCUMENT_LIMIT: 'This request has reached its file history limit.',
+  INQUIRY_FILE_NOT_STORED: 'The file was not stored. Retry your upload.',
   PORTAL_REFERENCE_SOURCE_REQUIRED: "Choose a public HTTPS source, source category and actual collection time for this claim.",
   PORTAL_PACKAGE_EVIDENCE_REQUIRED: "Review each provided package field against its relevant source or approved supporting document before approving or publishing.",
   PORTAL_PACKAGE_CONDITIONS_REQUIRED: "Describe the limits or extra charges for every conditional package service.",

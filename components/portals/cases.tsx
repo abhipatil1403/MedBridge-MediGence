@@ -17,6 +17,7 @@ import {
   useResource,
 } from "./core";
 import { CommandForm } from "./command-form";
+import { InquiryDetail } from '@/components/inquiries/detail';
 
 export function Cases({
   mode = "all",
@@ -151,6 +152,7 @@ export function Cases({
         onOpen={setSelected}
       />
       {selected && (
+        selected.inquiry_source&&selected.inquiry_source!=='legacy'?<Modal title="Care coordination request" onClose={()=>setSelected(undefined)}><InquiryDetail id={String(selected.id)} portal={portal}/></Modal>:
         <CaseDetail
           id={String(selected.id)}
           onClose={() => setSelected(undefined)}
@@ -179,6 +181,7 @@ export function CaseDetail({
     documents?: Row;
   }>("case_context", { id });
   const c = data?.case;
+  if(c?.inquiry_source&&c.inquiry_source!=='legacy')return <Modal title="Care coordination request" onClose={onClose}><InquiryDetail id={id} portal={portal}/></Modal>;
   const messageFields: Field[] = [
     {
       key: "visibility",

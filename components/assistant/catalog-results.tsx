@@ -9,6 +9,7 @@ import type { Finding, PlanningResultGroup } from '@/lib/agents/schemas';
 import { RequirementResults } from './requirement-results';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { resultGroupLabel } from '@/lib/agents/treatment-planning/results';
+import { assistanceHref } from '@/lib/inquiries/links';
 
 type Actions = { onRequest?: (content: string) => void; disabled?: boolean };
 export function PlanningResultGroups({ groups, onRequest, disabled }: { groups: PlanningResultGroup[] } & Actions) {
@@ -36,6 +37,7 @@ export function FindingCards({ findings, onRequest, disabled }: { findings: Find
     <RequirementResults evaluation={item.requirementEvaluation} />
     <div className="assistant-finding__actions">{['hospitals','doctors','packages'].includes(item.kind)&&<SaveButton kind={item.kind==='hospitals'?'hospital':item.kind==='doctors'?'doctor':'package'} recordId={item.provenance.recordId}/>} {item.href && <Link href={item.href}><T>{"View details →"}</T></Link>}
       {onRequest && ['hospitals','doctors'].includes(item.kind)&&<details><summary><T>{'More options'}</T></summary><button type="button" disabled={disabled} onClick={()=>onRequest(`Verify ${item.title}`)}><T>{'Check provider information'}</T></button>{item.kind==='hospitals'&&<><button type="button" disabled={disabled} onClick={()=>onRequest(`Show packages for ${item.title}`)}><T>{'Explore packages'}</T></button><button type="button" disabled={disabled} onClick={()=>onRequest(`Organize documents for ${item.title}`)}><T>{'Organize documents'}</T></button></>}</details>}
+      {item.provenance.sourceKind!=='synthetic'&&['hospitals','doctors','packages'].includes(item.kind)&&<Link href={assistanceHref(item.kind==='hospitals'?'hospital':item.kind==='doctors'?'doctor':'package',item.provenance.recordId,'ai_finding')}><T>{'Request assistance'}</T></Link>}
     </div>
     <div className="evidence-strip"><BookOpen size={14} aria-hidden="true"/><T>{item.provenance.sourceKind === 'synthetic' ? 'Demo data' : item.provenance.sourceKind === 'external' ? 'External catalog data' : 'MedBridge data'}</T></div>
     <details className="assistant-finding__evidence"><summary><T>{"View evidence and full details"}</T></summary><p>{item.matchReason}</p>
