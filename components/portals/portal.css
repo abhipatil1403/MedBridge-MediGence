@@ -382,10 +382,15 @@
   gap: 8px;
   min-width: 160px;
   flex: 1;
-  border: 1px solid #d9e3db;
+  border: 1px solid #687861;
   border-radius: 7px;
   padding-left: 12px;
   color: var(--portal-muted);
+}
+.portal-field :is(input,textarea)::placeholder,
+.portal-table-tools input::placeholder {
+  color: var(--portal-muted);
+  opacity: 1;
 }
 .portal-table-tools .portal-search input {
   border: 0;

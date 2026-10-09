@@ -6,3 +6,4 @@
 .inquiry-detail,.inquiry-flow{--inquiry-control-border:#687861}
 :is(.inquiry-detail,.inquiry-flow) .personal-form :is(input:not([type=checkbox]),select,textarea),
 :is(.inquiry-detail,.inquiry-flow) .save-control{border-color:var(--inquiry-control-border)}
+:is(.inquiry-detail,.inquiry-flow) :is(input,textarea)::placeholder{color:#586b63;opacity:1}
