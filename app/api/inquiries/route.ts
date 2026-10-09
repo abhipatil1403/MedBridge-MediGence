@@ -1,3 +1,5 @@
+import { recordRequest } from '@/lib/operations/server';
+import { failureCategory, requestEventSchema } from '@/lib/operations/contracts';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { portalSession,portalResponse,portalFailure,checked,PortalError } from '@/lib/portals/server';
@@ -20,9 +22,20 @@ export async function GET(request:NextRequest){try{
   const {data,error,count}=await query;if(error)throw new PortalError(400,'Your requests could not be loaded. Please retry.');
   return portalResponse({items:data,total:count,page});
 }catch(error){return portalFailure(error);}}
-export async function POST(request:NextRequest){try{
-  const {db}=await portalSession(request);
+export async function POST(request:NextRequest){
+ const started=performance.now(),correlationId=crypto.randomUUID();let actor:string|undefined;let parsed:z.infer<typeof inquiryCommandSchema>|undefined;
+ try{
+  const {db,user}=await portalSession(request);actor=user.id;
   if(Number(request.headers.get('content-length')??0)>20000)throw new PortalError(413,'This request is too large.');
-  const parsed=inquiryCommandSchema.parse(await request.json());
-  return portalResponse(checked(await db.rpc('inquiry_command',{p_action:parsed.action,p_input:parsed.input})));
-}catch(error){return portalFailure(error);}}
+  parsed=inquiryCommandSchema.parse(await request.json());
+  const result=await db.rpc('inquiry_command',{p_action:parsed.action,p_input:parsed.input});
+  if(result.error){
+   const known=['CONSENT','CONFIRMATION','DENIED','INVALID','CONFLICT'].find(code=>result.error.message.includes(code));
+   await recordRequest(user.id,{correlationId,operationId:parsed.input.operationId,kind:'inquiry',action:requestEventSchema.shape.action.parse(parsed.action),outcome:'failed',category:failureCategory(known?`INQUIRY_${known}`:result.error.code),durationMs:Math.min(300000,Math.round(performance.now()-started)),retryCount:0,modelFailures:[],recovered:false});
+  }else await recordRequest(user.id,{correlationId,operationId:parsed.input.operationId,kind:'inquiry',action:requestEventSchema.shape.action.parse(parsed.action),outcome:'completed',durationMs:Math.min(300000,Math.round(performance.now()-started)),retryCount:0,modelFailures:[],recovered:false});
+  return portalResponse(checked(result));
+ }catch(error){
+  if(actor&&parsed&&!(error instanceof PortalError))await recordRequest(actor,{correlationId,operationId:parsed.input.operationId,kind:'inquiry',action:requestEventSchema.shape.action.parse(parsed.action),outcome:'failed',category:'database_unavailable',durationMs:Math.min(300000,Math.round(performance.now()-started)),retryCount:0,modelFailures:[],recovered:false});
+  return portalFailure(error);
+ }
+}

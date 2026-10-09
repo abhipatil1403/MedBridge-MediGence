@@ -113,7 +113,14 @@ select public.inquiry_command('provider_response',(select v from net where k='re
 select set_config('request.jwt.claim.sub',(select id::text from net where k='patient'),true);
 select pg_temp.n_assert(public.inquiry_context((select id from net where k='case'))->'providerCoordination'->'latestResponse'->>'body'='LOCAL QA response from the authorized team. No appointment or treatment is confirmed.','patient reads the actual attributable response after a fresh role context');
 select set_config('request.jwt.claim.sub',(select id::text from net where k='admin'),true);
+-- Operational acceptance records verify current authority, actual response and actual in-app notification.
+insert into net(k,v) values('pilot_acceptance',jsonb_build_object('operationId',gen_random_uuid(),'confirmed',true,'realParticipantConfirmed',true,'organizationId',(select id from net where k='org'),'caseId',(select id from net where k='case')));
+select pg_temp.n_denied(format('select public.operations_command(''operations_accept_pilot'',%L)',((select v from net where k='pilot_acceptance')||'{"realParticipantConfirmed":false}')::text),'PORTAL_EVIDENCE_REQUIRED');
+select public.operations_command('operations_accept_pilot',(select v from net where k='pilot_acceptance'));
+select public.operations_command('operations_accept_pilot',(select v from net where k='pilot_acceptance'));
+select pg_temp.n_assert(exists(select 1 from jsonb_array_elements(public.operations_overview()->'pilotRows')r where r->>'organizationId'=(select id::text from net where k='org') and r->>'acceptanceRecorded'='true'),'local acceptance attestation is backed by current consented response and notification, not registration');
 select public.portal_command('organization_status',jsonb_build_object('organizationId',(select id from net where k='org'),'status','suspended','reason','Local operational suspension test.','confirmed',true,'operationId',gen_random_uuid()));
+select pg_temp.n_assert(not exists(select 1 from jsonb_array_elements(public.operations_overview()->'pilotRows')r where r->>'organizationId'=(select id::text from net where k='org') and r->>'acceptanceRecorded'='true'),'suspended authority invalidates operational acceptance readiness');
 select set_config('request.jwt.claim.sub',(select id::text from net where k='editor'),true);
 select pg_temp.n_denied(format('select public.inquiry_context(%L)',(select id from net where k='case')),'PORTAL_DENIED');
 select set_config('request.jwt.claim.sub',(select id::text from net where k='admin'),true);

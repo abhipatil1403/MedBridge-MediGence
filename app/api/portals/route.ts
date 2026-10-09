@@ -14,6 +14,9 @@ import {
   PortalError,
 } from "@/lib/portals/server";
 
+import { operationsActions, operationsCommandSchema } from '@/lib/operations/contracts';
+import { recordHealth } from '@/lib/operations/server';
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 const resources = {
@@ -138,6 +141,8 @@ export async function GET(request: NextRequest) {
       checked({ ...(await db.rpc("portal_touch_activity", {})), data: true });
       return portalResponse(context);
     }
+    if (resource === 'operations_overview') return portalResponse(checked(await db.rpc('operations_overview', {}).abortSignal(AbortSignal.timeout(5000))));
+    if (resource === 'operations_inquiries') return portalResponse(checked(await db.rpc('operations_inquiries', {p_filter: z.enum(['all','overdue','unassigned','support','provider','patient']).parse(params.get('filter') ?? 'overdue')}).abortSignal(AbortSignal.timeout(5000))));
     if (resource === "stats") {
       const org = params.get("organizationId");
       const counters =
@@ -636,6 +641,7 @@ const catalogActions = [
 const commandSchema = z
   .object({
     action: z.enum([
+      ...operationsActions,
       ...portalActions,
       ...networkActions,
       ...supportActions,
@@ -651,10 +657,15 @@ const commandSchema = z
   .strict();
 export async function POST(request: NextRequest) {
   try {
-    const { db } = await portalSession(request);
+    const { db, user, context } = await portalSession(request);
     if (Number(request.headers.get("content-length") ?? 0) > 100000)
       throw new PortalError(413, "This change is too large.");
     const body = commandSchema.parse(await request.json());
+    if ((operationsActions as readonly string[]).includes(body.action)) {
+      if (!['admin','super_admin'].includes(context.role ?? '')) throw new PortalError(403, 'Administrator access is required.');
+      const command = operationsCommandSchema.parse(body);
+      return portalResponse(command.action === 'operations_health_check' ? await recordHealth(db, user.id, command.input.operationId) : checked(await db.rpc('operations_command', {p_action: command.action, p_input: command.input as Json}).abortSignal(AbortSignal.timeout(5000))));
+    }
     if ((networkActions as readonly string[]).includes(body.action)) body.input = networkCommandSchema.parse(body).input;
     if (body.action === "create_reference_organization") body.input=referenceOrganizationSchema.parse(body.input);
     if (body.action === "create_reference_source") body.input=referenceSourceSchema.parse(body.input);

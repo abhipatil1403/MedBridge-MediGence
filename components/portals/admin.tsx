@@ -41,6 +41,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { publicUrl } from "@/lib/portals/public-url";
 import { ReferenceWorkspace } from "./reference-data";
+import { Operations, SupportAttention } from './operations';
 const catalogs = [
   "hospitals",
   "doctors",
@@ -52,6 +53,7 @@ const catalogs = [
   "services",
 ];
 export function AdminContent({ section }: { section: string }) {
+  if (section === "operations") return <Operations/>;
   if (section === "reference-data") return <ReferenceWorkspace />;
   if (catalogs.includes(section))
     return (
@@ -73,6 +75,7 @@ export function AdminContent({ section }: { section: string }) {
   return <Dashboard />;
 }
 export function SupportContent({ section }: { section: string }) {
+  if (section === "attention") return <SupportAttention/>;
   if (["cases", "all-cases"].includes(section)) return <Cases />;
   if (section === "queue") return <Cases mode="mine" />;
   if (section === "escalated") return <Cases mode="escalated" />;

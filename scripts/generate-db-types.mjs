@@ -57,6 +57,12 @@ for (const [table, fields] of Object.entries(byTable).sort(([a], [b]) => a.local
   lines.push('        };', '        Relationships: [];', '      };');
 }
 lines.push('    };', '    Views: Record<string, never>;', '    Functions: {',
+  '      operations_overview: { Args: Record<string, never>; Returns: Json };',
+  '      operations_inquiries: { Args: { p_filter?: string }; Returns: Json };',
+  '      operations_probe: { Args: Record<string, never>; Returns: Json };',
+  '      operations_command: { Args: { p_action: string; p_input: Json }; Returns: Json };',
+  '      operations_record_health: { Args: { p_actor: string; p_operation: string; p_result: Json }; Returns: Json };',
+  '      operations_record_request: { Args: { p_actor: string; p_metadata: Json }; Returns: undefined };',
   '      inquiry_command: { Args: { p_action: string; p_input: Json }; Returns: Json };',
   '      public_catalog_snapshot: { Args: Record<string, never>; Returns: Json };',
   '      inquiry_context: { Args: { p_case_id: string }; Returns: Json };',

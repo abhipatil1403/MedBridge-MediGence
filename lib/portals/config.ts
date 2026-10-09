@@ -349,6 +349,7 @@ export const providerSections = [
   ["settings", "Settings"],
 ] as const;
 export const supportSections = [
+  ["attention", "Needs attention"],
   ["dashboard", "Dashboard"],
   ["cases", "Cases"],
   ["queue", "My queue"],
@@ -365,6 +366,7 @@ export const supportSections = [
   ["settings", "Settings"],
 ] as const;
 export const adminSections = [
+  ["operations", "Operations"],
   ["dashboard", "Dashboard"],
   ["reference-data", "Reference data"],
   ["users", "Users & roles"],

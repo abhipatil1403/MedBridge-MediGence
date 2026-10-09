@@ -78,7 +78,7 @@ export function CommandForm({
             ]),
           );
           const payload = { ...input, ...data };
-          const idempotent = ["submit_organization_verification", "review_organization_verification", "assign_listing_ownership", "revoke_listing_ownership", "create_organization", "invite_member", "update_member", "organization_status"].includes(action);
+          const idempotent = action.startsWith("operations_") || ["submit_organization_verification", "review_organization_verification", "assign_listing_ownership", "revoke_listing_ownership", "create_organization", "invite_member", "update_member", "organization_status"].includes(action);
           if (idempotent) {
             const key = JSON.stringify(payload);
             const current = operation?.payload === key ? operation : {payload:key, id:crypto.randomUUID()};

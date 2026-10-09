@@ -1,3 +1,4 @@
+import { reliabilityMessages } from './messages-reliability';
 import type { Locale } from './preferences';
 import { networkMessages } from './messages-network';
 import { catalogueMessages } from './messages-catalogue';
@@ -13,6 +14,7 @@ import { packageMessages } from './messages-packages';
 import { companionMessages } from './messages-companion';
 // Reviewed interface text only. Canonical names, provider content, evidence and citations never pass through this dictionary.
 export const messages: Record<string, readonly [string,string]> = {
+  ...reliabilityMessages,
   ...networkMessages,
   ...companionMessages,
   ...packageMessages,

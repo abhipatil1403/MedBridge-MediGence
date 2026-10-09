@@ -1178,6 +1178,87 @@ export type Database = {
         };
         Relationships: [];
       };
+      operational_incidents: {
+        Row: {
+          id: string;
+          category: string;
+          severity: string;
+          status: string;
+          owner_id: string | null;
+          created_by: string;
+          correlation_id: string | null;
+          revision: number;
+          created_at: string;
+          updated_at: string;
+          resolved_at: string | null;
+          resolution_note: string | null;
+        };
+        Insert: {
+          id?: string;
+          category: string;
+          severity: string;
+          status?: string;
+          owner_id?: string | null;
+          created_by: string;
+          correlation_id?: string | null;
+          revision?: number;
+          created_at?: string;
+          updated_at?: string;
+          resolved_at?: string | null;
+          resolution_note?: string | null;
+        };
+        Update: {
+          id?: string;
+          category?: string;
+          severity?: string;
+          status?: string;
+          owner_id?: string | null;
+          created_by?: string;
+          correlation_id?: string | null;
+          revision?: number;
+          created_at?: string;
+          updated_at?: string;
+          resolved_at?: string | null;
+          resolution_note?: string | null;
+        };
+        Relationships: [];
+      };
+      operational_recovery_attempts: {
+        Row: {
+          id: string;
+          source_event_id: string;
+          kind: string;
+          status: string;
+          attempt_count: number;
+          last_attempt_at: string;
+          next_attempt_at: string | null;
+          result_code: string;
+          last_actor_id: string;
+        };
+        Insert: {
+          id?: string;
+          source_event_id: string;
+          kind?: string;
+          status: string;
+          attempt_count: number;
+          last_attempt_at?: string;
+          next_attempt_at?: string | null;
+          result_code: string;
+          last_actor_id: string;
+        };
+        Update: {
+          id?: string;
+          source_event_id?: string;
+          kind?: string;
+          status?: string;
+          attempt_count?: number;
+          last_attempt_at?: string;
+          next_attempt_at?: string | null;
+          result_code?: string;
+          last_actor_id?: string;
+        };
+        Relationships: [];
+      };
       organization_invites: {
         Row: {
           id: string;
@@ -3092,6 +3173,12 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      operations_overview: { Args: Record<string, never>; Returns: Json };
+      operations_inquiries: { Args: { p_filter?: string }; Returns: Json };
+      operations_probe: { Args: Record<string, never>; Returns: Json };
+      operations_command: { Args: { p_action: string; p_input: Json }; Returns: Json };
+      operations_record_health: { Args: { p_actor: string; p_operation: string; p_result: Json }; Returns: Json };
+      operations_record_request: { Args: { p_actor: string; p_metadata: Json }; Returns: undefined };
       inquiry_command: { Args: { p_action: string; p_input: Json }; Returns: Json };
       public_catalog_snapshot: { Args: Record<string, never>; Returns: Json };
       inquiry_context: { Args: { p_case_id: string }; Returns: Json };

@@ -14,7 +14,7 @@ for(const [table,column] of [['hospitals','verified_by'],['hospitals','verificat
  assert.ok((await client.from(table).select(column)).error,`${table}.${column} must remain private`);
  console.log(`PASS ${++passed}: private ${table}.${column} denied`);
 }
-for(const table of ['provider_documents','provider_revisions','provider_section_reviews','provider_field_reviews','provider_reference_claims','source_records','audit_events','organization_verification_requests','provider_listing_ownership','portal_network_operations']) {
+for(const table of ['provider_documents','provider_revisions','provider_section_reviews','provider_field_reviews','provider_reference_claims','source_records','audit_events','organization_verification_requests','provider_listing_ownership','portal_network_operations','operational_incidents','operational_recovery_attempts']) {
  const {data,error}=await client.from(table).select('id').limit(1);
  assert.ok(error || data.length===0,`${table} must remain private`);
  console.log(`PASS ${++passed}: private ${table} denied`);
@@ -30,7 +30,7 @@ for(const [name,args] of [['public_reference_locations',{}]]){
  assert.ok(Array.isArray(data));assert.ok(data.every(row=>!Object.hasOwn(row,'evidence_summary')&&!Object.hasOwn(row,'reviewed_by')));
  console.log(`PASS ${++passed}: ${name} excludes private evidence and operators`);
 }
-for(const [name,args] of [['portal_network_readiness',{}],['portal_network_command',{p_action:'submit_organization_verification',p_input:{}}]]) {
+for(const [name,args] of [['operations_overview',{}],['operations_probe',{}],['operations_inquiries',{}],['operations_command',{p_action:'operations_policy',p_input:{}}],['operations_record_health',{p_actor:null,p_operation:null,p_result:{}}],['operations_record_request',{p_actor:null,p_metadata:{}}],['portal_network_readiness',{}],['portal_network_command',{p_action:'submit_organization_verification',p_input:{}}]]) {
  assert.ok((await client.rpc(name,args)).error,`${name}: authentication required`);
  console.log(`PASS ${++passed}: anonymous ${name} denied`);
 }

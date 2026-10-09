@@ -13,6 +13,7 @@ export class PortalError extends Error {
   }
 }
 const messages: Record<string, string> = {
+  OPERATIONS_RETRY_WAIT: 'Wait until the next eligible check and refresh before reconciling again.',
   PORTAL_ORGANIZATION_UNVERIFIED: "Current organization authority approval is required for operational access and first-party publication.",
   PORTAL_CONTACT_CONFIRMATION_REQUIRED: "Record the actual official-contact confirmation before approving organization authority.",
   PORTAL_OWNERSHIP_CONFLICT: "Another organization owns this canonical listing. Admin must resolve and audit the existing claim first.",

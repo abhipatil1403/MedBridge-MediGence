@@ -68,3 +68,19 @@
  .portal-navigation-dialog .portal-sidebar {position:relative;left:auto;top:auto;}
 }
 @media(prefers-reduced-motion:reduce) {.portal-navigation-dialog .portal-sidebar{transition:none}}
+
+/* Operational workspace: persisted facts and explicit interventions. */
+.operations-workspace{display:grid;gap:1.25rem;min-width:0}
+.operations-intro{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}
+.operations-intro h2{font-size:1.65rem;margin:0 0 .4rem}.operations-intro p{margin:.4rem 0}
+.operations-counts,.operations-health{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:1rem;margin:1rem 0}
+.operations-counts dt,.operations-health dt{color:var(--text-secondary,#596575);font-size:.85rem}.operations-counts dd{font-size:1.65rem;font-weight:650;margin:.4rem 0}.operations-health dd{margin:.5rem 0}
+.operations-list{display:grid;gap:0}.operations-row{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;padding:1rem 0;border-bottom:1px solid var(--border,#e2e8ec);min-width:0}.operations-row>div{min-width:0}.operations-row p{margin:.45rem 0}.operations-row details{margin-top:.6rem}
+.operations-id{overflow-wrap:anywhere;font-size:.82rem}.operations-workspace details>summary{cursor:pointer;padding:.6rem 0;font-weight:550}.operations-workspace dd{overflow-wrap:anywhere}.operations-workspace .portal-panel-heading{gap:1rem;align-items:flex-start}.operations-workspace .portal-panel-heading .portal-field{margin:0;min-width:120px}
+@media(max-width:600px){.operations-row{flex-wrap:wrap}.operations-row>div:first-child{flex-basis:100%}.operations-row .portal-actions{flex-wrap:wrap}.operations-intro{flex-wrap:wrap}.operations-workspace .portal-panel-heading{flex-wrap:wrap}.operations-counts,.operations-health{grid-template-columns:repeat(2,minmax(0,1fr))}.operations-workspace .portal-button{white-space:normal}.operations-workspace .portal-panel{min-width:0}}
+
+.operations-workspace .status-ready,.operations-workspace .status-available,.operations-workspace .status-completed{color:#17664e;background:#e8f5ee}
+.operations-workspace .status-not_ready,.operations-workspace .status-unavailable,.operations-workspace .status-failed,.operations-workspace .status-permanent_failed,.operations-workspace .status-critical{color:#a23434;background:#fbeeed}
+.operations-workspace .status-overdue,.operations-workspace .status-unknown,.operations-workspace .status-timeout{color:#815713;background:#fff3d8}
+
+.operations-workspace .portal-status{max-width:100%;white-space:normal}

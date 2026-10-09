@@ -1,6 +1,8 @@
 import 'server-only';
 import { z } from 'zod';
 import type { LLMProvider, ModelRequest } from '@/lib/ai/contracts';
+import { failureCategory, type FailureCategory } from '@/lib/operations/contracts';
+export type ModelAttempt = {attempt:number;durationMs:number;category?:FailureCategory};
 import { AgentError } from './errors';
 
 const DEFAULT_MODEL = '@cf/zai-org/glm-4.7-flash';
@@ -12,12 +14,12 @@ export function cloudflareConfigured() {
   return Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN);
 }
 
-export function configuredProvider(): LLMProvider {
+export function configuredProvider(observer?: (event: ModelAttempt) => void): LLMProvider {
   if (cloudflareConfigured()) {
-    try { return new CloudflareProvider(); }
+    try { return new CloudflareProvider(undefined, undefined, undefined, fetch, observer); }
     catch { console.error(JSON.stringify({ event: 'model_configuration_unavailable' })); }
   }
-  return { generateStructured: async () => { throw new AgentError('MODEL_UNAVAILABLE', 'Model assistance is unavailable; catalog search can continue.'); } };
+  return { generateStructured: async () => { observer?.({attempt:0,durationMs:0,category:'configuration'}); throw new AgentError('MODEL_UNAVAILABLE', 'Model assistance is unavailable; catalog search can continue.'); } };
 }
 
 function responseContent(result: unknown): unknown {
@@ -48,6 +50,7 @@ export class CloudflareProvider implements LLMProvider {
     private readonly token = process.env.CLOUDFLARE_API_TOKEN,
     readonly model = process.env.CLOUDFLARE_AI_MODEL || DEFAULT_MODEL,
     private readonly fetcher: typeof fetch = fetch,
+    private readonly observer?: (event: ModelAttempt) => void,
   ) {
     if (!accountId || !token) throw new AgentError('CONFIGURATION_MISSING', 'The assistant needs server configuration before it can run.');
     if (!accountPattern.test(accountId) || !modelPattern.test(model)) throw new AgentError('CONFIGURATION_INVALID', 'The assistant configuration is invalid.');
@@ -59,6 +62,7 @@ export class CloudflareProvider implements LLMProvider {
     const deadline = AbortSignal.timeout(request.timeoutMs);
     let lastError: AgentError | undefined;
     for (let attempt = 0; attempt < 2; attempt++) {
+      const started = performance.now();
       try {
         const response = await this.fetcher(this.endpoint, {
           method: 'POST',
@@ -76,13 +80,14 @@ export class CloudflareProvider implements LLMProvider {
         const envelope = envelopeSchema.safeParse(await response.json());
         if (!envelope.success || !envelope.data.success) throw new AgentError('MODEL_UNAVAILABLE', 'AI assistance is temporarily unavailable. You can use standard search.');
         const parsed = request.schema.safeParse(parseJson(responseContent(envelope.data.result)));
-        if (parsed.success) return parsed.data;
+        if (parsed.success) { this.observer?.({attempt,durationMs:Math.round(performance.now()-started)}); return parsed.data; }
         throw new AgentError('MODEL_OUTPUT_INVALID', 'The assistant returned an invalid response. Please try again.');
       } catch (error) {
         const failure = error instanceof AgentError ? error
           : error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
             ? new AgentError('MODEL_TIMEOUT', 'AI assistance took too long. Please try again.')
             : new AgentError('MODEL_UNAVAILABLE', 'AI assistance is temporarily unavailable. You can use standard search.');
+        this.observer?.({attempt,durationMs:Math.round(performance.now()-started),category:failureCategory(failure.code)});
         if (failure.code !== 'MODEL_OUTPUT_INVALID' || attempt === 1) throw failure;
         lastError = failure;
       }
