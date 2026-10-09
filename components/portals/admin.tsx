@@ -24,6 +24,7 @@ import {
   usePortal,
   useResource,
 } from "./core";
+import { OrganizationActivation } from "./organization-activation";
 import { CommandForm } from "./command-form";
 import { Cases, Tasks } from "./cases";
 import {
@@ -189,7 +190,7 @@ export function Providers() {
   const state = usePortal();
   const { portal } = state;
   const [org, setOrg] = useState<Row>();
-  const [section, setSection] = useState("profile");
+  const [section, setSection] = useState("onboarding");
   const [create, setCreate] = useState(false);
   return (
     <>
@@ -208,6 +209,7 @@ export function Providers() {
             label: "Status",
             render: (row) => <Status value={row.status} />,
           },
+          { key: "verification_status", label: "Organization authority", render: row => <Status value={row.verification_status}/> },
           { key: "source_kind", label: "Provenance" },
           {
             key: "updated_at",
@@ -250,7 +252,6 @@ export function Providers() {
                       ([key]) =>
                         ![
                           "dashboard",
-                          "onboarding",
                           "notifications",
                           "settings",
                         ].includes(key),
@@ -277,6 +278,8 @@ export function Providers() {
                         type: "select",
                         options: ["active", "suspended", "archived"],
                       },
+                      { key: "reason", label: "Review reason", type: "textarea" },
+                      { key: "confirmed", label: "I reviewed and confirm this action", type: "checkbox" },
                     ]}
                     initial={{ status: org.status }}
                   />
@@ -289,6 +292,7 @@ export function Providers() {
                 {org.hospital_id && (
                   <PublicProvider id={String(org.hospital_id)} />
                 )}
+                <OrganizationActivation compact/>
                 <Submissions organizationId={String(org.id)} />
                 <Verification organizationId={String(org.id)} />
               </>

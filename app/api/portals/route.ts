@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/types/database";
 import { getPublicSupabaseClient } from "@/lib/supabase/server";
+import { networkActions, networkCommandSchema } from "@/lib/portals/network";
 import { recordInputSchema } from "@/lib/portals/config";
 import { referenceOrganizationSchema, referenceSourceSchema, referenceClaimSchema, referenceReviewSchema } from "@/lib/portals/reference";
 import {
@@ -16,6 +17,8 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 const resources = {
+  organization_verification_requests: { search: "legal_name", sort: "submitted_at" },
+  provider_listing_ownership: { search: null, sort: "assigned_at" },
   organizations: { search: "name", sort: "updated_at" },
   provider_records: { search: "name", sort: "updated_at" },
   provider_revisions: { search: "name", sort: "created_at" },
@@ -56,6 +59,8 @@ const resources = {
   >
 >;
 const orgTables = new Set([
+  "organization_verification_requests",
+  "provider_listing_ownership",
   "provider_reference_claims",
   "provider_records",
   "provider_revisions",
@@ -224,6 +229,9 @@ export async function GET(request: NextRequest) {
           }),
         ),
       );
+    if (resource === "network_readiness") {
+      return portalResponse(checked(await db.rpc("portal_network_readiness", { p_organization_id: params.get("organizationId") ? z.uuid().parse(params.get("organizationId")) : null })));
+    }
     if (resource === "listing_status") {
       return portalResponse(
         checked(
@@ -444,7 +452,9 @@ export async function GET(request: NextRequest) {
     const sort = sortAllowed.includes(requestedSort)
       ? requestedSort
       : spec.sort;
-    let query = readDb
+    const resourceDb = params.get("publicOnly") === "true" && ["hospitals", "doctors", "packages"].includes(table)
+      ? getPublicSupabaseClient() as SupabaseClient : readDb;
+    let query = resourceDb
       .from(table)
       .select(table === "provider_reference_claims" ? "*,source:source_records(source_name,source_url,source_type,retrieved_at,review_after)" : table === "cities" ? "*,country:countries(name)" : table === "hospitals" ? publicHospitalFields : table === "doctors" ? publicDoctorFields : "*", {
         count: "exact",
@@ -552,7 +562,9 @@ export async function GET(request: NextRequest) {
       .range((page - 1) * size, page * size - 1);
     const resultRows = checked(result);
     const enrichedRows =
-      table === "provider_submissions"
+      table === "provider_listing_ownership"
+        ? resultRows.map(raw => { const row = raw as unknown as Record<string, unknown>; return {...row, id: `${row.entity_kind}:${row.entity_id}`}; })
+        : table === "provider_submissions"
         ? await Promise.all(
             resultRows.map(async (row) => ({
               ...(row as unknown as Record<string, unknown>),
@@ -625,6 +637,7 @@ const commandSchema = z
   .object({
     action: z.enum([
       ...portalActions,
+      ...networkActions,
       ...supportActions,
       ...publicationActions,
       ...catalogActions,
@@ -642,6 +655,7 @@ export async function POST(request: NextRequest) {
     if (Number(request.headers.get("content-length") ?? 0) > 100000)
       throw new PortalError(413, "This change is too large.");
     const body = commandSchema.parse(await request.json());
+    if ((networkActions as readonly string[]).includes(body.action)) body.input = networkCommandSchema.parse(body).input;
     if (body.action === "create_reference_organization") body.input=referenceOrganizationSchema.parse(body.input);
     if (body.action === "create_reference_source") body.input=referenceSourceSchema.parse(body.input);
     if (body.action === "attach_reference_claim") body.input=referenceClaimSchema.parse(body.input);

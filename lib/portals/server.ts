@@ -13,7 +13,11 @@ export class PortalError extends Error {
   }
 }
 const messages: Record<string, string> = {
-  PORTAL_CONFIRMATION_REQUIRED: 'Review and explicitly confirm this provider response before sending it.',
+  PORTAL_ORGANIZATION_UNVERIFIED: "Current organization authority approval is required for operational access and first-party publication.",
+  PORTAL_CONTACT_CONFIRMATION_REQUIRED: "Record the actual official-contact confirmation before approving organization authority.",
+  PORTAL_OWNERSHIP_CONFLICT: "Another organization owns this canonical listing. Admin must resolve and audit the existing claim first.",
+  PORTAL_OWNERSHIP_SCOPE: "Choose a listing and draft within this organization’s reviewed authority scope.",
+  PORTAL_CONFIRMATION_REQUIRED: 'Review and explicitly confirm this action before saving it.',
   INQUIRY_INPUT_INVALID: 'Check the request fields and try again.',
   INQUIRY_RETRY_CONFLICT: 'This retry contains different information. Review and submit a new operation.',
   INQUIRY_ENTITY_UNAVAILABLE: 'This listing is no longer available for assistance.',

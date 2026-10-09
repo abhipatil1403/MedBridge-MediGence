@@ -32,6 +32,7 @@ export function CommandForm({
   advancedKeys?:string[];
 }) {
   const { command } = usePortal();
+  const [operation, setOperation] = useState<{payload: string; id: string} | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const form = useForm<z.infer<typeof schema>>({
@@ -76,7 +77,16 @@ export function CommandForm({
                   : values.values[field.key],
             ]),
           );
-          const row = await command(action, { ...input, ...data });
+          const payload = { ...input, ...data };
+          const idempotent = ["submit_organization_verification", "review_organization_verification", "assign_listing_ownership", "revoke_listing_ownership", "create_organization", "invite_member", "update_member", "organization_status"].includes(action);
+          if (idempotent) {
+            const key = JSON.stringify(payload);
+            const current = operation?.payload === key ? operation : {payload:key, id:crypto.randomUUID()};
+            setOperation(current);
+            payload.operationId = current.id;
+          }
+          const row = await command(action, payload);
+          setOperation(null);
           form.reset();
           onDone?.(row);
         } catch (err) {

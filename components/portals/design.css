@@ -1,4 +1,7 @@
 /* Role workspaces: publication, coordination, governance. */
+.portal-authority-details {margin:0 0 20px;}
+.portal-authority-details dt {color:var(--portal-muted);font-size:12px;margin-bottom:6px;}
+.portal-authority-details dd {margin:0;color:var(--portal-ink);overflow-wrap:anywhere;}
 .portal-shell {--portal-line:#dce1d8;--portal-ink:#173e36;--portal-muted:#596860;background:#faf9f5;}
 .portal-desktop-navigation {flex:none;width:232px;}
 .portal-shell .portal-sidebar {width:232px;background:#eef2e9;border-color:var(--portal-line);}

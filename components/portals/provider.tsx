@@ -22,6 +22,7 @@ import {
   usePortal,
   useResource,
 } from "./core";
+import { OrganizationActivation } from "./organization-activation";
 import { CommandForm } from "./command-form";
 import { Cases, CaseDetail } from "./cases";
 import { RecordWorkspace } from "./record-form";
@@ -343,6 +344,8 @@ function Onboarding({ compact = false }: { compact?: boolean }) {
                     ],
                 );
   return (
+    <>
+    <OrganizationActivation compact={compact}/>
     <Panel title="Organization onboarding">
       {error || listingError ? (
         <ErrorPanel message={error || listingError} />
@@ -380,7 +383,7 @@ function Onboarding({ compact = false }: { compact?: boolean }) {
           )}
           <p className="portal-muted">
             <T>{"Optional sections can be added later. Each saved draft persists when you leave and return."}</T></p>
-          <ol className={`portal-onboarding ${compact ? "compact" : ""}`}>
+          {portal === "provider" ? <ol className={`portal-onboarding ${compact ? "compact" : ""}`}>
             {steps.map(([name, section], index) => (
               <li key={name} className={complete(name) ? "is-complete" : ""}>
                 <Link href={`/${portal}/${section}`}>
@@ -392,10 +395,11 @@ function Onboarding({ compact = false }: { compact?: boolean }) {
                 </Link>
               </li>
             ))}
-          </ol>
+          </ol> : <p className="portal-muted"><T>Use the organization tabs above to inspect its private profile, documents and listing submissions.</T></p>}
         </>
       )}
     </Panel>
+    </>
   );
 }
 function Preview() {
@@ -590,7 +594,7 @@ function Team() {
         <>
           <Panel title="Invite a team member">
             <p>
-              <T>{"Create an invitation, then share its link with the intended teammate. They must sign in using the matching email address."}</T></p>
+              <T>{"Create an invitation, then share its link with the intended teammate. They must sign in using the matching email address. Invitations expire after seven days; no invitation email is sent automatically."}</T></p>
             <CommandForm
               action="invite_member"
               input={{ organizationId }}
@@ -642,7 +646,7 @@ function Team() {
                     ? "Revoked"
                     : row.accepted_by
                       ? "Accepted"
-                      : "Pending",
+                      : new Date(String(row.expires_at)).valueOf() <= Date.now() ? "Expired" : "Pending",
               },
               {
                 key: "action",
@@ -652,7 +656,7 @@ function Team() {
                   !row.accepted_by && (
                     <Action
                       action="revoke_invite"
-                      input={{ inviteId: row.id }}
+                      input={{ inviteId: row.id, organizationId }}
                       confirm
                       danger
                     >
@@ -680,6 +684,7 @@ function Team() {
                 options: ["provider_admin", "provider_editor"],
               },
               { key: "active", label: "Active team access", type: "checkbox" },
+              { key: "confirmed", label: "I reviewed and confirm this action", type: "checkbox" },
             ]}
             initial={{ role: selected.role, active: selected.active }}
             onDone={() => setSelected(undefined)}
@@ -802,12 +807,14 @@ export function CreateOrganization({
 }: {
   onDone?: (row: Row) => void;
 }) {
+  const { portal } = usePortal();
   return (
     <Panel title="Create your organization">
       <p>
         <T>{"Create a private workspace for a hospital, clinic or healthcare organization you represent."}</T></p>
       <CommandForm
         action="create_organization"
+        input={{ sourceKind: "first_party" }}
         fields={[
           { key: "name", label: "Organization name" },
           { key: "legalName", label: "Legal name" },
@@ -817,12 +824,12 @@ export function CreateOrganization({
             type: "select",
             options: ["hospital", "clinic", "healthcare_organization"],
           },
-          {
+          ...(portal === "admin" ? [{
             key: "sourceKind",
             label: "Record provenance",
-            type: "select",
+            type: "select" as const,
             options: ["first_party", "synthetic"],
-          },
+          }] : []),
         ]}
         initial={{ providerType: "hospital", sourceKind: "first_party" }}
         submit="Create organization"

@@ -86,7 +86,7 @@ select set_config('request.jwt.claim.sub',(select id::text from qa_ids where k='
 select pg_temp.check_qa((select count(*)=0 from public.support_cases),'other agent cannot read assigned cases');
 select pg_temp.denied_qa(format('select public.portal_case_context(%L)',(select id from qa_ids where k='case')),'PORTAL_DENIED');
 select set_config('request.jwt.claim.sub',(select id::text from qa_ids where k='provider'),true);
-select pg_temp.check_qa(position('INTERNAL SECRET' in public.portal_case_context((select id from qa_ids where k='case'))::text)=0,'internal notes hidden from provider');
+select pg_temp.denied_qa(format('select public.portal_case_context(%L)',(select id from qa_ids where k='case')),'PORTAL_DENIED'); -- Synthetic unverified workspaces cannot enter operational cases.
 select set_config('request.jwt.claim.sub',(select id::text from qa_ids where k='patient'),true);
 select pg_temp.check_qa(position('INTERNAL SECRET' in public.portal_case_context((select id from qa_ids where k='case'))::text)=0,'internal notes hidden from patient');
 select pg_temp.check_qa((public.portal_case_context((select id from qa_ids where k='case'))->'tasks')='[]'::jsonb,'internal tasks hidden from patient');

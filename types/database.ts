@@ -1265,6 +1265,63 @@ export type Database = {
         };
         Relationships: [];
       };
+      organization_verification_requests: {
+        Row: {
+          id: string;
+          organization_id: string;
+          document_id: string;
+          requested_hospital_id: string | null;
+          legal_name: string;
+          contact_name: string;
+          contact_email: string;
+          contact_phone: string;
+          declaration: string;
+          status: string;
+          submitted_by: string;
+          submitted_at: string;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          reason: string | null;
+          contact_confirmation: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          document_id: string;
+          requested_hospital_id?: string | null;
+          legal_name: string;
+          contact_name: string;
+          contact_email: string;
+          contact_phone: string;
+          declaration: string;
+          status?: string;
+          submitted_by: string;
+          submitted_at?: string;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          reason?: string | null;
+          contact_confirmation?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          document_id?: string;
+          requested_hospital_id?: string | null;
+          legal_name?: string;
+          contact_name?: string;
+          contact_email?: string;
+          contact_phone?: string;
+          declaration?: string;
+          status?: string;
+          submitted_by?: string;
+          submitted_at?: string;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          reason?: string | null;
+          contact_confirmation?: string | null;
+        };
+        Relationships: [];
+      };
       organizations: {
         Row: {
           id: string;
@@ -1278,6 +1335,8 @@ export type Database = {
           created_at: string;
           updated_at: string;
           onboarding_origin: string;
+          verification_status: string;
+          verification_request_id: string | null;
         };
         Insert: {
           id?: string;
@@ -1291,6 +1350,8 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           onboarding_origin?: string;
+          verification_status?: string;
+          verification_request_id?: string | null;
         };
         Update: {
           id?: string;
@@ -1304,6 +1365,8 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           onboarding_origin?: string;
+          verification_status?: string;
+          verification_request_id?: string | null;
         };
         Relationships: [];
       };
@@ -1445,6 +1508,36 @@ export type Database = {
           active?: boolean;
           notification_preferences?: Json;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      portal_network_operations: {
+        Row: {
+          actor_id: string;
+          operation_id: string;
+          action: string;
+          input_hash: string;
+          organization_id: string;
+          result: Json;
+          created_at: string;
+        };
+        Insert: {
+          actor_id: string;
+          operation_id: string;
+          action: string;
+          input_hash: string;
+          organization_id: string;
+          result: Json;
+          created_at?: string;
+        };
+        Update: {
+          actor_id?: string;
+          operation_id?: string;
+          action?: string;
+          input_hash?: string;
+          organization_id?: string;
+          result?: Json;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -1730,6 +1823,36 @@ export type Database = {
           expires_on?: string | null;
           reviewed_by?: string;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      provider_listing_ownership: {
+        Row: {
+          entity_kind: string;
+          entity_id: string;
+          organization_id: string;
+          request_id: string;
+          assigned_by: string;
+          assigned_at: string;
+          revoked_at: string | null;
+        };
+        Insert: {
+          entity_kind: string;
+          entity_id: string;
+          organization_id: string;
+          request_id: string;
+          assigned_by: string;
+          assigned_at?: string;
+          revoked_at?: string | null;
+        };
+        Update: {
+          entity_kind?: string;
+          entity_id?: string;
+          organization_id?: string;
+          request_id?: string;
+          assigned_by?: string;
+          assigned_at?: string;
+          revoked_at?: string | null;
         };
         Relationships: [];
       };
@@ -2419,31 +2542,31 @@ export type Database = {
           id: string;
           case_id: string;
           actor_id: string;
-          sender_role: string | null;
-          sender_organization_id: string | null;
           body: string;
           visibility: string;
           created_at: string;
+          sender_role: string | null;
+          sender_organization_id: string | null;
         };
         Insert: {
           id?: string;
           case_id: string;
           actor_id: string;
-          sender_role?: string | null;
-          sender_organization_id?: string | null;
           body: string;
           visibility: string;
           created_at?: string;
+          sender_role?: string | null;
+          sender_organization_id?: string | null;
         };
         Update: {
           id?: string;
           case_id?: string;
           actor_id?: string;
-          sender_role?: string | null;
-          sender_organization_id?: string | null;
           body?: string;
           visibility?: string;
           created_at?: string;
+          sender_role?: string | null;
+          sender_organization_id?: string | null;
         };
         Relationships: [];
       };
@@ -2510,10 +2633,10 @@ export type Database = {
           provider_response_status: string;
           provider_responded_by: string | null;
           provider_responded_at: string | null;
+          recovery_journey_id: string | null;
           provider_response_message_id: string | null;
           provider_information_requested_at: string | null;
           provider_information_answered_at: string | null;
-          recovery_journey_id: string | null;
         };
         Insert: {
           id?: string;
@@ -2547,10 +2670,10 @@ export type Database = {
           provider_response_status?: string;
           provider_responded_by?: string | null;
           provider_responded_at?: string | null;
+          recovery_journey_id?: string | null;
           provider_response_message_id?: string | null;
           provider_information_requested_at?: string | null;
           provider_information_answered_at?: string | null;
-          recovery_journey_id?: string | null;
         };
         Update: {
           id?: string;
@@ -2584,10 +2707,10 @@ export type Database = {
           provider_response_status?: string;
           provider_responded_by?: string | null;
           provider_responded_at?: string | null;
+          recovery_journey_id?: string | null;
           provider_response_message_id?: string | null;
           provider_information_requested_at?: string | null;
           provider_information_answered_at?: string | null;
-          recovery_journey_id?: string | null;
         };
         Relationships: [];
       };
@@ -2987,6 +3110,8 @@ export type Database = {
       release_assistant_turn: { Args: { p_conversation_id: string; p_token: string }; Returns: undefined };
       save_care_plan: { Args: { p_plan: Json; p_token: string }; Returns: undefined };
       save_document_workspace: { Args: { p_workspace: Json; p_expected_revision: number; p_action: string }; Returns: undefined };
+      portal_network_readiness: { Args: { p_organization_id?: string | null }; Returns: Json };
+      portal_network_command: { Args: { p_action: string; p_input: Json }; Returns: Json };
       portal_context: { Args: Record<string, never>; Returns: Json };
       portal_touch_activity: { Args: Record<string, never>; Returns: undefined };
       portal_account_active: { Args: Record<string, never>; Returns: boolean };

@@ -34,6 +34,10 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub',(select id::text from qc where k='provider'),true);
 insert into qc(k,id) select 'org',(public.portal_command('create_organization','{"name":"LOCAL VALIDATION Care Centre","providerType":"hospital","sourceKind":"first_party"}')->>'id')::uuid;
+reset role;
+\ir pg-network-authority-fixtures.sql
+select pg_temp.qa_approve_authority((select id from qc where k='org'),(select id from qc where k='provider'),(select id from qc where k='admin'));
+set local role authenticated;
 insert into qc(k,id) select 'profile',(public.portal_command('save_record',jsonb_build_object('organizationId',(select id from qc where k='org'),'kind','organization','name','LOCAL VALIDATION Care Centre','data',jsonb_build_object('cityId',(select id from public.cities where slug='mumbai'),'description','Disposable local publication test. Not a real provider or medical offer.','email','qa@qa.invalid','phone','00000000','address','Local test address','website','https://qa.invalid')))->>'id')::uuid;
 insert into qc(k,id) select 'location',(public.portal_command('save_record',jsonb_build_object('organizationId',(select id from qc where k='org'),'kind','location','name','Local validation Delhi location','data',jsonb_build_object('cityId',(select id from public.cities where slug='new-delhi'),'address','Local additional address','phone','00000000')))->>'id')::uuid;
 insert into qc(k,id) select 'specialty',(public.portal_command('save_record',jsonb_build_object('organizationId',(select id from qc where k='org'),'kind','specialty','name','Local Orthopedics department','data',jsonb_build_object('specialtyId',(select id from public.specialties where slug='orthopedics'),'department','Orthopedics','description','Local reviewed department.','availability','available')))->>'id')::uuid;

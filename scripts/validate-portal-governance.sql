@@ -12,6 +12,10 @@ create function pg_temp.qg_denied(stmt text,expected text) returns void language
 set local role authenticated;
 select set_config('request.jwt.claim.sub',(select id::text from qg where k='provider'),true);
 insert into qg(k,id) select 'org',(public.portal_command('create_organization','{"name":"LOCAL QA Identity Hospital","providerType":"hospital","sourceKind":"first_party"}')->>'id')::uuid;
+reset role;
+\ir pg-network-authority-fixtures.sql
+select pg_temp.qa_approve_authority((select id from qg where k='org'),(select id from qg where k='provider'),(select id from qg where k='admin'));
+set local role authenticated;
 insert into qg(k,id) select 'record',(public.portal_command('save_record',jsonb_build_object('organizationId',(select id from qg where k='org'),'kind','organization','name','LOCAL QA Identity Hospital','data',jsonb_build_object('cityId',(select id from public.cities where slug='mumbai' limit 1),'description','Local QA only, rolled back without publishing real-world claims.','email','qa@qa.invalid','phone','0000','website','https://qa.invalid')))->>'id')::uuid;
 insert into qg(k,id) select 'submission',(public.portal_command('submit',jsonb_build_object('organizationId',(select id from qg where k='org')))->>'id')::uuid;
 select public.portal_touch_activity();
