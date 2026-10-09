@@ -89,7 +89,7 @@ All overview counts are measured at `asOf`; rolling windows start at `windowStar
 
 | Metric | Source, scope and definition |
 | --- | --- |
-| New inquiries | Consented, nonlegacy active inquiry cohort created in the last 24 hours. |
+| New inquiries | Consented, nonlegacy inquiries created in the last 24 hours, including subsequently closed items while consent remains valid. |
 | Active inquiries | All current eligible nonterminal inquiries, not limited to 24 hours. |
 | Unassigned | Eligible active inquiries with no assigned Support user; may overlap provider/patient waiting counts. |
 | Support/provider/patient waiting | Current attention category: provider/patient waiting states take precedence; otherwise assignment determines unassigned versus Support. |
