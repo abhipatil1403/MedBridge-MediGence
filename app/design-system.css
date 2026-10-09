@@ -186,6 +186,10 @@ small,.muted,.personal-muted {color:var(--muted);}
 .recovery-timeline li {padding-left:20px;border-left:1px solid #a6bca0;margin-left:8px;}
 @media(max-width:1100px) {.site-header__inner{gap:14px}.desktop-nav{gap:16px}.detail-hero{gap:32px;grid-template-columns:minmax(0,1fr) 280px}.detail-layout{gap:32px}}
 @media(max-width:800px) {.desktop-nav,.header-preferences{display:none}.menu-toggle{display:flex}.site-header__inner{min-height:68px}}
+/* Keep the fixed assistant clear of the footer's clinical disclaimer. */
+@media(min-width:768px) {
+  body:has(.assistant-launcher) .site-footer {padding-bottom:80px;}
+}
 @media(max-width:767px) {
   :root {--space-section:40px;--page-gutter:20px;}
   .assistant-launcher {display:none;}
