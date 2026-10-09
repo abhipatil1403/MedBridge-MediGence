@@ -81,6 +81,6 @@
 
 .operations-workspace .status-ready,.operations-workspace .status-available,.operations-workspace .status-completed{color:#17664e;background:#e8f5ee}
 .operations-workspace .status-not_ready,.operations-workspace .status-unavailable,.operations-workspace .status-failed,.operations-workspace .status-permanent_failed,.operations-workspace .status-critical{color:#a23434;background:#fbeeed}
-.operations-workspace .status-overdue,.operations-workspace .status-unknown,.operations-workspace .status-timeout{color:#815713;background:#fff3d8}
+.operations-workspace .status-partially_completed,.operations-workspace .status-overdue,.operations-workspace .status-unknown,.operations-workspace .status-timeout{color:#815713;background:#fff3d8}
 
 .operations-workspace .portal-status{max-width:100%;white-space:normal}
