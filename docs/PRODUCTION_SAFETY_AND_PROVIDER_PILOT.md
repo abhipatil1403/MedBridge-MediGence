@@ -4,6 +4,11 @@ Audit date: 10 October 2026. Baseline: `97e3aa890d70efaa235f46a9b4525e0b7f98a585
 Read alongside [the acceptance plan](PRODUCTION_ACCEPTANCE_AND_PROVIDER_PILOT.md).
 **Decision: NO-GO. No real provider has confirmed participation.**
 
+Monitoring follow-up (10 October): [monitoring and incident response](PRODUCTION_MONITORING_AND_INCIDENT_RESPONSE.md)
+reuses existing Operations/Support controls and prepares a restricted dependency probe
+and independent worker. External account/host, alert receiver, real delivery verification
+and named on-call coverage remain blocked. Code deployment does not activate them.
+
 Backup activation audit (10 October): [production backup and disaster recovery](PRODUCTION_BACKUP_AND_DISASTER_RECOVERY.md)
 records current official API evidence, the database/private-object consistency design,
 operator access requirements and genuine Supabase restore acceptance procedure.

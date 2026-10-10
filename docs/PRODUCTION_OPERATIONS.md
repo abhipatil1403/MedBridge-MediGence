@@ -1,5 +1,9 @@
 # Production operations and recovery
 
+Current monitoring extension and remaining activation dependencies:
+[Production monitoring and incident response](PRODUCTION_MONITORING_AND_INCIDENT_RESPONSE.md).
+Historical release evidence below does not establish external integration activation.
+
 ## Initial audit — 10 October 2026
 
 Clean main at 6a0d6a14ede431d64759c81fb895a8da833564ac.

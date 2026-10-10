@@ -23,12 +23,17 @@ try{
  check((await api(null,'/api/health/ready')).status===401,'readiness details require authentication');
  check((await api(null,'/api/portals?portal=admin&resource=operations_overview')).status===401,'anonymous Operations access is denied');
  const patient=await actor('patient'),support=await actor('support_agent'),operator=await actor('admin');
+ check((await api(null,'/api/internal/operations-monitor')).status===401,'anonymous monitor probe access is denied');
+ check((await api(patient,'/api/internal/operations-monitor')).status===401,'ordinary patient token cannot become a monitor credential');
+ check((await api(operator,'/api/internal/operations-monitor')).status===401,'ordinary Admin token cannot become a monitor credential');
+ check((await patient.db.rpc('operations_monitor_probe',{})).error,'ordinary RPC access cannot bypass monitor credential');
  check((await api(patient,'/api/health/ready')).status===403,'patient cannot read readiness details');
  check((await api(support,'/api/health/ready?portal=support')).status===403,'Support cannot read privileged readiness');
  check((await api(patient,'/api/portals?portal=provider&resource=operations_overview')).status===403,'ordinary provider-portal access does not grant Operations');
  check((await api(support,'/api/portals?portal=support&resource=operations_overview')).status===403,'Support cannot read the global operational aggregate');
  const overview=await api(operator,'/api/portals?portal=admin&resource=operations_overview');check(overview.status===200,'authenticated Admin reads real operational state');
  check(overview.cache==='private, no-store','operational responses are private and not cached');
+ check(['not_configured','configured_not_verified'].includes(overview.data.monitoring.dependencyProbe)&&overview.data.monitoring.externalMonitoring==='not_verified'&&overview.data.monitoring.externalAlertDelivery==='not_verified','Operations configuration does not fabricate verified monitoring or delivery');
  check(overview.data.providers.connected===0&&overview.data.providers.responseObserved===0,'production still has no connected participating provider or response');
  check(overview.data.pilotRows.every(p=>!p.acceptanceRecorded),'local QA has not become production pilot acceptance');
  check(!/description|storage_path|signedUrl|patient_id|email|prompt|Authorization|stack/.test(JSON.stringify(overview.data)),'operational projection has no patient payload or sensitive diagnostics');

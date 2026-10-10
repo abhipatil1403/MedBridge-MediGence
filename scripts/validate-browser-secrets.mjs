@@ -4,7 +4,7 @@ import {readFileSync,readdirSync,existsSync} from 'node:fs';
 import {join} from 'node:path';
 
 // Values stay in this process. Report paths only, never secret contents.
-const secrets=Object.entries(process.env).filter(([key,value])=>!key.startsWith('NEXT_PUBLIC_')&&/(API_KEY|API_TOKEN|SECRET_KEY|SERVICE_ROLE_KEY|DOCUMENT_SCANNER_TOKEN)$/.test(key)&&value?.length>=16);
+const secrets=Object.entries(process.env).filter(([key,value])=>!key.startsWith('NEXT_PUBLIC_')&&/(API_KEY|API_TOKEN|SECRET_KEY|SERVICE_ROLE_KEY|DOCUMENT_SCANNER_TOKEN|MONITOR_TOKEN|OPS_ALERT_TOKEN)$/.test(key)&&value?.length>=16);
 assert.ok(secrets.length>0,'Load the ignored local environment to audit configured secrets.');
 const sources=execFileSync('git',['ls-files','--cached','--others','--exclude-standard','-z'],{encoding:'utf8'}).split('\0').filter(path=>path&&existsSync(path));
 const browser=[];

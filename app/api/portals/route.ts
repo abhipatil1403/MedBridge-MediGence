@@ -16,6 +16,7 @@ import {
 
 import { operationsActions, operationsCommandSchema } from '@/lib/operations/contracts';
 import { recordHealth } from '@/lib/operations/server';
+import { monitoringConfiguration } from '@/lib/operations/monitor';
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -141,7 +142,11 @@ export async function GET(request: NextRequest) {
       checked({ ...(await db.rpc("portal_touch_activity", {})), data: true });
       return portalResponse(context);
     }
-    if (resource === 'operations_overview') return portalResponse(checked(await db.rpc('operations_overview', {}).abortSignal(AbortSignal.timeout(5000))));
+    if (resource === 'operations_overview') {
+      const overview=checked(await db.rpc('operations_overview', {}).abortSignal(AbortSignal.timeout(5000)));
+      // The RPC remains the authorization gate; configuration is never exposed on denial.
+      return portalResponse({...overview as Record<string, Json>,monitoring:monitoringConfiguration()});
+    }
     if (resource === 'operations_inquiries') return portalResponse(checked(await db.rpc('operations_inquiries', {p_filter: z.enum(['all','overdue','unassigned','support','provider','patient']).parse(params.get('filter') ?? 'overdue')}).abortSignal(AbortSignal.timeout(5000))));
     if (resource === "stats") {
       const org = params.get("organizationId");

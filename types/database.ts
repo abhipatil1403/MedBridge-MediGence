@@ -3173,6 +3173,7 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      operations_monitor_probe: { Args: Record<string, never>; Returns: Json };
       operations_overview: { Args: Record<string, never>; Returns: Json };
       operations_inquiries: { Args: { p_filter?: string }; Returns: Json };
       operations_probe: { Args: Record<string, never>; Returns: Json };
