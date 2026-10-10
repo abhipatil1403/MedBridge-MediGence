@@ -10,6 +10,9 @@ import { activitySchema } from './execution-schemas';
 import { safeValue } from './execution-state';
 import { documentWorkspaceSchema } from '@/lib/documents/schemas';
 import { verificationResultSchema } from '@/lib/verification/schemas';
+import { recoveryAvailability, recoveryCheckpointSchema, type RecoveryCheckpoint } from './recovery';
+import { assistantResponseSchema } from './schemas';
+import { label } from './execution-state';
 
 type Db = SupabaseClient<Database>;
 function checked<T>(data: T | null, error: { message: string } | null): T {
@@ -77,6 +80,8 @@ export class SupabaseCaseAccess implements CaseAccess {
 }
 
 export interface AgentStore {
+  loadRecovery?(conversationId: string, userId: string, runId: string): Promise<RecoveryCheckpoint | AgentResponse>;
+  abandonUnfinishedTasks?(runId: string): Promise<void>;
   saveExecutionState?(runId: string, state: Record<string, unknown>): Promise<void>;
   createConversation(userId: string, caseId?: string): Promise<string>;
   assertConversation(conversationId: string, userId: string, caseId?: string): Promise<void>;
@@ -101,6 +106,11 @@ export class SupabaseAgentStore implements AgentStore {
     if (error || !data || (data.case_id ?? undefined) !== caseId) throw new AgentError('CONVERSATION_ACCESS_DENIED', 'This conversation is unavailable.');
   }
   async addMessage(conversationId: string, role: 'user' | 'assistant', content: string, runId?: string, metadata: Record<string, unknown> = {}) {
+    if(role==='assistant' && runId){
+      const existing=await this.admin.from('conversation_messages').select('id').eq('conversation_id',conversationId).eq('run_id',runId).eq('role','assistant').limit(1).maybeSingle();
+      if(existing.error)throw new AgentError('DATABASE_FAILURE','The conversation could not be saved.');
+      if(existing.data)return;
+    }
     const { error } = await this.admin.from('conversation_messages').insert({ conversation_id: conversationId, run_id: runId ?? null, role, visibility: 'user', content, metadata: JSON.parse(JSON.stringify(metadata)) as Json });
     if (error) throw new AgentError('DATABASE_FAILURE', 'The conversation could not be saved.');
     const touch = await this.admin.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId);
@@ -172,7 +182,7 @@ export class SupabaseAgentStore implements AgentStore {
   }
   async readActivity(conversationId: string, userId: string, caseId?: string) {
     await this.assertConversation(conversationId, userId, caseId);
-    const result = await this.admin.from('agent_runs').select('id,metadata').eq('conversation_id', conversationId).eq('initiated_by', userId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const result = await this.admin.from('agent_runs').select('id,metadata,status').eq('conversation_id', conversationId).eq('initiated_by', userId).order('created_at', { ascending: false }).limit(1).maybeSingle();
     if (result.error) throw new AgentError('DATABASE_FAILURE', 'Run progress is temporarily unavailable.');
     const metadata = result.data?.metadata;
     const execution = metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata.execution : undefined;
@@ -187,12 +197,41 @@ export class SupabaseAgentStore implements AgentStore {
         const ownedDocuments = documents.success && documents.data.ownerId===userId && documents.data.conversationId===conversationId ? documents.data : undefined;
         const verification=verificationResultSchema.safeParse(output.verification);
         const ownedVerification=verification.success&&verification.data.report?.ownerId===userId&&verification.data.report.conversationId===conversationId?verification.data.report:undefined;
-        return { id: c.id, number: c.step, label: typeof c.tool === 'string' ? c.tool.replaceAll('_', ' ') : 'Catalog operation',
+        return { id: c.id, number: c.step, label: typeof c.tool === 'string' ? label(c.tool) : 'Catalog operation',
+          ...(typeof c.attempts==='number'?{attempts:c.attempts,retrying:c.retrying===true}:{}),
           status: c.status, recordCount: ownedVerification?ownedVerification.fields.length:ownedDocuments ? c.tool==='get_document_requirements' ? ownedDocuments.requirements.length : ownedDocuments.documents.filter(d=>d.uploadStatus==='uploaded').length
             : Array.isArray(output.findings) ? output.findings.length : 0,
           ...(c.status === 'failed' ? { error: execution.agent==='document_coordination' ? 'This document operation could not be completed.' : 'This catalog operation could not be completed.' } : {}) };
-      }), warnings: execution.warnings });
+      }), warnings: execution.warnings, recovery: recoveryAvailability(execution) });
     return parsed.success ? parsed.data : undefined;
+  }
+  async loadRecovery(conversationId: string, userId: string, runId: string): Promise<RecoveryCheckpoint | AgentResponse> {
+    await this.assertConversation(conversationId,userId);
+    const latest=await this.admin.from('agent_runs').select('id,metadata,status,case_id').eq('conversation_id',conversationId)
+      .eq('initiated_by',userId).order('created_at',{ascending:false}).limit(1).maybeSingle();
+    if(latest.error || !latest.data || latest.data.id!==runId || latest.data.case_id)
+      throw new AgentError('RECOVERY_ACCESS_DENIED','This workflow is unavailable.');
+    // A lost HTTP response must not replay a finished operation.
+    const saved=await this.admin.from('agent_outputs').select('content').eq('run_id',runId).eq('output_type','assistant_response').limit(1).maybeSingle();
+    if(saved.error)throw new AgentError('DATABASE_FAILURE','Saved workflow results are unavailable.');
+    const output=assistantResponseSchema.safeParse(saved.data?.content);
+    if(output.success && output.data.runId===runId && output.data.conversationId===conversationId){
+      await this.addMessage(conversationId,'assistant',output.data.summary,runId,{response:output.data});
+      await this.finishRun(runId,output.data.status);
+      return output.data;
+    }
+    const metadata=latest.data.metadata as Record<string,Json>;
+    const execution=metadata?.execution;
+    const availability=latest.data.status==='running'?recoveryAvailability(execution):{eligible:false,reason:'This run has finished. Review its saved results.'};
+    const parsed=recoveryCheckpointSchema.safeParse(execution);
+    if(!availability.eligible || !parsed.success || parsed.data.ownerId!==userId || parsed.data.conversationId!==conversationId || parsed.data.runId!==runId)
+      throw new AgentError('RECOVERY_NOT_ELIGIBLE',availability.reason);
+    return parsed.data;
+  }
+  async abandonUnfinishedTasks(runId: string) {
+    const result=await this.admin.from('agent_tasks').update({status:'failed',error_code:'TOOL_INTERRUPTED',completed_at:new Date().toISOString()})
+      .eq('run_id',runId).in('status',['pending','running']);
+    if(result.error)throw new AgentError('DATABASE_FAILURE','Interrupted task progress could not be saved.');
   }
   async finishRun(runId: string, status: AgentResponse['status'], errorCode?: string, diagnostics?: Record<string, string | boolean | null>) {
     const existing = await this.admin.from('agent_runs').select('metadata').eq('id', runId).single();

@@ -6,8 +6,10 @@ export const activitySchema = z.object({
   runId: z.uuid(), state: runStateSchema, updatedAt: z.iso.datetime(),
   steps: z.array(z.object({ id: z.uuid(), number: z.number().int().positive(), label: z.string().max(160),
     status: z.enum(['running', 'completed', 'failed', 'reused']), recordCount: z.number().int().nonnegative(),
-    error: z.string().max(120).optional() }).strict()).max(16),
+    error: z.string().max(120).optional(), attempts: z.number().int().min(1).max(2).optional(),
+    retrying: z.boolean().optional() }).strict()).max(16),
   warnings: z.array(z.string().max(300)).max(8),
+  recovery: z.object({ eligible: z.boolean(), reason: z.string().max(300) }).strict().optional(),
 }).strict();
 export type RunActivity = z.infer<typeof activitySchema>;
 

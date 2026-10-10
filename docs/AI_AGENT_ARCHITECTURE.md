@@ -1,5 +1,14 @@
 # Agentic AI architecture
 
+## Workflow recovery upgrade — 10 October 2026
+
+Current production uses governed published records; synthetic fixtures are isolated QA.
+The existing runtime now persists validated catalog recovery checkpoints, supports one
+owner-scoped interrupted-run recovery, bounded transient catalog-read retries, accurate
+polled activity and a read-before-review inquiry handoff. Consequential writes remain in
+their existing explicitly consented workflows. See [release audit and limits](AGENTIC_WORKFLOW_RELEASE.md).
+Earlier milestone sections below describe their original implementation dates.
+
 ## Provider factual verification (2 October 2026)
 
 ProviderVerificationAgent extends the existing registry and bounded execution loop with five scope-aware tools. Deterministic resolution uses the existing displayed-order reference resolver; exact server authorization prevents model-invented writes. The research collection/transport/source models provide exact attributed statements, strict entity identity, authority tiers and injection protections. Private immutable reports preserve internal values, external evidence, conflicts, dates and real history without updating catalog providers. ComparisonAgent consumes saved factual reports; Document Coordination can expose verified service sources while retaining its sourced checklist/manifest authority. See [PROVIDER_VERIFICATION.md](PROVIDER_VERIFICATION.md) for schemas, budgets, policy, security, coverage and measured validation.

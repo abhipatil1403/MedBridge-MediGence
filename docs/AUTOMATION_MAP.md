@@ -1,5 +1,16 @@
 # Automation map
 
+## Request-driven workflow recovery — 10 October 2026
+
+Eligible public-catalog reads retry only an explicit transient failure, at most once,
+within the existing invocation/time budget. An owned latest unfinished run may be resumed
+once after 180 seconds without saved progress, under the existing conversation lease.
+Current publication is checked before read reuse. A saved final output is returned without
+tool replay. Inquiry preparation reads the selected published listing and opens the
+existing reviewed consent form; it does not submit or share. No scheduler, background
+clinical task, external delivery or consequential replay is added. See
+[the audit, implementation and validation contract](AGENTIC_WORKFLOW_RELEASE.md).
+
 ## Provider Verification Agent
 
 Explicit verify/field/recheck requests resolve a provider through existing structured conversation references, then execute `verify_provider_information` or `refresh_provider_verification` in the shared authenticated runtime. Exact user action authorizes only a private evidence snapshot; no catalog mutation or provider selection occurs. Status/history are read-only registered tools. `compare_provider_evidence` runs under ComparisonAgent, reads real owned reports and supplies no clinical ranking. Source calls are bounded, deduplicated and selectively retried; refresh bypasses the evidence cache. Freshness is projected on reads under an optional central policy. There are no scheduled verifications, background source monitors, automatic catalog writes or clinical decisions. See [PROVIDER_VERIFICATION.md](PROVIDER_VERIFICATION.md).

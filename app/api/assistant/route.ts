@@ -70,6 +70,16 @@ export async function GET(request: NextRequest) {
     }
     const selectedConversation = conversationQuery.data?.find((c) => c.id === conversationId);
     const activity = conversationId && selectedConversation ? await new SupabaseAgentStore(createAdminClient(), db).readActivity(conversationId, user.id, selectedConversation.case_id ?? undefined) : undefined;
+    // An output may commit just before a process stops while adding its message.
+    // Restore that authoritative artifact without invoking any tool on a GET.
+    if(activity && ['completed','partially_completed','failed','waiting_for_input','awaiting_confirmation'].includes(activity.state)
+      && !messages.some(raw=>(raw as {metadata?:{response?:{runId?:string}}}).metadata?.response?.runId===activity.runId)){
+      const saved=await createAdminClient().from('agent_outputs').select('content').eq('run_id',activity.runId).eq('output_type','assistant_response').limit(1).maybeSingle();
+      if(saved.error)throw new AgentError('DATABASE_FAILURE','Saved workflow results are unavailable.');
+      const output=assistantResponseSchema.safeParse(saved.data?.content);
+      if(output.success && output.data.conversationId===conversationId && output.data.runId===activity.runId)
+        messages.push({id:`saved-${activity.runId}`,role:'assistant',content:output.data.summary,metadata:{response:output.data},created_at:activity.updatedAt});
+    }
     const plan = conversationId ? await new SupabasePlanningStore(createAdminClient(), db).load(conversationId, user.id) : undefined;
     return NextResponse.json({ conversations: conversationQuery.data ?? [], cases: (caseQuery.data ?? []).map((item) => ({ ...item, canManageConsent: item.owner_id === user.id, agentConsent: consent.get(item.id) === 'granted' })), messages, plan, activity },
       { headers: { 'Cache-Control': 'private, no-store' } });

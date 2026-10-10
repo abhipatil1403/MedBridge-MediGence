@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { inquiryAgentSchema,type InquiryAgentContext } from '@/lib/inquiries/agent';
+import { inquiryAgentSchema, inquiryPreparationSchema,type InquiryAgentContext } from '@/lib/inquiries/agent';
 import { currencies } from '@/lib/experience/preferences';
 import { coordinationSchema, type CoordinationContext } from '@/lib/experience/coordination-schema';
 import { verificationResultSchema, type VerificationResult } from '@/lib/verification/schemas';
@@ -49,6 +49,7 @@ export type AgentSynthesis = z.infer<typeof synthesisSchema>;
 export const userRequestSchema = z.object({
   content: z.string().trim().min(1).max(2000),
   conversationId: z.uuid().optional(),
+  resumeRunId: z.uuid().optional(),
   caseId: z.uuid().optional(),
   displayCurrency: z.enum(currencies).optional(),
 }).strict();
@@ -226,6 +227,7 @@ export interface AgentTaskView {
 }
 
 export interface AgentResponse {
+  inquiryPreparation?: z.infer<typeof inquiryPreparationSchema>;
   inquiries?: InquiryAgentContext;
   coordination?: CoordinationContext;
   verification?: VerificationResult;
@@ -268,6 +270,7 @@ export interface AgentResponse {
 }
 
 export const assistantResponseSchema = z.object({
+  inquiryPreparation:inquiryPreparationSchema.optional(),
   inquiries:inquiryAgentSchema.optional(),
   coordination: coordinationSchema.optional(),
   verification: verificationResultSchema.optional(),

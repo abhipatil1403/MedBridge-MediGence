@@ -42,11 +42,12 @@ export interface ToolObservation {
 }
 export interface ExecutionCall {
   id: string; runId: string; taskId?: string; tool: string; canonicalTool?: string; version: string; step: number;
-  input: unknown; validatedInput?: unknown; startedAt: string; endedAt?: string;
+  input: unknown; validatedInput?: unknown; startedAt: string; endedAt?: string; attempts?: number; retrying?: boolean;
   status: 'running' | 'completed' | 'failed' | 'reused'; output?: ToolResult;
   error?: { code: string; message: string }; provenance: ToolObservation['provenance'];
 }
 export class ExecutionState {
+  checkpoint?: { request: unknown; plan: unknown; snapshotSignature: string; recoverable: boolean; recoveryCount: number };
   conversation?: import('@/lib/conversation/context').ValidatedConversationContext;
   readonly started = Date.now();
   agent = 'discovery';
@@ -58,6 +59,7 @@ export class ExecutionState {
     readonly request: string, public goal: string, private readonly store: AgentStore) {}
   activity(): RunActivity { return activitySchema.parse({ runId: this.runId, state: this.state, updatedAt: new Date().toISOString(),
     steps: this.calls.map((c) => ({ id: c.id, number: c.step, label: label(c.tool), status: c.status,
+      ...(c.attempts ? { attempts: c.attempts, retrying: c.retrying ?? false } : {}),
       recordCount: c.output?.verification?.report ? c.output.verification.report.fields.length : c.output?.documents ? (c.tool === 'get_document_requirements' ? c.output.documents.requirements.length : c.output.documents.documents.filter(d => d.uploadStatus === 'uploaded').length)
         : (c.output?.findings.length ?? 0) + (c.output?.research?.findings.length ?? 0), ...(c.error ? { error: c.error.message } : {}) })), warnings: this.warnings.slice(0, 8) }); }
   async persist(finalOutput?: unknown) {
@@ -65,6 +67,7 @@ export class ExecutionState {
       ownerId: this.ownerId, agent: this.agent, originalRequest: safeText(this.request), goal: safeText(this.goal), state: this.state,
       continuation: this.conversation ? safeValue({ references: this.conversation.references, pendingClarification: this.conversation.pendingClarification, requirements: this.conversation.requirements, sourceRecordIds: this.conversation.findings.map(f => f.provenance.recordId) }) : undefined,
       currentStep: this.calls.length, calls: safeValue(this.calls), observations: safeValue(this.observations),
+      checkpoint: safeValue(this.checkpoint), executions: this.executions,
       errors: [...this.planningErrors, ...this.calls.flatMap((c) => c.error ? [c.error] : [])],
       provenance: { request: { kind: 'user' }, results: this.observations.flatMap((o) => o.provenance) },
       warnings: this.warnings, startedAt: new Date(this.started).toISOString(), updatedAt: new Date().toISOString(),

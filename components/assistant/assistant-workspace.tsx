@@ -23,6 +23,7 @@ import { getBrowserSupabaseClient } from '@/lib/supabase/browser';
 import Link from 'next/link';
 import { ClarificationQuestion, visibleText } from './response-status';
 import type { RunActivity } from '@/lib/agents/execution-schemas';
+import { ExecutionActivity } from './execution-activity';
 import type { AgentResponse, CarePlan } from '@/lib/agents/schemas';
 import { CarePlanPanel } from './care-plan-panel';
 import { FindingCards, PlanningResultGroups } from './catalog-results';
@@ -52,6 +53,7 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
   const [busy, setBusy] = useState(false);
   const [activity, setActivity] = useState<RunActivity | undefined>();
   const requestStarted = useRef<Set<string> | undefined>(undefined);
+  const pendingRun = useRef<{ previous?: string; resume?: string } | undefined>(undefined);
   const [notice, setNotice] = useState('');
   const activeUser = useRef<string | undefined>(undefined);
 
@@ -77,7 +79,8 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
       }
       setCases(data.cases);
       if (selectedId) {
-        setActivity(data.activity);
+        const tracking=pendingRun.current;
+        setActivity(!tracking || (tracking.resume ? data.activity?.runId===tracking.resume : data.activity?.runId!==tracking.previous) ? data.activity : undefined);
         setCarePlan(data.plan);
         setMessages(data.messages);
         const final = [...(data.messages as Message[])].reverse().find((message) => message.role === 'assistant' && message.metadata?.response);
@@ -143,15 +146,16 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
     finally { setBusy(false); }
   }
 
-  async function submitRequest(text: string) {
+  async function submitRequest(text: string, resumeRunId?: string) {
     if (!text || busy) return;
     const ownerAtStart = session?.user.id;
     const pendingId=crypto.randomUUID();
-    setMessages(current=>[...current,{id:pendingId,role:'user',content:text,metadata:{},created_at:new Date().toISOString()}]);
+    if(!resumeRunId)setMessages(current=>[...current,{id:pendingId,role:'user',content:text,metadata:{},created_at:new Date().toISOString()}]);
     requestStarted.current = new Set(conversations.map((c) => c.id));
+    pendingRun.current={previous:activity?.runId??latest?.runId,resume:resumeRunId};
     setActivity(undefined); setBusy(true); setNotice('');
     try {
-      const result: AgentResponse = await api('/api/assistant', { method: 'POST', body: JSON.stringify({ content: text, conversationId, caseId: caseId || undefined,displayCurrency:preferences.currency }) });
+      const result: AgentResponse = await api('/api/assistant', { method: 'POST', body: JSON.stringify({ content: text, conversationId, caseId: caseId || undefined,displayCurrency:preferences.currency,...(resumeRunId?{resumeRunId}:{}) }) });
       if (activeUser.current !== ownerAtStart) return;
       setConversationId(result.conversationId);
       setActivity(result.activity);
@@ -160,7 +164,7 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
       setContent(result.status === 'failed' ? text : '');
       await refresh(result.conversationId);
     } catch (error) { if(activeUser.current===ownerAtStart){setMessages(current=>current.filter(message=>message.id!==pendingId));setNotice(error instanceof Error ? error.message : 'The assistant could not run.');} }
-    finally { requestStarted.current = undefined; setBusy(false); }
+    finally { requestStarted.current = undefined; pendingRun.current=undefined; setBusy(false); }
   }
 
   async function send(event: FormEvent) {
@@ -233,7 +237,12 @@ export function AssistantWorkspace({ configured, initialRequest = '', initialCon
             disabled={busy} onRequest={text=>{void submitRequest(text);}} /> : <p>{message.content}</p>}
         </article>)}
 
-        {busy && <div className="assistant-working" role="status"><T>{'Working…'}</T></div>}
+        {activity && (busy || !messages.some(m=>m.metadata?.response?.runId===activity.runId)) && <ExecutionActivity activity={activity}/>}
+        {activity?.recovery?.eligible && !busy && <section className="assistant-recovery" aria-label="Interrupted workflow">
+          <p><T>{activity.recovery.reason}</T></p><button className="button button--primary" type="button" onClick={()=>void submitRequest('Resume saved catalog workflow',activity.runId)}><T>{'Resume catalog workflow'}</T></button>
+          <p><T>{'Only eligible catalog reads resume. Sharing, inquiries and external actions require their own reviewed confirmation.'}</T></p>
+        </section>}
+        {busy && !activity && <div className="assistant-working" role="status"><T>{'Waiting for saved progress…'}</T></div>}
       </div>
       <form className="assistant-composer" onSubmit={send}><label htmlFor="assistant-input"><T>{messages.length ? 'Ask a follow-up' : 'What are you looking for?'}</T></label>
         <Localized as="textarea" id="assistant-input" value={content} onChange={(event) => setContent(event.target.value)} placeholder={messages.length ? 'Ask about these options, evidence or next steps…' : 'Treatment, location, budget — start in your own words…'} rows={3} maxLength={2000} disabled={busy} required />
@@ -276,6 +285,7 @@ export function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, 
     {response.inquiries&&<section className="inquiry-ai-results"><h3>Your care requests</h3>{!response.inquiries.requests.length&&<p>No saved inquiries in your account. Choose Request assistance from a published listing to start.</p>}<ul className="personal-list">{response.inquiries.requests.map(r=><li key={r.id}><div><Link href={`/account?section=requests&request=${r.id}`}>{r.title}</Link><p>{r.status.replaceAll('_',' ')} · Provider: {providerStatusLabel(r.providerStatus)}</p><p>{r.nextStep}</p><small>{r.providerAuthorized?'Provider access authorized':'Provider access not authorized'} · Support consent {r.supportConsentActive?'active':'withdrawn'}</small><p><Link href={r.linkedListing.href}>{r.linkedListing.name}</Link></p>{r.outstanding.map((d,i)=><p key={i}><strong>{d.title}</strong> · {d.purpose} · {d.status.replaceAll('_',' ')}</p>)}</div></li>)}</ul><Link className="text-link" href="/account?section=requests">Open My Requests →</Link></section>}
     {response.coordination&&<CoordinationResults context={response.coordination}/>}
     {response.workflow === 'case_intake' && response.caseSummary && <CaseSummaryContent summary={response.caseSummary} />}
+    {response.inquiryPreparation&&<section className="inquiry-ai-results"><h3><T>{'Review your inquiry'}</T></h3><p>{response.inquiryPreparation.name}</p><p><T>{'Review your question and consent before submitting. Documents and provider access need separate permission.'}</T></p><Link className="button button--primary" href={response.inquiryPreparation.href}><T>{'Prepare inquiry'}</T></Link></section>}
     {response.caseHandoff && <p><T>{"Using the reviewed case for catalog coordination. Reported medical information is separate from search requirements and does not establish treatment suitability. No case has been submitted to a provider."}</T></p>}
     {response.agent === 'document_coordination' ? <p>{response.summary}</p> : <FindingsSummary response={response} />}
     {Boolean(response.requirements?.length)&&<details><summary><T>{'Why these results?'}</T></summary><RequestUnderstanding response={response} /></details>}
@@ -293,6 +303,7 @@ export function ResponseBlocks({ response, approvalStatus, onDecision, onRetry, 
       {analysis.missingInformation.length > 0 && <ul>{analysis.missingInformation.map((gap, i) => <li key={i}>{gap}</li>)}</ul>}
       <small><T>{"Derived from"}</T>{' '}{analysis.recordIds.length} <T>{"sourced catalog records ·"}</T><T>{analysis.complete ? 'Evidence review completed' : 'Incomplete evidence'}</T></small></details>)}
     <ClarificationQuestion question={response.question} />
+    {response.activity && !response.verification && <ExecutionActivity activity={response.activity}/>}
     {response.findings.length > 0 && response.summarySource !== 'model' && <details className="assistant-evidence-review"><summary><T>{"About these results"}</T></summary><p>{response.summary}</p></details>}
     {response.approvalProposal && <div className="assistant-response__approval"><small><T>{"PROPOSED ACTION"}</T></small><p>{response.approvalProposal.detail}</p>
       {response.approvalProposal.action === 'request_external_action' ? <p><T>{"External sharing and bookings are not connected. This request remains pending human review."}</T></p>

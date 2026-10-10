@@ -89,7 +89,7 @@ describe('registered execution boundary', () => {
   it('times out a hanging read without losing prior results', async () => {
     vi.useFakeTimers(); const { state } = await execution(); await call(state);
     vi.spyOn(toolRegistry.search_packages, 'execute').mockImplementation(() => new Promise(() => {}));
-    const pending = call(state, 'search_packages', { query: 'knee' }); await vi.advanceTimersByTimeAsync(AGENT_LIMITS.toolTimeoutMs + 1);
+    const pending = call(state, 'search_packages', { query: 'knee' }); await vi.advanceTimersByTimeAsync(AGENT_LIMITS.toolTimeoutMs * 2 + 201);
     expect((await pending).error?.code).toBe('TOOL_TIMEOUT'); expect(state.observations[0].status).toBe('completed');
   });
   it('rejects nested tool invocation', async () => { const { state } = await execution(); await state.transition('executing'); await expect(call(state)).rejects.toMatchObject({ code: 'TOOL_RECURSION_DENIED' }); });

@@ -5,7 +5,7 @@ import { inquiryCommandSchema,inquiryNextStep,providerStatusLabel,type InquiryCo
 import { inquiryIntent,inquiryAgentSchema,type InquiryAgentContext } from '@/lib/inquiries/agent';
 import { executeTool,toolRegistry } from '@/lib/agents/tools';
 import { validateUpload } from '@/lib/documents/coordination';
-import { harness,tools,unavailable,userId } from './fixtures/comparison-harness';
+import { harness,tools,unavailable,userId,snapshot,hospital } from './fixtures/comparison-harness';
 const caseId=randomUUID(),otherId=randomUUID();
 const context:InquiryAgentContext={selectedId:caseId,requests:[{id:caseId,title:'Coordination question',status:'waiting_patient',providerStatus:'not_requested',updatedAt:new Date().toISOString(),supportConsentActive:true,providerAuthorized:false,linkedListing:{kind:'hospital',name:'Published listing',href:'/hospitals/published-listing'},outstanding:[{title:'Coordination summary',purpose:'Answer this administrative question.',status:'requested'}]}]};
 const create={action:'create',input:{operationId:randomUUID(),entityKind:'hospital',entityId:randomUUID(),expectedPublishedRevision:1,source:'hospital_detail',title:'Assistance request',objective:'Clarify this coordination question.',consent:true,reviewed:true}};
@@ -37,6 +37,28 @@ describe('reviewed inquiry inputs',()=>{
   it('rejects empty and oversized files',()=>{expect(()=>validateUpload('a.pdf','application/pdf',new Uint8Array())).toThrow();expect(()=>validateUpload('a.pdf','application/pdf',new Uint8Array(3145729))).toThrow();});
 });
 describe('owner-scoped registered inquiry tool and conversation references',()=>{
+  const published={...hospital,name:'Sourced Hospital',demo:false,sourceKind:'external' as const};
+  const publishedTools={...tools,repository:{...tools.repository,loadSnapshot:async()=>({...snapshot,hospitals:[published]}),listHospitals:async()=>[published]}};
+  it('reads a named listing before handing off to the existing consent form',async()=>{
+    const h=harness(unavailable,publishedTools),response=await h.send('Make an inquiry about Sourced Hospital');
+    expect(h.actions).toEqual(['get_hospital_details']);expect(response.inquiryPreparation?.state).toBe('review_required');
+    expect(response.inquiryPreparation?.href).toContain(`entityId=${published.recordId}`);expect(response.inquiryPreparation?.href).toContain(`conversation=${response.conversationId}`);
+    expect(response.summary).toContain('No inquiry has been submitted');expect(response.activity?.state).toBe('waiting_for_input');expect(response.inquiries).toBeUndefined();
+  });
+  it('uses the previously displayed ordinal for inquiry preparation',async()=>{
+    const h=harness(unavailable,publishedTools),first=await h.send('Find knee replacement hospitals in Mumbai.');
+    const response=await h.send('Make an inquiry for the first hospital',first.conversationId);
+    expect(response.inquiryPreparation?.name).toBe(published.name);expect(response.inquiryPreparation?.href).toContain(published.recordId);
+  });
+  it('clarifies an inquiry without an unambiguous listing',async()=>{
+    const h=harness(),response=await h.send('Make an inquiry');expect(response.question).toContain('Which published');expect(response.inquiryPreparation).toBeUndefined();expect(h.actions).toEqual([]);
+  });
+  it('does not offer submission for a synthetic listing',async()=>{
+    const h=harness(),response=await h.send(`Make an inquiry about ${hospital.name}`);expect(response.inquiryPreparation).toBeUndefined();expect(response.summary).toContain('Synthetic listings cannot');
+  });
+  it('retains a clinical gate before preparing an inquiry',async()=>{
+    const h=harness(unavailable,publishedTools),response=await h.send('Diagnose chest pain and make an inquiry about Sourced Hospital');expect(response.inquiryPreparation).toBeUndefined();expect(response.summary).toContain('cannot diagnose');
+  });
   it('uses the existing planning agent and read-only permission',()=>expect(toolRegistry.get_inquiry_context).toMatchObject({sideEffect:'read',mode:'read',authorization:'authenticated',allowedAgents:['treatment_planning']}));
   it('does not infer an inquiry from an unrelated conversation',()=>expect(inquiryIntent('What is its status?')).toBeNull());
   it('resolves a follow-up only from the supplied conversation reference',()=>expect(inquiryIntent('What is its status?',context)).toEqual({caseId,ambiguous:false}));

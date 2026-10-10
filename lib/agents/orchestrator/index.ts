@@ -1,5 +1,6 @@
 import { withResearchRecovery } from '@/lib/research/recovery';
-import { inquiryIntent } from '@/lib/inquiries/agent';
+import { inquiryIntent, wantsInquiryPreparation } from '@/lib/inquiries/agent';
+import { prepareInquiry } from '@/lib/inquiries/preparation';
 import { prepareVerification } from '@/lib/verification/agent';
 import { prepareResearchExecution, wantsExternalResearch } from '@/lib/research/agent';
 import { randomUUID } from 'node:crypto';
@@ -43,7 +44,8 @@ export interface OrchestratorContext extends RuntimeContext { planningStore: Pla
 /** One authenticated turn, one selected workflow, one bounded runtime. No recursive agent calls. */
 export async function orchestrate(rawRequest: unknown, context: OrchestratorContext): Promise<AgentResponse> {
   context = { ...context, supportedAgents: ['discovery', 'treatment_planning', 'hospital_matching', 'comparison', 'research'] };
-  const request = userRequestSchema.parse(rawRequest);
+  let request = userRequestSchema.parse(rawRequest);
+  if(request.resumeRunId && (!request.conversationId || request.caseId))throw new AgentError('RECOVERY_ACCESS_DENIED','Choose an owned catalog conversation to resume.');
   const caseContext = request.caseId ? await context.caseAccess.readContext(request.caseId) : undefined;
   const conversationId = request.conversationId ?? await context.store.createConversation(context.userId, request.caseId);
   await context.store.assertConversation(conversationId, context.userId, request.caseId);
@@ -57,13 +59,20 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
     hasPlanningSchema = false;
   }
   try {
+    if(request.resumeRunId) {
+      if(!hasPlanningSchema || !context.store.loadRecovery)throw new AgentError('RECOVERY_NOT_ELIGIBLE','Workflow recovery is unavailable.');
+      const recovery=await context.store.loadRecovery(conversationId,context.userId,request.resumeRunId);
+      if('summary' in recovery)return validateResponse(recovery);
+      request={...recovery.checkpoint.request,conversationId};
+      context={...context,recovery};
+    }
     if(context.prepareTurn)await context.prepareTurn(context);
     const [active, recent] = await Promise.all([hasPlanningSchema ? context.planningStore.load(conversationId, context.userId) : undefined, context.planningStore.recentMessages(conversationId)]);
     context = { ...context, conversation: validatedConversationContext(conversationId, recent, active) };
     const boundary = requestBoundary(request.content);
     const previousInquiry=persistedResponses(recent,conversationId).at(-1)?.inquiries;
     const inquiry=inquiryIntent(request.content,previousInquiry);
-    if(inquiry&&boundary!=='clinical'){
+    if(inquiry&&boundary!=='clinical'&&!wantsInquiryPreparation(request.content)){
       return validateResponse(await runAgent({...request,conversationId},{...context,execution:{
         plan:{agent:'treatment_planning',understanding:'You requested your saved care coordination inquiries.',steps:inquiry.ambiguous?[]:[{objective:'Read your own saved inquiry context',tool:'get_inquiry_context',input:JSON.stringify(inquiry.caseId?{caseId:inquiry.caseId}:{})}],missingInformation:inquiry.ambiguous?'Choose one request to review.':null},
         diagnostics:{workflow:'reference_patient_inquiry'},allowModelFollowUps:false,
@@ -135,6 +144,8 @@ export async function orchestrate(rawRequest: unknown, context: OrchestratorCont
       return validateResponse(await runAgent({ ...request, conversationId }, { ...context, execution }));
     }
     let snapshot = await loadDiscoverySnapshot(context.tools?.repository ?? defaultToolDependencies.repository);
+    if(wantsInquiryPreparation(request.content))return validateResponse(await runAgent({...request,conversationId},{...context,tools:{...(context.tools??defaultToolDependencies),evaluationSnapshot:snapshot},
+      execution:await prepareInquiry({content:request.content,conversationId,recent,active,snapshot,store:context.planningStore,lease})}));
     const verificationExecution=prepareVerification({content:request.content,conversationId,userId:context.userId,recent,snapshot});
     if(verificationExecution)return validateResponse(await runAgent({...request,conversationId},{...context,tools:{...(context.tools??defaultToolDependencies),evaluationSnapshot:snapshot},execution:verificationExecution}));
     let routingContent = wantsHandoff && continueCase ? draft!.pendingCoordinationRequest! : request.content;

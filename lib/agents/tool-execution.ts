@@ -6,6 +6,11 @@ import { AgentError } from './errors';
 import { toolRegistry, toolAliases, type ToolContext, type ToolDependencies } from './tools';
 import { toolNameSchema, type ToolResult } from './schemas';
 import { AGENT_LIMITS, canonicalInput, ExecutionState, safeText, safeValue, type ToolObservation } from './execution-state';
+import { recoverableTool } from './recovery';
+
+function transientReadFailure(error: unknown) {
+  return error instanceof AgentError && ['TOOL_TIMEOUT','CATALOG_TIMEOUT','CATALOG_UNAVAILABLE','TOOL_RATE_LIMIT'].includes(error.code);
+}
 
 /** Only this boundary turns a proposal into a registered service invocation. */
 export async function executeRegisteredTool(state: ExecutionState, proposal: { tool: string; version?: string; input: unknown; taskId?: string },
@@ -21,7 +26,7 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
     const name = parsedName.data;
     const definition = toolRegistry[name];
     if (call.version !== definition.version) throw new AgentError('TOOL_VERSION_UNSUPPORTED', 'This tool version is unavailable.');
-    if (!context.userId || !definition.allowedAgents.includes(context.agent)) throw new AgentError('TOOL_DENIED', 'This agent cannot perform that action.');
+    if (!context.userId || context.userId!==state.ownerId || !definition.allowedAgents.includes(context.agent)) throw new AgentError('TOOL_DENIED', 'This agent cannot perform that action.');
     if (['write', 'external', 'clinical'].includes(definition.mode)
       && !(definition.mode === 'write' && (authorizeDocumentTool(name,proposal.input,context.userId,context.documentAuthorization)||authorizeVerification(name,proposal.input,context.userId,context.verificationAuthorization))))
       throw new AgentError('TOOL_CONFIRMATION_REQUIRED', 'This action needs a separate authorized confirmation or professional review.');
@@ -45,10 +50,15 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
       output = cached.output; call.status = 'reused';
     } else {
       if (limit) { state.warnings.push(limit); throw new AgentError('TOOL_BUDGET_EXHAUSTED', limit); }
-      state.executions++;
-      await state.persist();
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      try {
+      // One logical call, at most two actual invocations. Writes/proposals/private
+      // reads and unknown errors never enter this retry path.
+      for (let attempt=1; attempt<=2; attempt++) {
+        const exhausted=state.limit(canonicalName);
+        if(exhausted)throw new AgentError('TOOL_BUDGET_EXHAUSTED',exhausted);
+        state.executions++; call.attempts=attempt; call.retrying=attempt>1;
+        await state.persist();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
         const remaining = AGENT_LIMITS.runTimeoutMs - (Date.now() - state.started);
         const raw = await Promise.race([definition.execute(parsed.data, context, dependencies), new Promise<never>((_resolve, reject) => {
           timer = setTimeout(() => reject(new AgentError('TOOL_TIMEOUT', context.agent==='document_coordination' ? 'This document operation took too long.' : 'This catalog operation took too long.')), Math.min(definition.timeoutMs, remaining));
@@ -56,10 +66,19 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
         const valid = definition.outputSchema.safeParse(raw);
         if (!valid.success || safeText(JSON.stringify(raw)) !== JSON.stringify(raw)) throw new AgentError('TOOL_OUTPUT_INVALID', 'This tool returned an invalid result.');
         output = valid.data;
-      } finally { if (timer) clearTimeout(timer); }
+        break;
+        } catch(error) {
+          if(attempt>=2 || !recoverableTool(name) || !transientReadFailure(error) || state.limit(canonicalName)) throw error;
+          call.retrying=true; await state.persist();
+          await new Promise(resolve=>setTimeout(resolve,200));
+        } finally { if (timer) clearTimeout(timer); }
+      }
+      call.retrying=false;
+      if(!output)throw new AgentError('TOOL_OUTPUT_INVALID','This tool returned an invalid result.');
       call.status = 'completed';
       if (definition.mode === 'read' && definition.authorization !== 'case_consent') state.cache.set(key, { output, at: Date.now() });
     }
+    if(!output)throw new AgentError('TOOL_OUTPUT_INVALID','This tool returned an invalid result.');
     // Case context stays in existing consent-controlled storage, not the new model observations.
     call.output = { ...output, caseContext: undefined };
     call.provenance = [
@@ -73,6 +92,7 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
       }), ...(output.analysis ? [{ kind: 'derived', recordIds: output.analysis.recordIds }] : []),
     ];
   } catch (error) {
+    call.retrying=false;
     state.failures++;
     call.status = 'failed';
     call.error = { code: error instanceof ZodError ? 'TOOL_OUTPUT_INVALID' : error instanceof AgentError ? error.code : 'TOOL_FAILURE',
@@ -81,7 +101,7 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
   }
   call.endedAt = new Date().toISOString();
   const observation: ToolObservation = { id: call.id, tool: call.tool,
-    status: call.status === 'failed' ? 'failed' : call.status === 'reused' ? 'reused' : !output?.findings.length && !output?.research?.findings.length && !output?.documents && !output?.verification && !output?.requestedInformation && !output?.approvalRequired ? 'empty' : 'completed',
+    status: call.status === 'failed' ? 'failed' : call.status === 'reused' ? 'reused' : !output?.findings.length && !output?.research?.findings.length && !output?.documents && !output?.verification && !output?.inquiries && !output?.coordination && !output?.requestedInformation && !output?.approvalRequired ? 'empty' : 'completed',
     ...(output ? { data: { ...output, caseContext: undefined } } : {}), provenance: call.provenance,
     missingInformation: output?.analysis?.missingInformation ?? (output?.requestedInformation ? [output.requestedInformation] : []),
     warnings: output?.note ? [output.note] : [], error: call.error,

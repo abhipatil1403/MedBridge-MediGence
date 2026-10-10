@@ -13,6 +13,7 @@ import { ReferenceDetector } from '@/lib/conversation/ReferenceDetector';
 import { AGENT_LIMITS, ExecutionState, terminalStates, canonicalInput, safeText, safeValue } from './execution-state';
 import { executeRegisteredTool } from './tool-execution';
 import { observeNext } from './observation';
+import { catalogSignature, restoreCatalogReads, recoverableTool, type RecoveryCheckpoint } from './recovery';
 export { AGENT_LIMITS } from './execution-state';
 const clinicalPattern = /\b(chest pain|chest hurts|can't breathe|cannot breathe|stroke symptoms|suicid|diagnose|what disease|prescribe|prescription)\b/i;
 const externalPatterns: Array<[RegExp, 'share_records' | 'booking' | 'payment' | 'travel_purchase' | 'visa_submission']> = [
@@ -24,6 +25,7 @@ const externalPatterns: Array<[RegExp, 'share_records' | 'booking' | 'payment' |
 ];
 
 export interface RuntimeContext {
+  recovery?: RecoveryCheckpoint;
   conversation?: ValidatedConversationContext;
   userId: string;
   caseAccess: CaseAccess;
@@ -147,17 +149,24 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
   if (request.caseId && context.execution?.diagnostics?.workflow !== 'document_coordination') caseContext = await context.caseAccess.readContext(request.caseId);
   const conversationId = request.conversationId ?? await context.store.createConversation(context.userId, request.caseId);
   if (request.conversationId) await context.store.assertConversation(conversationId, context.userId, request.caseId);
-  await context.store.addMessage(conversationId, 'user', safeText(request.content), undefined,
+  if(request.resumeRunId && !context.recovery)throw new AgentError('RECOVERY_NOT_ELIGIBLE','Resume this workflow through its saved conversation.');
+  if(!context.recovery)await context.store.addMessage(conversationId, 'user', safeText(request.content), undefined,
     context.execution?.messageSourceId ? { sourceId: context.execution.messageSourceId } : {});
 
   const clinical = requestBoundary(request.content) === 'clinical';
   let route: DiscoveryRoute | undefined;
   const diagnostics: Record<string, string | boolean | null> = { ...context.execution?.diagnostics };
   let plan: AgentPlan;
-  const runId = await context.store.startRun(conversationId, context.userId, context.execution?.plan.agent ?? 'discovery', request.caseId, context.execution?.carePlanId);
+  const runId = context.recovery?.runId ?? await context.store.startRun(conversationId, context.userId, context.execution?.plan.agent ?? 'discovery', request.caseId, context.execution?.carePlanId);
   const execution = new ExecutionState(runId, conversationId, context.userId, request.content, 'Understand the catalog request', context.store);
   execution.agent = context.execution?.plan.agent ?? 'discovery';
   execution.conversation = context.conversation;
+  if(context.recovery) {
+    execution.checkpoint={...context.recovery.checkpoint,recoveryCount:context.recovery.checkpoint.recoveryCount+1};
+    execution.calls=context.recovery.calls;
+    execution.executions=context.recovery.executions;
+    await context.store.abandonUnfinishedTasks?.(runId);
+  }
   await execution.persist();
   await execution.transition('planning');
   try {
@@ -214,6 +223,16 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
   }
 
   execution.goal = plan.understanding; execution.agent = plan.agent;
+  const snapshot=route?.snapshot??context.tools?.evaluationSnapshot;
+  if(snapshot) {
+    const signature=catalogSignature(snapshot);
+    execution.checkpoint={request:{...request,conversationId},plan,snapshotSignature:signature,recoveryCount:context.recovery?1:0,
+      recoverable:!request.caseId && !requestBoundary(request.content) && !context.execution?.messageSourceId
+        && !context.execution?.referenceBoundary && !context.conversation?.pendingClarification
+        && (!context.execution?.diagnostics?.workflow || ['compound','comparison','treatment_planning'].includes(String(context.execution.diagnostics.workflow)))
+        && plan.steps.every(s=>recoverableTool(s.tool))};
+    if(context.recovery)restoreCatalogReads(execution,context.recovery,signature);
+  }
   await execution.persist();
   const tasks: AgentTaskView[] = [];
   const findings: Finding[] = [];
