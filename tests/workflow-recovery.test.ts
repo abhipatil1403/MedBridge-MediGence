@@ -132,5 +132,8 @@ describe('owned interrupted workflow recovery',()=>{
     const html=render();expect(html).toContain('Retrying eligible read');expect(html).toContain('2');expect(html).not.toContain(hospital.slug);
     state.calls[0].status='failed';state.calls[0].error={code:'TOOL_TIMEOUT',message:'This read timed out.'};
     expect(render()).toContain('This read timed out.');
+    state.calls[0].tool='compare_providers';state.calls[0].error={code:'TOOL_INPUT_INVALID',message:'Use {"recordIds":[...]} with returned catalog IDs.'};state.state='partially_completed';
+    state.calls[0].retrying=false;
+    const failed=render();expect(failed).toContain('recordIds');expect(failed).toContain('Partially complete');expect(failed).toContain('Could not complete');expect(failed).not.toContain(hospital.recordId);
   });
 });

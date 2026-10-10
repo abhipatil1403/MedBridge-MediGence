@@ -41,6 +41,16 @@ try{
  await turn('I need knee replacement in Mumbai under $6000 with accommodation.',false);
  const transfer=await turn('Show me health check packages with airport transfer.',false);
  check(transfer.findings.filter(f=>f.kind==='packages').every(f=>f.requirementEvaluation?.overallStatus!=='fully_satisfies'&&f.facts.transferStatus==='not confirmed'),'unknown transfer never becomes an included or fully satisfied match');
+ check(transfer.findings.filter(f=>f.kind==='packages').length===5,'airport-transfer search preserves all five eligible records');
+ const savedRun=await admin.from('agent_runs').select('metadata').eq('id',transfer.runId).single();assert.equal(savedRun.error,null);
+ const calls=savedRun.data.metadata.execution.calls;
+ const completed=calls.filter(c=>['completed','reused'].includes(c.status));
+ check(completed.length>0&&completed.every(c=>c.validatedInput&&typeof c.validatedInput==='object'&&!Array.isArray(c.validatedInput)&&
+  (c.tool!=='compare_providers'||c.validatedInput.recordIds?.length>0&&c.validatedInput.recordIds.every(id=>transfer.findings.some(f=>f.provenance.recordId===id)))),'completed catalog steps persist object arguments; any comparison references returned findings');
+ const historyResponse=await fetch(origin+`/api/assistant?conversationId=${transfer.conversationId}`,{headers:{Authorization:`Bearer ${session.access_token}`},signal:AbortSignal.timeout(20000)});
+ assert.equal(historyResponse.status,200);const history=await historyResponse.json();
+ check(JSON.stringify(history.activity.steps)===JSON.stringify(transfer.activity.steps),'airport-transfer history restores the exact persisted activity');
+ console.log(JSON.stringify({event:'airport_transfer_argument_diagnostic',findingCount:transfer.findings.length,state:transfer.activity.state,comparisons:calls.filter(c=>c.tool==='compare_providers').map(c=>({rawShape:Array.isArray(c.input)?'array':typeof c.input,validatedShape:c.validatedInput?'recordIds_object':'none',status:c.status,errorCode:c.error?.code}))}));
  const requirements=await turn('Show me health check packages in Mumbai under $6000 with accommodation.',false);
  const evaluated=requirements.findings.filter(f=>f.kind==='packages');
  check(evaluated.length===2&&evaluated.every(f=>f.requirementEvaluation?.overallStatus!=='fully_satisfies'),'two real Mumbai packages do not fully satisfy unconfirmed or conditional accommodation');

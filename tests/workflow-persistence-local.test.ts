@@ -1,4 +1,4 @@
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {it,expect,vi} from 'vitest';
 vi.mock('server-only',()=>({}));
 vi.mock('@/lib/supabase/server',async()=>{
@@ -19,6 +19,43 @@ import {AgentError} from '@/lib/agents/errors';
 import {RequirementExtractor} from '@/lib/requirements/RequirementExtractor';
 import {parseCompoundIntent} from '@/lib/orchestration/CompoundIntentParser';
 import {prepareCompoundExecution} from '@/lib/orchestration/OperationExecutor';
+import {runAgent} from '@/lib/agents/runtime';
+
+it.skipIf(!process.env.MEDBRIDGE_LOCAL_WORKFLOW_DB)('real local PostgreSQL: canonical comparison replay keeps one action, output and assistant message',async()=>{
+  const root=localSqlClient(process.env.MEDBRIDGE_LOCAL_WORKFLOW_DB!,'postgres'),owner=randomUUID();
+  root.sql(`insert into auth.users(id) values('${owner}');insert into public.profiles(id) values('${owner}') on conflict do nothing;grant all on all tables in schema public to service_role;grant usage on all sequences in schema public to service_role;select to_json(true)`);
+  const admin=localSqlClient(process.env.MEDBRIDGE_LOCAL_WORKFLOW_DB!,'service_role').db,user=localSqlClient(process.env.MEDBRIDGE_LOCAL_WORKFLOW_DB!,'authenticated',owner).db;
+  const store=new SupabaseAgentStore(admin,user),planningStore=new SupabasePlanningStore(admin,user);
+  const snapshot=await loadDiscoverySnapshot(catalogRepository),packages=snapshot.packages.slice(0,2);expect(packages.length).toBeGreaterThan(0);
+  const ids=packages.map(p=>p.recordId),input={recordIds:ids},content='Compare these packages with airport transfer.';
+  const invoke=vi.spyOn(toolRegistry.compare_providers,'execute');
+  const provider={generateStructured:async()=>{throw new AgentError('MODEL_UNAVAILABLE','Unavailable');}};
+  try {
+    const response=await runAgent({content},{userId:owner,store,provider,caseAccess:{readContext:async()=>({}),readDocumentMetadata:async()=>[]},
+      tools:{...defaultToolDependencies,evaluationSnapshot:snapshot,requirements:RequirementExtractor.extract(content,snapshot)},
+      execution:{plan:{agent:'discovery',understanding:'Compare selected catalog evidence',missingInformation:null,steps:[
+        ...packages.map(p=>({tool:'get_package' as const,objective:'Read selected package',input:JSON.stringify({slug:p.slug})})),
+        {tool:'compare_providers',objective:'Compare returned records',input:JSON.stringify(ids)},
+        {tool:'compare_providers',objective:'Repeat equivalent comparison',input:JSON.stringify(input)}]},allowModelFollowUps:false,
+        synthesis:{summary:'Compared selected catalog evidence; missing inclusions need confirmation.',question:null,nextSteps:[]}}});
+    expect(response.status).toBe('completed');expect(invoke).toHaveBeenCalledTimes(1);
+    const persisted=await admin.from('agent_runs').select('metadata').eq('id',response.runId).single();expect(persisted.error).toBeNull();
+    const execution=(persisted.data!.metadata as unknown as {execution:{calls:Array<{tool:string;input:unknown;validatedInput:unknown;status:string}>}}).execution;
+    expect(execution.calls.filter(c=>c.tool==='compare_providers')).toEqual(expect.arrayContaining([
+      expect.objectContaining({input:ids,validatedInput:input,status:'completed'}),expect.objectContaining({input,validatedInput:input,status:'reused'})]));
+    const actions=await admin.from('agent_actions').select('tool_name,input_hash').eq('run_id',response.runId);expect(actions.error).toBeNull();
+    expect(actions.data?.filter(a=>a.tool_name==='compare_providers')).toEqual([{tool_name:'compare_providers',input_hash:createHash('sha256').update(JSON.stringify(input)).digest('hex')}]);
+    root.sql(`delete from public.conversation_messages where run_id='${response.runId}' and role='assistant';select to_json(true)`);
+    for(let i=0;i<2;i++) {
+      const restored=await orchestrate({content:'Resume',conversationId:response.conversationId,resumeRunId:response.runId},{userId:owner,store,planningStore,provider,tools:defaultToolDependencies,caseAccess:{readContext:async()=>({}),readDocumentMetadata:async()=>[]}});
+      expect(restored.runId).toBe(response.runId);expect(restored.activity?.steps).toEqual(response.activity?.steps);expect(restored.findings).toEqual(response.findings);
+    }
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect((await admin.from('agent_actions').select('id').eq('run_id',response.runId)).data).toHaveLength(packages.length+1);
+    expect((await admin.from('agent_outputs').select('id').eq('run_id',response.runId)).data).toHaveLength(1);
+    expect((await user.from('conversation_messages').select('role').eq('conversation_id',response.conversationId)).data?.filter(m=>m.role==='assistant')).toHaveLength(1);
+  } finally {invoke.mockRestore();}
+},120000);
 
 it.skipIf(!process.env.MEDBRIDGE_LOCAL_WORKFLOW_DB)('real local PostgreSQL: recover dependent catalog reads, persist retry failure, preserve evidence and enforce owner RLS',async()=>{
   const url=process.env.MEDBRIDGE_LOCAL_WORKFLOW_DB!,root=localSqlClient(url,'postgres'),owner=randomUUID(),other=randomUUID();

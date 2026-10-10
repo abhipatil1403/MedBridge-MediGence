@@ -44,6 +44,12 @@ const questionInput = z.object({ question: z.string().min(3).max(300) }).strict(
 const externalActionInput = z.object({ action: z.enum(['share_records', 'booking', 'payment', 'travel_purchase', 'visa_submission']), recipient: z.string().max(120).optional() }).strict();
 
 const analysisInput = z.object({ recordIds: z.array(z.guid()).min(1).max(10) }).strict();
+/** Compatibility for a model's bare comparison ID list; never guess IDs or drop fields. */
+export function normalizeToolInput(name: string, input: unknown): unknown {
+  if (name !== 'compare_providers' || !Array.isArray(input)) return input;
+  const candidate = { recordIds: input };
+  return analysisInput.safeParse(candidate).success && new Set(input).size === input.length ? candidate : input;
+}
 export const toolAliases = { get_hospital_details: 'get_hospital', get_doctor_details: 'get_doctor', get_treatment_details: 'get_treatment', get_package_details: 'get_package', search_locations: 'search_countries' } as const;
 export const toolSchemas = {
   get_inquiry_context: z.object({caseId:z.uuid().optional()}).strict(),
@@ -262,8 +268,10 @@ export async function executeTool(name: ToolName, rawInput: unknown, context: To
     }
     const targets = [...new Set(records.map((r) => r.kind))].filter((k): k is 'hospitals' | 'packages' | 'doctors' => ['hospitals', 'packages', 'doctors'].includes(k));
     if (!targets.length) throw new AgentError('TOOL_INPUT_INVALID', 'Compare hospitals, doctors, or packages.');
-    const result = compareCandidates({ intent: 'comparison', options: [], targets, focus: 'catalog' }, [targets.map((target) => ({ taskId: context.userId, target, status: 'completed' as const, findings: records.filter((r) => r.kind === target), matchType: 'exact' as const, matchReason: 'Selected sourced records.' }))]);
-    return { findings: records, analysis: { kind: 'derived', recordIds: args.recordIds, summary: result.summary, complete: result.complete, missingInformation: result.complete ? [] : ['At least two sourced peers are needed for comparison.'] } };
+    const findings = requirements.length ? evaluateFindings(records, requirements, snapshot) : records;
+    const result = compareCandidates({ intent: 'comparison', options: [], targets, focus: 'catalog' }, [targets.map((target) => ({ taskId: context.userId, target, status: 'completed' as const, findings: findings.filter((r) => r.kind === target), matchType: 'exact' as const, matchReason: 'Selected sourced records.' }))]);
+    const gaps = [...new Set(findings.flatMap(f => f.requirementEvaluation?.evaluations.filter(e => ['unknown','incomplete','related'].includes(e.status)).map(e => e.explanation) ?? []))];
+    return { findings, analysis: { kind: 'derived', recordIds: args.recordIds, summary: result.summary, complete: result.complete && gaps.length === 0, missingInformation: [...(result.complete ? [] : ['At least two sourced peers are needed for comparison.']), ...gaps] } };
   }
   if (name in searchKinds) {
     const kind = searchKinds[name as keyof typeof searchKinds];

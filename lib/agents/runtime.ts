@@ -4,7 +4,7 @@ import { AgentError } from './errors';
 import { discoveryRoute, routeToolDependencies, type DiscoveryRoute } from './discovery-routing';
 import { agents } from './registry';
 import { assistantResponseSchema, discoveryResultSchema, planSchema, synthesisSchema, toolResultSchema, userRequestSchema, type AgentId, type AgentPlan, type AgentResponse, type AgentTaskView, type Finding, type ToolResult } from './schemas';
-import { toolRegistry, type CaseAccess, type ToolDependencies, defaultToolDependencies, toolDescriptions, toolSchemas } from './tools';
+import { toolRegistry, normalizeToolInput, type CaseAccess, type ToolDependencies, defaultToolDependencies, toolDescriptions, toolSchemas } from './tools';
 import type { AgentStore } from './persistence';
 import { attachReferences } from '@/lib/conversation/context';
 import type { ValidatedConversationContext } from '@/lib/conversation/context';
@@ -109,7 +109,7 @@ async function planRequest(provider: LLMProvider, content: string, caseContext?:
       for (const step of plan.steps) {
         let input: unknown;
         try { input = JSON.parse(step.input); } catch { throw new AgentError('PLAN_INPUT_INVALID', 'The assistant could not prepare a reliable search.', `${step.tool}:invalid_json`); }
-        const validated = toolSchemas[step.tool].safeParse(input);
+        const validated = toolSchemas[step.tool].safeParse(normalizeToolInput(step.tool, input));
         if (!validated.success) throw new AgentError('PLAN_INPUT_INVALID', 'The assistant could not prepare a reliable search.',
           `${step.tool}:${validated.error.issues.map((issue) => `${issue.path.join('.')}:${issue.code}`).join(',')}`);
       }
@@ -308,7 +308,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
           else task.status = 'completed';
           task.completedAt = new Date().toISOString();
           await context.store.updateTask(taskId, task.status, undefined, result);
-          const actionId = observation.status === 'reused' ? undefined : await context.store.recordAction(runId, taskId, step.tool, result.approvalRequired ? 'proposed' : 'completed', duration, input, result);
+          const actionId = observation.status === 'reused' ? undefined : await context.store.recordAction(runId, taskId, step.tool, result.approvalRequired ? 'proposed' : 'completed', duration, normalizeToolInput(step.tool, input), result);
           if (result.approvalRequired) {
             const args = input as Record<string, string>;
             approvalId = actionId;

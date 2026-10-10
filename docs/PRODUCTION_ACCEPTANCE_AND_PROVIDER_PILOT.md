@@ -65,8 +65,9 @@ Support; the assistant must not describe that as delivery to an active provider.
 - The hosted airport-transfer run exposed duplicate counting: search and requirements
   returned the same five records, but the summary counted ten. The summary now uses
   the same unique, bounded findings as the cards. A regression failed before the fix
-  and passes afterward; the original invalid array comparison proposal is separately
-  covered and remains rejected without executing its service.
+  and passes afterward. At that audit baseline, the original invalid array comparison
+  proposal remained rejected without executing its service; the follow-up below fixes
+  that separate argument defect.
 
 No production authorization defect was reproduced in this audit. A hosted model follow-up
 did produce `TOOL_INPUT_INVALID`: the run truthfully failed with `partially_completed`
@@ -74,6 +75,65 @@ activity and five preserved findings. The first package live gate stopped after 
 checks; this failure is retained as evidence, not converted to a pass. Model argument
 reliability is an operational risk even with strict validation. This does not certify
 every possible access path or replace the required real-provider rehearsal.
+
+### Comparison argument follow-up (10 October 2026)
+
+Starting baseline: `dc09686c691868fb9d9dc585cd6a418d57c657eb`.
+Read-only inspection of both failed airport-transfer runs reproduced the same model
+proposal: `compare_providers` received a bare array of the five returned public package
+UUIDs, rather than the registered strict object `{ "recordIds": [ ... ] }`.
+Both persisted calls had `TOOL_INPUT_INVALID` and no validated input. Schema rejection
+was correct; the defect was model argument shape plus the lack of narrow compatibility
+at the execution boundary. The harness surfaced a genuine failed step. The prior runs
+and their five valid findings remain retained; neither has been rewritten as successful.
+
+The registry still requires its original strict object schema. Before validating it,
+the registered execution boundary wraps only an unambiguous, unique, one-to-ten UUID
+array for `compare_providers`. It preserves every ID and its order. Empty, mixed,
+oversized, duplicate or malformed inputs are rejected without executing comparison;
+unknown/out-of-scope records still fail the existing scope and availability checks.
+Extra object fields and constraints are never silently removed. Planning uses the same
+adapter, and comparison now retains requirement evaluations and missing evidence.
+
+Raw and validated inputs are retained in private execution state. Equivalent array and
+object proposals share the existing cache key and persisted action hash. An actionable
+`TOOL_INPUT_INVALID` observation lets the model correct an argument; existing tool,
+failure and iteration budgets bound recovery. External/write authorization, confirmation
+requirements and database policies are unchanged. No migration is required.
+
+Verification attempts, including failed test assertions, are preserved in the release
+report and command logs:
+
+| Attempt | Exact result |
+| --- | --- |
+| Baseline strict rejection regression | 1 passed, 56 skipped; confirms the original array rejection |
+| Targeted attempt 1 | 143 passed in 3 files |
+| Targeted attempt 2 | 144 passed in 3 files, including the five-record transfer sequence |
+| Targeted attempt 3, with real PostgreSQL | 145 passed, 1 failed: new UI assertion expected the wrong existing partial-status label |
+| Targeted attempt 4, with real PostgreSQL | 145 passed, 1 failed: new UI assertion expected `Failed` instead of the existing `Could not complete` label |
+| Targeted attempt 5, corrected assertions | 146 passed in 4 files, including both actual PostgreSQL tests |
+| First full suite | 1,009 passed, 40 skipped |
+| Final full suite, with additional opt-in PostgreSQL test | 1,009 passed, 41 skipped; PostgreSQL opt-in tests separately passed above |
+| Lint and TypeScript | Both initial and final runs passed |
+| Production webpack build | Passed |
+| Fresh database/security gate | All 20 SQL scripts passed, plus migration reapplication and network lifecycle rerun |
+| Configured-secret/browser scan | Passed; no configured private value in tracked source or browser JavaScript |
+| Package live attempt 1, local production build | 47 checks passed; disposable account cleanup passed |
+| Package live attempt 2, tightened persisted-argument check | 47 checks passed; disposable account cleanup passed; no comparison requested on the transfer turn |
+
+The local live airport-transfer turn completed with five preserved package findings and
+`partially_completed` activity because transfer evidence was unknown. It requested no
+comparison tool on that turn; this is explicitly reported by the sanitized diagnostic.
+It is not claimed as live execution of the adapter. Forced bare-list execution, malformed
+input correction/exhaustion, constraint retention, contextual references and truthful
+failure projection pass the regressions. Actual PostgreSQL verifies one comparison
+action for equivalent proposals and one restored output/message after a lost response.
+The latest production package gate and exact deployed SHA must be checked after push;
+their results belong in the final release report, not inferred from local success.
+
+**Provider pilot remains NO-GO.** These checks do not establish a real partnership,
+consent, operational coverage, document-handling approval, independent monitoring,
+external delivery, backup/restore or a genuine provider response.
 
 ## Measured capabilities and pending dependencies
 
@@ -146,7 +206,8 @@ inquiry count. No autonomous clinical advice, bookings, payments or external pur
   the patient controls withdrawal of consent. Preserve historical responses and audit.
   Support informs only authorized participants through the agreed channel. Do not delete
   history or use the server key to bypass policy.
-- This release adds no migration; its runtime change corrects the displayed record count. Revert the release commit
+- These acceptance releases add no migration; runtime fixes correct the displayed record count,
+  normalize unambiguous comparison lists and preserve requirement evidence. Revert the release commit
   through normal Git deployment if needed; do not roll back the production schema or
   replay uncertain operations. Infrastructure/data incidents follow the approved restore plan.
 - Exit successfully only after the agreed cohort/window completes with genuine responses,
@@ -156,7 +217,7 @@ inquiry count. No autonomous clinical advice, bookings, payments or external pur
 
 ## Reproducible technical gates
 
-Final default suite: **993 passed, 40 opt-in skipped**; two additional runtime regressions
+Baseline audit default suite: **993 passed, 40 opt-in skipped**; two additional runtime regressions
 cover the observed invalid comparison proposal and duplicated summary count. Separately: **one live Cloudflare test**
 and **one actual local PostgreSQL recovery test** passed. Fresh migrations/seed and all
 **20 SQL validation scripts** passed, including operation migration reapplication;

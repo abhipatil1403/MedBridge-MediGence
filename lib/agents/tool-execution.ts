@@ -3,7 +3,7 @@ import { authorizeVerification } from '@/lib/verification/service';
 import { verificationToolSchemas } from '@/lib/verification/schemas';
 import { authorizeDocumentTool } from '@/lib/documents/service';
 import { AgentError } from './errors';
-import { toolRegistry, toolAliases, type ToolContext, type ToolDependencies } from './tools';
+import { toolRegistry, toolAliases, normalizeToolInput, type ToolContext, type ToolDependencies } from './tools';
 import { toolNameSchema, type ToolResult } from './schemas';
 import { AGENT_LIMITS, canonicalInput, ExecutionState, safeText, safeValue, type ToolObservation } from './execution-state';
 import { recoverableTool } from './recovery';
@@ -30,8 +30,12 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
     if (['write', 'external', 'clinical'].includes(definition.mode)
       && !(definition.mode === 'write' && (authorizeDocumentTool(name,proposal.input,context.userId,context.documentAuthorization)||authorizeVerification(name,proposal.input,context.userId,context.verificationAuthorization))))
       throw new AgentError('TOOL_CONFIRMATION_REQUIRED', 'This action needs a separate authorized confirmation or professional review.');
-    const parsed = definition.inputSchema.safeParse(proposal.input);
-    if (!parsed.success || safeText(JSON.stringify(proposal.input)) !== JSON.stringify(proposal.input)) throw new AgentError('TOOL_INPUT_INVALID', 'The requested tool arguments are invalid.');
+    const input = normalizeToolInput(name, proposal.input);
+    const parsed = definition.inputSchema.safeParse(input);
+    if (!parsed.success || safeText(JSON.stringify(proposal.input)) !== JSON.stringify(proposal.input)) throw new AgentError('TOOL_INPUT_INVALID',
+      name === 'compare_providers' || name === 'check_requirements'
+        ? 'Use {"recordIds":[...]} with 1–10 unique catalog IDs already returned by tools; preserve the requested order.'
+        : 'The requested tool arguments are invalid.');
     call.validatedInput = safeValue(parsed.data);
     if(Object.hasOwn(verificationToolSchemas,name)&&!authorizeVerification(name,parsed.data,context.userId,context.verificationAuthorization))throw new AgentError('VERIFICATION_ACTION_DENIED','Provider verification requires a resolved authenticated request.');
     const reference = context.referenceBoundary;
@@ -104,7 +108,7 @@ export async function executeRegisteredTool(state: ExecutionState, proposal: { t
     status: call.status === 'failed' ? 'failed' : call.status === 'reused' ? 'reused' : !output?.findings.length && !output?.research?.findings.length && !output?.documents && !output?.verification && !output?.inquiries && !output?.coordination && !output?.requestedInformation && !output?.approvalRequired ? 'empty' : 'completed',
     ...(output ? { data: { ...output, caseContext: undefined } } : {}), provenance: call.provenance,
     missingInformation: output?.analysis?.missingInformation ?? (output?.requestedInformation ? [output.requestedInformation] : []),
-    warnings: output?.note ? [output.note] : [], error: call.error,
+    warnings: [...(output?.note ? [output.note] : []), ...(Array.isArray(proposal.input) && call.validatedInput ? ['Normalized a bare comparison ID list to the registered recordIds object.'] : [])], error: call.error,
     nextStepRequired: call.status === 'failed' || Boolean(output?.requestedInformation || (output?.analysis && !output.analysis.complete)),
   };
   state.observations.push(observation);

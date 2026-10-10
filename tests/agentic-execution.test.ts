@@ -4,7 +4,7 @@ vi.mock('server-only', () => ({}));
 import { z } from 'zod';
 import { ExecutionState, AGENT_LIMITS, canonicalInput, safeValue } from '@/lib/agents/execution-state';
 import { executeRegisteredTool } from '@/lib/agents/tool-execution';
-import { toolRegistry, type ToolDependencies } from '@/lib/agents/tools';
+import { toolRegistry, toolSchemas, normalizeToolInput, type ToolDependencies } from '@/lib/agents/tools';
 import { runAgent } from '@/lib/agents/runtime';
 import { discoveryRoute } from '@/lib/agents/discovery-routing';
 import { activitySchema, decisionSchema } from '@/lib/agents/execution-schemas';
@@ -12,7 +12,9 @@ import { SupabaseAgentStore } from '@/lib/agents/persistence';
 import type { AgentStore } from '@/lib/agents/persistence';
 import type { AgentResponse, AgentPlan } from '@/lib/agents/schemas';
 import type { LLMProvider, ModelRequest } from '@/lib/ai/contracts';
-import { tools, hospital, pkg, userId, harness } from './fixtures/comparison-harness';
+import { tools, hospital, pkg, userId, harness, snapshot } from './fixtures/comparison-harness';
+import { RequirementExtractor } from '@/lib/requirements/RequirementExtractor';
+import { SearchService } from '@/lib/discovery/search-service';
 
 const caseAccess = { readContext: async () => ({}), readDocumentMetadata: async () => [] };
 const context = { agent: 'discovery' as const, userId, caseAccess };
@@ -30,6 +32,45 @@ const call = (state: ExecutionState, tool = 'get_hospital_details', input: unkno
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe('registered execution boundary', () => {
+  it('reproduces the exact hosted shape: schema rejects a bare list, supported adapter preserves all five IDs and order', () => {
+    const ids = ['98b860cf-4e50-47aa-889f-8d548d123b3f','8b2199e5-1b41-488f-a546-fd13b0fe5bcd','1bbc3760-637b-4c04-a653-cae116c65e0d','dc43caa5-2175-4b76-a5dc-9771e2692f32','b164a1e5-4da5-40c0-b446-7b3879e0ddbc'];
+    expect(toolSchemas.compare_providers.safeParse(ids).success).toBe(false);
+    const normalized = normalizeToolInput('compare_providers', ids);
+    expect(normalized).toEqual({recordIds:ids});
+    expect(toolSchemas.compare_providers.parse(normalized)).toEqual({recordIds:ids});
+  });
+  it.each([[], ['not-an-id'], [hospital.recordId, hospital.recordId], [{id:hospital.recordId}], [hospital.recordId,42], Array.from({length:11}, () => randomUUID()), {ids:[hospital.recordId]}, {recordIds:[hospital.recordId],constraint:'ignore transfer'}])('rejects invalid or ambiguous comparison input %j without invoking a service', async input => {
+    const invoke = vi.spyOn(toolRegistry.compare_providers, 'execute');
+    const result = await call((await execution()).state, 'compare_providers', input);
+    expect(result.error?.code).toMatch(/TOOL_INPUT_INVALID|TOOL_RECORD_UNAVAILABLE/);
+    if(result.error?.code === 'TOOL_INPUT_INVALID')expect(result.error.message).toContain('recordIds');
+    expect(invoke).not.toHaveBeenCalled();
+  });
+  it('normalizes only comparison lists and never substitutes unknown or unobserved IDs', async () => {
+    expect(normalizeToolInput('create_case',[hospital.recordId])).toEqual([hospital.recordId]);
+    expect(normalizeToolInput('check_requirements',[hospital.recordId])).toEqual([hospital.recordId]);
+    const {state} = await execution();
+    const foreign = await executeRegisteredTool(state,{tool:'compare_providers',input:[randomUUID()]}, {...context,observedRecordIds:[hospital.recordId]},tools);
+    expect(foreign.error?.code).toBe('TOOL_SCOPE_DENIED');
+  });
+  it('persists raw and canonical inputs and reuses object/list equivalents without another invocation', async () => {
+    const {state,saved} = await execution();
+    const invoke = vi.spyOn(toolRegistry.compare_providers,'execute');
+    const first = await call(state,'compare_providers',[hospital.recordId]);
+    const repeated = await call(state,'compare_providers',{recordIds:[hospital.recordId]});
+    expect(first.status).toBe('completed');expect(repeated.status).toBe('reused');expect(invoke).toHaveBeenCalledOnce();
+    expect(state.calls[0]).toMatchObject({input:[hospital.recordId],validatedInput:{recordIds:[hospital.recordId]},status:'completed'});
+    expect(first.warnings).toContain('Normalized a bare comparison ID list to the registered recordIds object.');
+    expect(saved.at(-1)?.calls).toEqual(state.calls);
+  });
+  it('retains airport-transfer constraints, provenance and missing evidence through normalized comparison', async () => {
+    const requirements = RequirementExtractor.extract('Find knee replacement packages in Mumbai with airport transfer',snapshot);
+    const result = await call((await execution()).state,'compare_providers',[pkg.recordId],{...tools,requirements,evaluationSnapshot:snapshot});
+    expect(result.data?.findings[0].requirementEvaluation?.evaluations.some(e=>e.type==='airport_transfer'&&['unknown','incomplete'].includes(e.status))).toBe(true);
+    expect(result.data?.findings[0].provenance.recordId).toBe(pkg.recordId);
+    expect(result.data?.analysis?.complete).toBe(false);
+    expect(result.data?.analysis?.missingInformation.length).toBeGreaterThan(0);
+  });
   it('defines the required tools with complete execution metadata', () => {
     for (const id of ['search_hospitals', 'search_doctors', 'search_treatments', 'search_packages', 'get_hospital_details', 'get_doctor_details', 'get_treatment_details', 'get_package_details', 'compare_providers', 'check_requirements', 'search_locations'] as const) {
       expect(toolRegistry[id]).toMatchObject({ id, version: '1', permission: 'read', mode: 'read', failureHandling: 'observe_and_recover' });
@@ -155,10 +196,9 @@ describe('existing runtime with model observation decisions', () => {
     const result = await run([request('search_packages', { query: 'knee' })], { ...tools, search: async () => { throw new Error('private service error'); } });
     expect(result.response.activity?.state).toBe('partially_completed'); expect(result.response.findings[0].provenance.recordId).toBe(hospital.recordId); expect(result.response.summary).not.toContain('private service');
   });
-  it('rejects an array proposed as comparison arguments and preserves partial evidence', async () => {
-    // Reproduces the hosted model proposal; no network or production failure injection.
+  it('rejects ambiguous comparison arguments and preserves partial evidence', async () => {
     const execute = vi.spyOn(toolRegistry.compare_providers, 'execute');
-    const result = await run([request('compare_providers', [hospital.recordId])]);
+    const result = await run([request('compare_providers', [hospital.recordId,42])]);
     expect(execute).not.toHaveBeenCalled();
     expect(result.response.status).toBe('failed');
     expect(result.response.activity?.state).toBe('partially_completed');
@@ -171,7 +211,7 @@ describe('existing runtime with model observation decisions', () => {
     const route = await discoveryRoute('Find knee replacement hospitals in Mumbai', tools.repository);
     expect(route).toBeDefined();
     const m = memory();
-    const decisions = [request('check_requirements', {recordIds:[hospital.recordId]}), request('compare_providers', [hospital.recordId])];
+    const decisions = [request('check_requirements', {recordIds:[hospital.recordId]}), request('compare_providers', [hospital.recordId,42])];
     const provider: LLMProvider = {generateStructured: async <T extends z.ZodType>() => decisions.shift() as z.infer<T>};
     const response = await runAgent({content:'Find knee replacement hospitals in Mumbai and check requirements'},
       {userId,store:m.store,provider,caseAccess,tools,execution:{plan:route!.plan,route}});
@@ -180,6 +220,58 @@ describe('existing runtime with model observation decisions', () => {
     expect(response.summary).toContain('I found 1 catalog record matching');
     expect(response.activity?.state).toBe('partially_completed');
     expect(m.output()?.summary).toBe(response.summary);
+  });
+  it('recovers an actionable argument rejection, persists success and does not duplicate normalized actions', async () => {
+    const result = await run([request('compare_providers',{ids:[hospital.recordId]}),request('compare_providers',[hospital.recordId]),request('compare_providers',{recordIds:[hospital.recordId]})]);
+    expect(result.response.status).toBe('completed');
+    expect(result.response.activity?.state).toBe('partially_completed'); // one peer cannot complete a comparison
+    expect(result.inputs.some(i => i.includes('Use {\\"recordIds\\"'))).toBe(true);
+    expect(result.response.tasks.map(t => t.status)).toEqual(['completed','failed','completed','completed']);
+    expect(result.actions.filter(a=>a==='compare_providers')).toHaveLength(2); // rejected attempt + one actual read
+    expect(result.response.activity?.steps.at(-1)?.status).toBe('reused');
+    expect(result.output()?.status).toBe(result.response.status);
+    expect(result.response.summary).not.toContain('could not be completed');
+  });
+  it('exhausts malformed proposals within the existing failure budget without a comparison service call', async () => {
+    const invoke = vi.spyOn(toolRegistry.compare_providers,'execute');
+    const result = await run(Array.from({length:20},()=>request('compare_providers',{ids:[hospital.recordId]})));
+    expect(invoke).not.toHaveBeenCalled();
+    expect(result.response.tasks.filter(t=>t.status==='failed')).toHaveLength(AGENT_LIMITS.maxFailures);
+    expect(result.response.tasks.length).toBeLessThanOrEqual(AGENT_LIMITS.maxToolCalls);
+    expect(result.response.status).toBe('failed');expect(result.response.activity?.state).toBe('partially_completed');
+    expect(result.response.findings[0].provenance.recordId).toBe(hospital.recordId);
+    expect(result.saved.at(-1)?.state).toBe('partially_completed');
+    expect(result.response.summary).toContain('could not be completed');
+  });
+  it('preserves airport-transfer follow-up constraints and contextual package references', async () => {
+    const h = harness();
+    const initial = await h.send('Find knee replacement packages in Mumbai');
+    const followUp = await h.send('Does the first one include airport transfer?',initial.conversationId);
+    expect(followUp.findings.filter(f=>f.kind==='packages').map(f=>f.provenance.recordId)).toEqual([pkg.recordId]);
+    expect(followUp.requirements?.some(r=>r.type==='airport_transfer')).toBe(true);
+    expect(followUp.findings[0].requirementEvaluation?.overallStatus).not.toBe('fully_satisfies');
+    expect(followUp.findings[0].requirementEvaluation?.evaluations.some(e=>e.type==='airport_transfer'&&e.status==='unknown')).toBe(true);
+  });
+  it('completes the five-record airport-transfer sequence with canonical arguments and honest evidence gaps', async () => {
+    const packages = Array.from({length:5},(_,i)=>({...pkg,recordId:randomUUID(),slug:`qa-package-${i}`,name:`QA Package ${i}`}));
+    const localSnapshot = {...snapshot,packages};
+    const repository = {...tools.repository,loadSnapshot:async()=>localSnapshot,listPackages:async()=>packages,findCandidateSlugs:async(parsed:Parameters<typeof tools.repository.findCandidateSlugs>[0])=>({...(await tools.repository.findCandidateSlugs(parsed)),packages:new Set(packages.map(p=>p.slug))})};
+    const search = new SearchService(repository);
+    const dependencies:ToolDependencies = {...tools,repository,search:(q,type,filters)=>search.search({q,type,...filters,sort:'relevance'}),evaluationSnapshot:localSnapshot,
+      requirements:RequirementExtractor.extract('Find knee replacement packages in Mumbai with airport transfer',localSnapshot)};
+    const route = await discoveryRoute('Find knee replacement packages in Mumbai with airport transfer',repository);
+    const ids=packages.map(p=>p.recordId),decisions=[request('check_requirements',{recordIds:ids}),request('compare_providers',ids),{action:'finish',tool:null,input:null,version:null,question:null}];
+    const m=memory(),provider:LLMProvider={generateStructured:async <T extends z.ZodType>()=>decisions.shift() as z.infer<T>};
+    const response=await runAgent({content:'Find knee replacement packages in Mumbai with airport transfer and check requirements'},
+      {userId,store:m.store,provider,caseAccess,tools:dependencies,execution:{plan:route!.plan,route}});
+    expect(response.status).toBe('completed');expect(response.tasks.map(t=>t.status)).toEqual(['completed','completed','completed']);
+    expect(response.findings.map(f=>f.provenance.recordId)).toEqual(ids);
+    expect(response.findings.every(f=>f.requirementEvaluation?.evaluations.some(e=>e.type==='airport_transfer'&&e.status==='unknown'))).toBe(true);
+    expect(response.activity?.state).toBe('partially_completed');
+    expect(response.summary).toContain('I found 5 catalog records');
+    expect(response.summary).not.toContain('could not be completed');
+    expect(m.saved.at(-1)?.calls).toEqual(expect.arrayContaining([expect.objectContaining({tool:'compare_providers',input:ids,validatedInput:{recordIds:ids},status:'completed'})]));
+    expect(m.output()?.findings).toEqual(response.findings);
   });
   it('reuses a duplicate service call without creating another action', async () => { const result = await run([request('get_hospital_details', { slug: hospital.slug })]); expect(result.actions).toEqual(['get_hospital']); expect(result.response.activity?.steps[1].status).toBe('reused'); });
   it('bounds a model that requests the same call forever', async () => { const result = await run(Array.from({ length: 15 }, () => request('get_hospital', { slug: hospital.slug }))); expect(result.response.activity?.state).toBe('partially_completed'); expect(result.response.tasks.length).toBeLessThanOrEqual(AGENT_LIMITS.maxToolCalls); });
