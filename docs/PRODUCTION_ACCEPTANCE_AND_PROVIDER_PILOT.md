@@ -1,5 +1,9 @@
 # Production acceptance and first provider pilot
 
+Latest safety audit and practical pilot checklist:
+[Production safety and controlled provider pilot](PRODUCTION_SAFETY_AND_PROVIDER_PILOT.md).
+Its technical fixes do not change the NO-GO decision below.
+
 Audit date: 10 October 2026. Baseline: `c9a0cf27a2629db76abfba417307e5a2c8bf11cf`.
 Production origin: https://medbridge-medigence.vercel.app.
 

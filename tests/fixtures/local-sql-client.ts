@@ -22,6 +22,7 @@ export function localSqlClient(url:string,role:'postgres'|'service_role'|'authen
     insert(values:Record<string,unknown>){this.mode='insert';this.values=values;return this;}
     update(values:Record<string,unknown>){this.mode='update';this.values=values;return this;}
     eq(key:string,value:unknown){this.filters.push(`${identifier(key)}=${literal(value)}`);return this;}
+    neq(key:string,value:unknown){this.filters.push(`${identifier(key)}<>${literal(value)}`);return this;}
     in(key:string,values:unknown[]){this.filters.push(`${identifier(key)} in (${values.map(literal).join(',')})`);return this;}
     order(key:string,options?:{ascending?:boolean}){this.ordering=` order by ${identifier(key)} ${options?.ascending===false?'desc':'asc'}`;return this;}
     limit(n:number){this.cap=n;return this;}

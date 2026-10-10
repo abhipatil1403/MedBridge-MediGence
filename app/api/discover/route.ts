@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { InvalidDiscoveryFilters, parseDiscoveryFilters } from "@/lib/discovery/filters";
 import { searchService } from "@/lib/discovery/search-service";
+import { failureCategory } from '@/lib/operations/contracts';
 
 export async function GET(request: NextRequest) {
   const started=performance.now();
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
     const results = await searchService.search(filters);
     return NextResponse.json(results, { headers: { "Cache-Control": "no-store",'Server-Timing':`catalog;dur=${Math.round(performance.now()-started)}` } });
   } catch (error) {
-    if (!(error instanceof InvalidDiscoveryFilters)) console.error("Discovery catalog read failed", error);
+    if (!(error instanceof InvalidDiscoveryFilters)) console.error(JSON.stringify({event:'catalog_read_failed',category:failureCategory((error as {code?:unknown})?.code)}));
     const message = error instanceof InvalidDiscoveryFilters ? error.message : "Search is temporarily unavailable. Please retry.";
     return NextResponse.json({ error: message }, { status: error instanceof InvalidDiscoveryFilters ? 400 : 503 });
   }

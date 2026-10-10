@@ -3,7 +3,7 @@ import { failureCategory, requestEventSchema } from '@/lib/operations/contracts'
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { portalSession,portalResponse,portalFailure,checked,PortalError } from '@/lib/portals/server';
-import { entityKind,inquiryCommandSchema } from '@/lib/inquiries/schemas';
+import { entityKind,inquiryCommandSchema,projectInquiryContext,type InquiryContext } from '@/lib/inquiries/schemas';
 export const runtime='nodejs';
 export async function GET(request:NextRequest){try{
   const {db,user,portal}=await portalSession(request);const params=request.nextUrl.searchParams;
@@ -13,7 +13,7 @@ export async function GET(request:NextRequest){try{
       const own=await db.from('support_cases').select('id').eq('id',id).eq('patient_id',user.id).maybeSingle();
       if(own.error||!own.data)throw new PortalError(403,'This request is unavailable in your account.');
     }
-    return portalResponse(checked(await db.rpc('inquiry_context',{p_case_id:id})));
+    return portalResponse(projectInquiryContext(checked(await db.rpc('inquiry_context',{p_case_id:id})) as unknown as InquiryContext));
   }
   if(params.has('entityId'))return portalResponse(checked(await db.rpc('inquiry_target',{p_kind:entityKind.parse(params.get('kind')),p_id:z.uuid().parse(params.get('entityId'))})));
   const page=z.coerce.number().int().min(0).max(1000).parse(params.get('page')??0);

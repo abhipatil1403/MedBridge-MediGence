@@ -17,7 +17,7 @@ import {
   useResource,
 } from "./core";
 import { CommandForm } from "./command-form";
-import { providerStatusLabel } from '@/lib/inquiries/schemas';
+import { providerQueueStatusLabel } from '@/lib/inquiries/schemas';
 import { InquiryDetail } from '@/components/inquiries/detail';
 
 export function Cases({
@@ -121,7 +121,7 @@ export function Cases({
             render: (row) => String(row.id).slice(0, 8),
           },
           { key: "title", label: "Request" },
-          { key:'provider_response_status',label:'Provider coordination',render:row=>row.inquiry_source==='legacy'?'Earlier Support request':<><span>{row.organization_id?'Connected organization':'Support coordination pending'}</span><br/><span>{row.share_with_provider?providerStatusLabel(String(row.provider_response_status)):'Provider sharing not authorized'}</span>{row.provider_responded_at&&<small>{date(row.provider_responded_at)}</small>}</> },
+          { key:'provider_response_status',label:'Provider coordination',render:row=>row.inquiry_source==='legacy'?'Earlier Support request':<><span>{row.organization_id?'Connected organization':'Support coordination pending'}</span><br/><span>{row.share_with_provider?providerQueueStatusLabel(String(row.provider_response_status)):'Provider sharing not authorized'}</span>{row.provider_responded_at&&<small>{date(row.provider_responded_at)}</small>}</> },
           {
             key: "case_type",
             label: "Type",

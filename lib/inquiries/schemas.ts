@@ -30,31 +30,47 @@ export type InquiryDocument={id:string;filename:string;mime_type:string;size_byt
 export type ProviderCoordination={readiness?:string|null;available:boolean;informationRequestedAt:string|null;informationAnsweredAt:string|null;latestResponse:{id:string;body:string;createdAt:string;responderName:string;organizationName:string}|null};
 export type InquiryContext={case:InquiryRow;role:'patient'|'support'|'provider';patient:{displayName:string|null};organization:{id:string;name:string}|null;providerCoordination?:ProviderCoordination;messages:{id:string;body:string;visibility:string;created_at:string;sender:string}[];events:InquiryEvent[];documents:InquiryDocument[];documentRequests:{id:string;title:string;purpose:string;requesting_party:string;status:string;created_at:string}[];consents:{id:string;purpose:string;granted_at:string;revoked_at:string|null}[];staffDirectory:{id:string;name:string;role:string}[];tasks:{id:string;title:string;status:string;revision:number;assigned_to:string|null;due_at:string|null;priority:string}[];journeys:{id:string;title:string}[];unread:number};
 
+const responseStates=new Set(['information_requested','responded','accepted_for_coordination','further_review','unable_to_coordinate']);
+/** The authenticated RPC links a same-case, provider-principal message. A status alone is not evidence. */
+export function effectiveProviderStatus(context:InquiryContext):string {
+  const status=context.case.provider_response_status,response=context.providerCoordination?.latestResponse;
+  return responseStates.has(status)&&(!response||!z.uuid().safeParse(response.id).success||!response.body?.trim())?'unconfirmed_response':status;
+}
+export function projectInquiryContext(context:InquiryContext):InquiryContext {
+  return {...context,case:{...context.case,provider_response_status:effectiveProviderStatus(context)}};
+}
+/** Queue rows have no attributable message projection; verify the response in the scoped detail. */
+export function providerQueueStatusLabel(value:string):string {
+  return responseStates.has(value)?'Open the request to verify its recorded provider response.':providerStatusLabel(value);
+}
+
 export function inquiryStatusLabel(value:string):string {
   const labels:Record<string,string>={open:'Submitted to Support',in_progress:'Coordination in progress',waiting_patient:'Awaiting patient information',waiting_provider:'Awaiting provider response',escalated:'Escalated to Support',resolved:'Resolved',closed:'Closed',cancelled:'Cancelled'};
   return labels[value]??'Status unavailable';
 }
 export function providerStatusLabel(value:string):string {
-  const labels:Record<string,string>={not_requested:'Provider sharing not authorized',pending:'Awaiting provider response',information_requested:'Provider requested information',responded:'Provider responded',accepted_for_coordination:'Provider confirmed it can continue coordination',further_review:'Further coordination required',unable_to_coordinate:'Provider unable to proceed'};
+  const labels:Record<string,string>={unconfirmed_response:'Provider response not confirmed',not_requested:'Provider sharing not authorized',pending:'Awaiting provider response',information_requested:'Provider requested information',responded:'Provider responded',accepted_for_coordination:'Provider confirmed it can continue coordination',further_review:'Further coordination required',unable_to_coordinate:'Provider unable to proceed'};
   return labels[value]??'Coordination status unavailable';
 }
 export function inquiryNextStep(context:InquiryContext):string {
   if(context.case.consent_revoked_at)return 'Support consent is withdrawn. Your request remains available to you.';
   if(context.case.status==='cancelled')return 'You cancelled this request.';
   if(['resolved','closed'].includes(context.case.status))return context.case.resolution_summary??'This request is complete.';
+  const providerStatus=effectiveProviderStatus(context);
+  if(providerStatus==='unconfirmed_response'&&context.organization&&context.providerCoordination?.available!==false)return 'No attributable provider response is available. Ask Support to review the recorded status; no provider acceptance is confirmed.';
   if(context.role==='provider'){
-    if(context.case.provider_response_status==='information_requested')return 'Await the patient’s shared reply or an explicitly shared document. Private uploads remain unavailable until separately authorized.';
-    if(context.case.provider_response_status==='further_review')return 'Review this request with your team, then record an updated operational response.';
+    if(providerStatus==='information_requested')return 'Await the patient’s shared reply or an explicitly shared document. Private uploads remain unavailable until separately authorized.';
+    if(providerStatus==='further_review')return 'Review this request with your team, then record an updated operational response.';
     return 'Review the authorized request and record your organization’s response. Coordination does not confirm a booking or treatment.';
   }
   if(context.documentRequests.some(d=>['requested','replacement_requested'].includes(d.status)))return 'Review the document request and its purpose. Uploading is private; sharing is a separate choice.';
-  if(context.case.provider_response_status==='information_requested'&&context.case.share_with_provider)return 'Review the provider’s information request. Choose Patient, Support and authorized provider when replying so the provider can read your answer.';
+  if(providerStatus==='information_requested'&&context.case.share_with_provider)return 'Review the provider’s information request. Choose Patient, Support and authorized provider when replying so the provider can read your answer.';
   if(context.case.status==='waiting_patient')return 'Support needs information. Review the messages and reply.';
   if(!context.organization||context.providerCoordination?.available===false)return 'Support will coordinate your question. Direct provider coordination is not available for this listing; no provider response is confirmed.';
-  if(context.case.share_with_provider&&context.case.provider_response_status==='unable_to_coordinate')return 'The provider cannot proceed with this request. Ask Support about the next coordination step.';
-  if(context.case.share_with_provider&&context.case.provider_response_status==='further_review')return 'The provider requires further coordination. Review its response and contact Support about the next step.';
-  if(context.case.share_with_provider&&context.case.provider_response_status==='accepted_for_coordination')return 'The provider confirmed it can continue coordination. Review its response; an appointment, price or treatment is not confirmed.';
-  if(context.case.share_with_provider&&context.case.provider_response_status==='responded')return 'A provider response is available below. Review it and reply to the authorized recipients if needed.';
+  if(context.case.share_with_provider&&providerStatus==='unable_to_coordinate')return 'The provider cannot proceed with this request. Ask Support about the next coordination step.';
+  if(context.case.share_with_provider&&providerStatus==='further_review')return 'The provider requires further coordination. Review its response and contact Support about the next step.';
+  if(context.case.share_with_provider&&providerStatus==='accepted_for_coordination')return 'The provider confirmed it can continue coordination. Review its response; an appointment, price or treatment is not confirmed.';
+  if(context.case.share_with_provider&&providerStatus==='responded')return 'A provider response is available below. Review it and reply to the authorized recipients if needed.';
   if(context.case.share_with_provider)return 'Your authorized provider team can review the shared request. Check here for its response.';
   return 'Support will review your request. Provider access requires your separate permission.';
 }

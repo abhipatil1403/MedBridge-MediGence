@@ -6,7 +6,7 @@ import { useExperience } from '@/components/experience/provider';
 import { T, LocalDateTime } from '@/components/experience/translation';
 import { InlineSkeleton } from '@/components/inline-skeleton';
 import { getBrowserSupabaseClient } from '@/lib/supabase/browser';
-import { inquiryNextStep,inquiryStatusLabel,providerStatusLabel,type InquiryContext,type InquiryDocument } from '@/lib/inquiries/schemas';
+import { inquiryNextStep,inquiryStatusLabel,providerStatusLabel,effectiveProviderStatus,type InquiryContext,type InquiryDocument } from '@/lib/inquiries/schemas';
 type Fields=Record<string,unknown>;
 type Run=(action:string,input:Fields)=>Promise<void>;
 function Form({title,action,children,input,run,busy,confirm=false,submit='Save'}:{title:string;action:string;children?:ReactNode;input?:(f:FormData)=>Fields;run:Run;busy:boolean;confirm?:boolean;submit?:string}){
@@ -68,7 +68,7 @@ export function InquiryDetail({id,portal='patient'}:{id:string;portal?:'patient'
       </li>)}</ul>
       {(isStaff||isProvider)&&active&&<Form title="Request a document" action="request_document" run={run} busy={busy} input={f=>({title:str(f,'title'),purpose:str(f,'purpose'),visibility:isProvider?'shared':'patient'})} submit="Send document request"><Field name="title" label="Document requested" max={180} min={3}/><Field name="purpose" label="Coordination purpose and recipient" max={800} min={5}/><p>Request only a necessary coordination document. This is not a hospital admission requirement or medical instruction.</p></Form>}
     </section>
-    <section><h3>Provider coordination</h3><p>{context.organization?.name??'No connected provider team for this reference listing.'}</p><p>{c.share_with_provider?'Sharing authorized by the patient for the purpose recorded below.':'Routed to MedBridge Support. Provider access has not been authorized.'}</p><p>Status: {['resolved','closed','cancelled'].includes(c.status)?'Coordination complete':providerStatusLabel(c.provider_response_status)}{c.provider_responded_at&&<> · <LocalDateTime value={c.provider_responded_at}/></>}</p>
+    <section><h3>Provider coordination</h3><p>{context.organization?.name??'No connected provider team for this reference listing.'}</p><p>{c.share_with_provider?'Sharing authorized by the patient for the purpose recorded below.':'Routed to MedBridge Support. Provider access has not been authorized.'}</p><p>Status: {['resolved','closed','cancelled'].includes(c.status)?'Coordination complete':providerStatusLabel(effectiveProviderStatus(context))}{c.provider_responded_at&&<> · <LocalDateTime value={c.provider_responded_at}/></>}</p>
       {context.role==='support' && context.providerCoordination?.readiness && <p><T>{providerConnectivityLabel(context.providerCoordination.readiness)}</T></p>}
       {context.providerCoordination?.available===false&&<p>Direct provider coordination is unavailable. Support can continue the permitted coordination process; no external delivery is confirmed.</p>}
       {context.providerCoordination?.latestResponse&&<div className="inquiry-next"><h4>Latest recorded provider response</h4><p>{context.providerCoordination.latestResponse.responderName} · {context.providerCoordination.latestResponse.organizationName} · <LocalDateTime value={context.providerCoordination.latestResponse.createdAt}/></p><p className="inquiry-prewrap">{context.providerCoordination.latestResponse.body}</p></div>}
