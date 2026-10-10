@@ -2,7 +2,7 @@
  * MEDBRIDGE_INQUIRY_LIVE_TEST=1 node --env-file=.env.local scripts/validate-patient-inquiries-live.mjs [--browser]
  */
 import assert from 'node:assert/strict';
-import { randomUUID,createHash } from 'node:crypto';
+import { randomUUID,randomBytes,createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import {writeFileSync} from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
@@ -14,7 +14,7 @@ const actors={},caseIds=[],storedPaths=[];let passed=0,broker;
 function check(ok,label){assert.ok(ok,label);console.log(`PASS ${++passed}: ${label}`);}
 function good(result){assert.equal(result.status,200,result.data?.error);return result.data;}
 function db(result){if(result.error)throw new Error(`Database gate failed: ${result.error.message}`);return result.data;}
-async function actor(role){const password=`QA-${randomUUID()}`;const created=db(await admin.auth.admin.createUser({email:`inquiry-qa-${role}-${randomUUID()}@qa.invalid`,password,email_confirm:true}));
+async function actor(role){const password=randomBytes(32).toString('base64url');const created=db(await admin.auth.admin.createUser({email:`inquiry-qa-${role}-${randomUUID()}@qa.invalid`,password,email_confirm:true}));
   const client=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,options);actors[role]={id:created.user.id,client};
   if(process.env.MEDBRIDGE_INQUIRY_QA_MANIFEST)writeFileSync(process.env.MEDBRIDGE_INQUIRY_QA_MANIFEST,JSON.stringify({origin,createdAt:new Date().toISOString(),actors:Object.entries(actors).map(([role,a])=>({role,id:a.id}))},null,2));
   const login=db(await client.auth.signInWithPassword({email:created.user.email,password}));actors[role].session=login.session;
