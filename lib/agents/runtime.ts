@@ -385,11 +385,12 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
         await context.store.updateTask(pending.id, 'blocked');
       }
     }
+    const unique = [...new Map(findings.map((item) => [item.provenance.recordId, item])).values()].slice(0, 30);
     let summary: string;
     let nextSteps: string[];
     if (approval) { summary = approval; nextSteps = ['Review the proposed action below. No change happens until you approve.']; }
     else if (route) {
-      const result = discoverySummary(route, findings);
+      const result = discoverySummary(route, unique);
       summary = result.summary; nextSteps = result.nextSteps;
       if (route.normalized.missingEntities.length) { status = 'awaiting_user_input'; question = plan.missingInformation; }
     } else if (context.execution?.synthesis) {
@@ -407,7 +408,6 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
       summary = synthesis.summary; nextSteps = synthesis.nextSteps;
       if (synthesis.question && !question && findings.length === 0) { question = synthesis.question; status = 'awaiting_user_input'; }
     }
-    const unique = [...new Map(findings.map((item) => [item.provenance.recordId, item])).values()];
     const unsupportedProcedure = Boolean(route?.normalized.entities.procedurePhrase && ['related', 'none'].includes(route.normalized.entities.procedureMatchType));
     const discoveryResult = route && plan.agent !== 'comparison' ? discoveryResultSchema.parse({
       query: request.content, normalizedQuery: route.normalized.normalizedQuery, intent: route.normalized.intent,
@@ -422,7 +422,7 @@ export async function runAgent(rawRequest: unknown, context: RuntimeContext): Pr
     const discovery = discoveryResult ? { normalizedQuery: discoveryResult.normalizedQuery, matchType: discoveryResult.matchType,
       matchReason: discoveryResult.matchReason, recovered: discoveryResult.recovered } : undefined;
     let response: AgentResponse = { conversationId, runId, agent: plan.agent, status, understanding: safeText(plan.understanding),
-      summary, findings: unique.slice(0, 30), analyses: results.flatMap((r) => r.result.analysis ? [r.result.analysis] : []), summarySource: route || context.execution?.synthesis ? 'application' : 'model', nextSteps, question, tasks, approvalId, approvalProposal, discovery };
+      summary, findings: unique, analyses: results.flatMap((r) => r.result.analysis ? [r.result.analysis] : []), summarySource: route || context.execution?.synthesis ? 'application' : 'model', nextSteps, question, tasks, approvalId, approvalProposal, discovery };
     if (context.execution?.finalize) response = await context.execution.finalize(response, results);
     if (context.finalizeResponse) response = await context.finalizeResponse(response);
     const failedCalls = execution.calls.filter((c) => c.status === 'failed' && !execution.calls.some((next) => next.step > c.step && next.tool === c.tool && ['completed', 'reused'].includes(next.status) && (c.error?.code === 'TOOL_INPUT_INVALID' || canonicalInput(next.input) === canonicalInput(c.input))));

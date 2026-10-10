@@ -118,6 +118,10 @@ select set_config('request.jwt.claim.sub',(select id::text from iq where k='pati
 select public.inquiry_command('revoke_provider',pg_temp.iq_input());
 select set_config('request.jwt.claim.sub',(select id::text from iq where k='provider'),true);
 select pg_temp.iq_denied(format('select public.inquiry_context(%L)',(select id from iq where k='case')),'PORTAL_DENIED');
+-- A saved receipt must not bypass current consent, even with the original actor.
+select pg_temp.iq_denied(format('select public.inquiry_command(''provider_response'',%L)',(select v from iq where k='provider_reply')::text),'PORTAL_DENIED');
+select pg_temp.iq_denied(format('select public.inquiry_command(''provider_response'',%L)',pg_temp.iq_input('{"status":"responded","body":"REVOKED_QA_RESPONSE_MUST_NOT_EXIST","confirmed":true}')::text),'PORTAL_DENIED');
+select pg_temp.iq_denied(format('select public.inquiry_document_delivery(%L)',(select id from iq where k='file')),'PORTAL_DENIED');
 select set_config('request.jwt.claim.sub',(select id::text from iq where k='patient'),true);
 select public.inquiry_command('revoke_support',pg_temp.iq_input());
 select set_config('request.jwt.claim.sub',(select id::text from iq where k='agent'),true);
@@ -135,5 +139,6 @@ select pg_temp.iq_assert(exists(select 1 from public.audit_events where entity_i
 select pg_temp.iq_assert(exists(select 1 from public.audit_events where entity_id=(select id from iq where k='case') and event_name='inquiry.provider_response' and actor_role in ('provider_admin','provider_editor')),'provider response audit records the actual acting provider role');
 select pg_temp.iq_assert(not exists(select 1 from public.audit_events where entity_id=(select id from iq where k='case') and (new_value::text like '%INTERNAL_QA_NEVER_EXPOSE%' or new_value::text like '%private.pdf%')),'field audit excludes patient prose and filenames');
 select pg_temp.iq_assert((select count(*)=1 from public.support_case_events where case_id=(select id from iq where k='case') and action='inquiry.document_uploaded'),'upload commit retry emits one immutable upload event');
+select pg_temp.iq_assert(not exists(select 1 from public.support_case_messages where case_id=(select id from iq where k='case') and body='REVOKED_QA_RESPONSE_MUST_NOT_EXIST'),'denied post-revocation response persists no message');
 rollback;
 \echo Patient inquiry lifecycle, permissions, documents, retries, notifications and Recover checks passed; all inquiry fixtures rolled back.

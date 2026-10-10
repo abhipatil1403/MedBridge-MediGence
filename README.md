@@ -1,12 +1,12 @@
 # MedBridge
 
-MedBridge is a healthcare discovery and care coordination prototype. Its searchable catalog is stored in PostgreSQL and contains explicitly synthetic records. The authenticated `/assistant` workspace uses server-side Cloudflare Workers AI and controlled MedBridge tools. It does **not** contain live providers, clinical advice, confirmed bookings, payments, or external record sharing.
+MedBridge is a healthcare discovery and care coordination platform. Its PostgreSQL catalog exposes governed published records; synthetic seed records are isolated from public production discovery. The authenticated `/assistant` uses server-side Cloudflare Workers AI and registered tools. Provider participation requires separately reviewed authority, canonical ownership, an active authorized team and explicit patient consent. A published reference does not establish an active provider relationship. Clinical advice, confirmed bookings and payments are not provided.
 
 ## Start locally
 
 Requires Node.js 22 or newer, npm, and a Supabase project with the migrations and seed applied. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to that project's public URL and publishable/anon key.
 
-With the Supabase CLI and a linked project, apply the versioned schema and synthetic catalog:
+With the Supabase CLI and an isolated development project, apply the versioned schema and synthetic QA catalog:
 
 ```bash
 supabase link --project-ref YOUR_PROJECT_REF
@@ -20,7 +20,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. Try a search such as `knee surgery`, `hospitals in India`, `cardiologist`, or `second opinion`. Discovery supports suggestions, intent parsing, entity matching, filtering, sorting and links into detail pages. Treatment planning, consultation, second opinion, medical travel and recovery routes show the next step with clear demo boundaries. The file picker for reports keeps files in the browser and does not upload them.
+Open `http://localhost:3000`. Discovery supports suggestions, intent parsing, entity matching, filtering, sorting and detail pages for eligible published records. An isolated seeded database can have an empty public catalog until QA publication fixtures are applied. Patient inquiries use reviewed consent and private uploads; provider and document sharing require separate recipient-specific grants. The assistant does not read document contents.
 
 To use `/assistant`, set `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_AI_MODEL` (default `@cf/zai-org/glm-4.7-flash`), and `SUPABASE_SECRET_KEY` in the ignored `.env.local`. Set the same server-only variables in Vercel for a deployed assistant. `SUPABASE_SECRET_KEY` is the project's secret server key and must never have a `NEXT_PUBLIC_` prefix. Add the public Supabase URL/key to Vercel as well. Apply `20260928100000_agent_conversations.sql` with `supabase db push` before using the workspace. Without the server keys, `/assistant` displays a configuration state and makes no model call.
 
@@ -41,7 +41,7 @@ npm run build
 
 After migrations and seed, regenerate database types from a migrated PostgreSQL database by setting `MEDBRIDGE_TYPES_DB_URL` and running `node scripts/generate-db-types.mjs`. With a local server running, `npm run smoke` checks the catalog inventory, searches, filtering, sorting, suggestions, empty/error responses and linked routes. Set `MEDBRIDGE_TEST_ORIGIN` if the server uses a port other than 3000. `scripts/validate-rls.sql` exercises anonymous directory access, case ownership, caregiver revocation, unauthorized access and private agent/audit tables against a test database.
 
-`GET /api/health` returns a generic status. `GET /api/discover` returns ranked published catalog results from PostgreSQL; synthetic examples retain their provenance labels. `GET /api/discover/suggestions` provides search suggestions. Neither API accepts patient information. `/api/assistant` requires a verified Supabase access token and uses the authenticated client for case reads. The server-only key writes private agent records after ownership and consent checks.
+`GET /api/health` returns generic liveness, not an uptime or integration guarantee. Admin-only `/api/health/ready` measures database readiness. `GET /api/discover` returns ranked eligible published records from PostgreSQL; synthetic records are excluded. `GET /api/discover/suggestions` provides search suggestions. Neither discovery API accepts patient information. `/api/assistant` requires a verified Supabase access token and uses the authenticated client for case reads. The server-only key writes private agent records after ownership and consent checks.
 
 ## Architecture
 
@@ -54,6 +54,7 @@ After migrations and seed, regenerate database types from a migrated PostgreSQL 
 - [UI system](docs/UI_SYSTEM.md), [design quality](docs/DESIGN_QUALITY_RULES.md) and [content rules](docs/CONTENT_RULES.md): product and editorial standards.
 - [Implementation roadmap](docs/IMPLEMENTATION_ROADMAP.md): milestone gates.
 - [Operational portals](docs/MULTI_PORTAL_PLATFORM.md): provider onboarding, staff roles, evidence review, publishing, support consent, hosting and validation.
+- [Production acceptance and provider pilot](docs/PRODUCTION_ACCEPTANCE_AND_PROVIDER_PILOT.md): current journey evidence, security checks, real-provider blockers, owner checklist and rollback/exit gates.
 
 ## Code layout
 

@@ -123,6 +123,7 @@ select public.portal_command('organization_status',jsonb_build_object('organizat
 select pg_temp.n_assert(not exists(select 1 from jsonb_array_elements(public.operations_overview()->'pilotRows')r where r->>'organizationId'=(select id::text from net where k='org') and r->>'acceptanceRecorded'='true'),'suspended authority invalidates operational acceptance readiness');
 select set_config('request.jwt.claim.sub',(select id::text from net where k='editor'),true);
 select pg_temp.n_denied(format('select public.inquiry_context(%L)',(select id from net where k='case')),'PORTAL_DENIED');
+select pg_temp.n_denied(format('select public.inquiry_command(''provider_response'',%L)',(select v from net where k='response')::text),'PORTAL_DENIED');
 select set_config('request.jwt.claim.sub',(select id::text from net where k='admin'),true);
 select public.portal_command('organization_status',jsonb_build_object('organizationId',(select id from net where k='org'),'status','active','reason','Local suspension test resolved.','confirmed',true,'operationId',gen_random_uuid()));
 select public.portal_command('review_document',jsonb_build_object('documentId',(select id from net where k='document'),'status','expired','message','Local current-evidence expiry test.'));
@@ -137,6 +138,7 @@ select pg_temp.n_denied(format('select public.portal_command(''update_member'',%
 select public.portal_command('update_member',jsonb_build_object('organizationId',(select id from net where k='org'),'userId',(select id from net where k='editor'),'role','provider_editor','active',false,'confirmed',true,'operationId',gen_random_uuid()));
 select set_config('request.jwt.claim.sub',(select id::text from net where k='editor'),true);
 select pg_temp.n_denied(format('select public.inquiry_context(%L)',(select id from net where k='case')),'PORTAL_DENIED');
+select pg_temp.n_denied(format('select public.inquiry_command(''provider_response'',%L)',(select v from net where k='response')::text),'PORTAL_DENIED');
 select pg_temp.n_assert((select count(*)=0 from public.provider_documents),'revoked member loses evidence access in the existing auth context');
 select set_config('request.jwt.claim.sub',(select id::text from net where k='admin'),true);
 select public.portal_network_command('revoke_listing_ownership',pg_temp.n_input(jsonb_build_object('entityKind','hospital','entityId',(select id from net where k='hospital'),'reason','Local explicit ownership revocation.')));

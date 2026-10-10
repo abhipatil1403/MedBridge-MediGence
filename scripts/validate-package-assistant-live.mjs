@@ -7,16 +7,20 @@ const options={auth:{persistSession:false,autoRefreshToken:false}};
 const admin=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL,process.env.SUPABASE_SECRET_KEY,options);
 const db=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,options);
 const catalog=await db.from('packages').select('id,name,estimated_min,estimated_max,currency');assert.equal(catalog.error,null);assert.equal(catalog.data.length,7);
-let userId,conversationId,passes=0;
+let userId,session,conversationId,passes=0;
 function check(ok,label){assert.ok(ok,label);console.log(`PASS ${++passes}: ${label}`);}
 try{
  const email=`medbridge-package-assistant-${randomUUID()}@example.invalid`,password=randomUUID();
  const created=await admin.auth.admin.createUser({email,password,email_confirm:true});assert.equal(created.error,null);userId=created.data.user.id;
  const login=await db.auth.signInWithPassword({email,password});assert.equal(login.error,null);
+ session=login.data.session;
  async function turn(content,continued=true){
   const response=await fetch(origin+'/api/assistant',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${login.data.session.access_token}`},body:JSON.stringify({content,displayCurrency:'INR',...(continued&&conversationId?{conversationId}:{})}),signal:AbortSignal.timeout(125000)});
   const result=await response.json();assert.equal(response.status,200,`${content}: ${result.code??''} ${result.error??''}`);
+  if(result.status==='failed')console.log(JSON.stringify({event:'package_assistant_incomplete',state:result.activity?.state,findingCount:result.findings?.length??0,failedTools:result.tasks?.filter(t=>t.status==='failed').map(t=>({tool:t.tool,code:t.errorCode}))}));
   assert.notEqual(result.status,'failed',content+' must complete or ask for clarification');
+  const count=result.summary.match(/I found (\d+) catalog records? matching/);
+  if(count)check(Number(count[1])===new Set(result.findings.map(f=>f.provenance.recordId)).size,'discovery summary counts unique displayed records');
   if(continued){check(!conversationId||conversationId===result.conversationId,'conversation identifier persists');conversationId=result.conversationId;}
   const packages=(result.findings??[]).filter(f=>f.kind==='packages');
   check(packages.every(f=>catalog.data.some(p=>p.id===f.provenance.recordId)&&f.provenance.sourceKind==='external'),'package findings are actual published canonical references');
@@ -46,4 +50,14 @@ try{
  await turn('Find health check packages under $6000.',false);
  await turn('Show me Hip Replacement packages in Mumbai.',false);
  console.log(`${passes} real production package Assistant checks passed.`);
-}finally{if(userId){const disabled=await admin.auth.admin.updateUserById(userId,{ban_duration:'876000h'});assert.equal(disabled.error,null);console.log('Disposable package Assistant patient disabled; immutable runtime history retained.');}}
+}finally{if(userId){
+ // Revoke before banning: GoTrue rejects sign-out of an already banned actor.
+ const revoked=session?await admin.auth.admin.signOut(session.access_token,'global'):null;
+ const cleanup=await Promise.allSettled([
+  admin.from('portal_accounts').upsert({user_id:userId,active:false}),
+  admin.from('conversations').update({status:'archived'}).eq('owner_id',userId),
+  admin.auth.admin.updateUserById(userId,{ban_duration:'876000h'})
+ ]);
+ assert.ok(!revoked?.error&&cleanup.every(r=>r.status==='fulfilled'&&!r.value.error),'Disposable package QA cleanup incomplete.');
+ console.log('Disposable package patient signed out, disabled and banned; private conversations archived and immutable runtime history retained.');
+}}

@@ -6,6 +6,7 @@ import { ExecutionState, AGENT_LIMITS, canonicalInput, safeValue } from '@/lib/a
 import { executeRegisteredTool } from '@/lib/agents/tool-execution';
 import { toolRegistry, type ToolDependencies } from '@/lib/agents/tools';
 import { runAgent } from '@/lib/agents/runtime';
+import { discoveryRoute } from '@/lib/agents/discovery-routing';
 import { activitySchema, decisionSchema } from '@/lib/agents/execution-schemas';
 import { SupabaseAgentStore } from '@/lib/agents/persistence';
 import type { AgentStore } from '@/lib/agents/persistence';
@@ -153,6 +154,32 @@ describe('existing runtime with model observation decisions', () => {
   it('preserves hospital findings when package search fails', async () => {
     const result = await run([request('search_packages', { query: 'knee' })], { ...tools, search: async () => { throw new Error('private service error'); } });
     expect(result.response.activity?.state).toBe('partially_completed'); expect(result.response.findings[0].provenance.recordId).toBe(hospital.recordId); expect(result.response.summary).not.toContain('private service');
+  });
+  it('rejects an array proposed as comparison arguments and preserves partial evidence', async () => {
+    // Reproduces the hosted model proposal; no network or production failure injection.
+    const execute = vi.spyOn(toolRegistry.compare_providers, 'execute');
+    const result = await run([request('compare_providers', [hospital.recordId])]);
+    expect(execute).not.toHaveBeenCalled();
+    expect(result.response.status).toBe('failed');
+    expect(result.response.activity?.state).toBe('partially_completed');
+    expect(result.response.findings.map(f => f.provenance.recordId)).toEqual([hospital.recordId]);
+    expect(result.response.tasks.at(-1)).toMatchObject({status:'failed',errorCode:'TOOL_INPUT_INVALID'});
+    expect(result.response.summary).toContain('could not be completed');
+    expect(result.saved.at(-1)?.state).toBe('partially_completed');
+  });
+  it('counts unique displayed records after a requirement check returns the same evidence', async () => {
+    const route = await discoveryRoute('Find knee replacement hospitals in Mumbai', tools.repository);
+    expect(route).toBeDefined();
+    const m = memory();
+    const decisions = [request('check_requirements', {recordIds:[hospital.recordId]}), request('compare_providers', [hospital.recordId])];
+    const provider: LLMProvider = {generateStructured: async <T extends z.ZodType>() => decisions.shift() as z.infer<T>};
+    const response = await runAgent({content:'Find knee replacement hospitals in Mumbai and check requirements'},
+      {userId,store:m.store,provider,caseAccess,tools,execution:{plan:route!.plan,route}});
+    expect(response.tasks.filter(t => t.status === 'completed')).toHaveLength(2);
+    expect(response.findings).toHaveLength(1);
+    expect(response.summary).toContain('I found 1 catalog record matching');
+    expect(response.activity?.state).toBe('partially_completed');
+    expect(m.output()?.summary).toBe(response.summary);
   });
   it('reuses a duplicate service call without creating another action', async () => { const result = await run([request('get_hospital_details', { slug: hospital.slug })]); expect(result.actions).toEqual(['get_hospital']); expect(result.response.activity?.steps[1].status).toBe('reused'); });
   it('bounds a model that requests the same call forever', async () => { const result = await run(Array.from({ length: 15 }, () => request('get_hospital', { slug: hospital.slug }))); expect(result.response.activity?.state).toBe('partially_completed'); expect(result.response.tasks.length).toBeLessThanOrEqual(AGENT_LIMITS.maxToolCalls); });
