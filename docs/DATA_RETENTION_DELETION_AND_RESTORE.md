@@ -171,6 +171,12 @@ configured. Do not reopen service based solely on its return value.
 
 ## Acceptance assessment
 
+The [production recovery activation design](PRODUCTION_BACKUP_AND_DISASTER_RECOVERY.md)
+provides the current backup API audit, separate object/ledger protection contract,
+owner decisions and genuine isolated Supabase restore gate. It supersedes no approved
+policy: expiry, backup retention and RPO/RTO remain pending. A code/documentation
+release is not proof that production backups have been activated.
+
 | Control | Status |
 |---|---|
 | Existing explicit assistant removal: authorization, atomic intent, holds, bounded recovery, categorical audit, truthful failure | PASS in unit/API and isolated PostgreSQL/Storage-adapter tests |

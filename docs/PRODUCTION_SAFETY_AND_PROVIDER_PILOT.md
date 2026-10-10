@@ -4,6 +4,14 @@ Audit date: 10 October 2026. Baseline: `97e3aa890d70efaa235f46a9b4525e0b7f98a585
 Read alongside [the acceptance plan](PRODUCTION_ACCEPTANCE_AND_PROVIDER_PILOT.md).
 **Decision: NO-GO. No real provider has confirmed participation.**
 
+Backup activation audit (10 October): [production backup and disaster recovery](PRODUCTION_BACKUP_AND_DISASTER_RECOVERY.md)
+records current official API evidence, the database/private-object consistency design,
+operator access requirements and genuine Supabase restore acceptance procedure.
+No listed recovery point or enabled PITR exists in the collected evidence; subscription,
+independent object backup, latest restriction ledger, target and RPO/RTO remain pending.
+This release does not activate a backup schedule, change billing or claim Storage
+recovery from the prior local filesystem exercise. Recovery assurance remains NO-GO.
+
 Retention follow-up (10 October): [data lifecycle and restore assurance](DATA_RETENTION_DELETION_AND_RESTORE.md)
 adds durable cleanup to existing explicit assistant-file removal, protected holds,
 fail-closed restoration checks and genuine isolated DB/file restoration evidence.
