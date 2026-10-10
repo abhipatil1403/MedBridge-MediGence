@@ -83,4 +83,10 @@ select pg_temp.d_assert((select state='queued' and completed_at is null from pub
 update public.document_deletion_jobs set state='deleting',attempts=3,lease_until=now()-interval '1 second' where id=(select id from fixture where k='deletion');
 select pg_temp.d_assert(public.document_deletion_claim((select id from fixture where k='deletion')) is null,'third expired lease exhausts retries');
 select pg_temp.d_assert((select state='cleanup_failed' and failure_category='lease_expired' from public.document_deletion_jobs where id=(select id from fixture where k='deletion')),'exhaustion remains visible and blocked');
+-- Missing recovery configuration must deny even the service-side clean assertion.
+select public.document_security_register('care-documents','QA-missing-gate/fixture.pdf',repeat('2',64),20,'application/pdf');
+update public.document_security_jobs set state='clean',scanned_at=now(),engine_version='1.4.6',signature_at=now() where object_path='QA-missing-gate/fixture.pdf';
+delete from private.document_recovery_gate;
+select pg_temp.d_denied($s$select public.document_security_assert_clean('care-documents','QA-missing-gate/fixture.pdf')$s$,'DOCUMENT_SECURITY_BLOCKED');
+select pg_temp.d_assert(private.document_security_clean('care-documents','QA-missing-gate/fixture.pdf') is false,'missing gate gives explicit false, not null');
 rollback;

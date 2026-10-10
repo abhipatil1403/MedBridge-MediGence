@@ -89,6 +89,10 @@ it.skipIf(process.env.MEDBRIDGE_RETENTION_RESTORE_QA!=='1')('genuine local pg_du
  expect(caseAccess(restoreUrl.href,staff)).toBe(false);expect(caseAccess(restoreUrl.href,owner)).toBe(true);expect(caseAccess(restoreUrl.href,other)).toBe(false);
  await expect(scannedDownload(client,'care-documents',paths[0])).rejects.toThrow();await expect(scannedDownload(client,'care-documents',paths[1])).rejects.toThrow();
  expect(Buffer.from(await scannedDownload(client,'care-documents',paths[2]))).toEqual(bytes);
+ root.sql('delete from private.document_recovery_gate;select to_json(true)');
+ await expect(scannedDownload(client,'care-documents',paths[2])).rejects.toThrow();
+ expect(caseAccess(restoreUrl.href,owner)).toBe(false);
+ root.sql('insert into private.document_recovery_gate values(true,false);select to_json(true)');
  expect(createHash('sha256').update(readFileSync(join(restored,`${w.documents[2].id}.pdf`))).digest('hex')).toBe(w.documents[2].checksum);
  expect(localSqlClient(restoreUrl.href,'authenticated',owner).sql("select to_json(count(*)) from storage.objects where bucket_id='care-documents'")).toBe(0);
  expect(localSqlClient(restoreUrl.href,'authenticated',other).sql(`select to_json(count(*)) from public.document_workspaces where id='${w.id}'`)).toBe(0);

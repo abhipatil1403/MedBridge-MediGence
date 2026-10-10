@@ -129,6 +129,9 @@ legitimate clean-file hash survive; ordinary direct Storage/signing remains deni
 No source/target is production; no patient data or production backup was copied.
 
 `document_deletion_reconcile()` is service-only and refuses an open recovery gate.
+Follow-up `20261010131000_document_recovery_gate_fail_closed.sql` makes missing gate
+configuration an explicit denial for service file checks and case access. Isolated
+SQL and actual restored-download tests cover absence as well as the blocked state.
 It cannot recover missing post-snapshot requests by itself, restore object bytes, or
 invent a missing consent delta. Production has no independent delta preservation
 configured. Do not reopen service based solely on its return value.
