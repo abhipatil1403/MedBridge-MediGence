@@ -7,8 +7,10 @@ Read alongside [the acceptance plan](PRODUCTION_ACCEPTANCE_AND_PROVIDER_PILOT.md
 Backup activation audit (10 October): [production backup and disaster recovery](PRODUCTION_BACKUP_AND_DISASTER_RECOVERY.md)
 records current official API evidence, the database/private-object consistency design,
 operator access requirements and genuine Supabase restore acceptance procedure.
-No listed recovery point or enabled PITR exists in the collected evidence; subscription,
-independent object backup, latest restriction ledger, target and RPO/RTO remain pending.
+No listed recovery point or enabled PITR exists in the collected evidence. Signed-in
+follow-up confirms Free/Nano excludes managed backups, one Owner with MFA disabled,
+and S3 enabled with no keys. Independent object backup, latest restriction ledger,
+operator separation, target and RPO/RTO remain pending.
 This release does not activate a backup schedule, change billing or claim Storage
 recovery from the prior local filesystem exercise. Recovery assurance remains NO-GO.
 

@@ -19,12 +19,22 @@ recovery interval is listed. The earlier retention report projected this as an e
 list; retain the raw distinction. WAL-G enabled alone proves neither backup completion
 nor recoverability. No configuration or billing change was made by this release.
 
-The organizations list does not expose a plan, and the dashboard was signed out at
-audit time. **The subscription plan is unverified; do not infer Free from missing
-backups.** A project owner must verify the subscription, compute, managed backup page,
-member roles, backup retention and restoration permissions. Existing CLI operator
-access proves the current operator can list backups/query the database, not that a
-separate backup operator, MFA, approval process or recovery audit is configured.
+The initial organizations list did not expose a plan, and the initial dashboard audit
+was signed out. After the user signed in, the authenticated dashboard directly
+confirmed **Free plan / Nano compute**. The scheduled backup page explicitly excludes
+project backups on Free. The plan quote shows Pro from $25/month with seven days of
+daily DB backups; the PITR page shows a Pro add-on starting at $100/month. PITR also
+requires eligible compute. These are observed starting prices, not an approved purchase
+or guaranteed total including usage/compute. No subscription/add-on was changed.
+
+The Team page shows exactly one member, the current session's Owner. That member is
+still listed under the **MFA disabled** filter. No dedicated recovery operator or
+independent approver is configured. Owner membership is verified, but a successful
+backup restore and restore audit are not. MFA enrollment/recovery codes require the
+owner's own authentication setup; no account factor, invite or permission was changed.
+Storage S3 connection is already enabled; its Access keys table contains **no keys**.
+No key was created or copied. Source credential separation and a protected destination
+remain pending, and an enabled endpoint alone is not object backup coverage.
 
 Metadata-only production audit finds two buckets (`care-documents`,
 `provider-documents`), both private and limited to 3,145,728 bytes. Each currently
@@ -199,8 +209,11 @@ After environment and access approval:
 
 ## Owner activation checklist
 
-- [ ] Verify actual Supabase subscription/compute and eligible backup feature, existing
-  member roles/MFA, restore permission and audit availability in the signed-in dashboard.
+- [x] Verify actual Supabase subscription/compute, backup entitlement and existing
+  member role/MFA in the signed-in dashboard: Free/Nano, managed backups excluded,
+  one Owner with MFA disabled. S3 enabled with no access keys.
+- [ ] Owner completes MFA and recovery-code setup, approves operator separation,
+  and verifies actual restoration permission/audit through the approved rehearsal.
 - [ ] If absent/insufficient, explicitly approve paid plan/compute/PITR costs, or approve
   independently hosted export strategy and operating cost. No purchase is authorized.
 - [ ] Approve backup data destination/region, worker host, account/IAM, credentials,
@@ -245,3 +258,10 @@ a new behavioral regression; existing consent/deletion/scanner/recovery tests we
 No live patients, provider responses, external communications or production data
 restoration were used. Backup activation, hosted object restore, independent alerts,
 approved retention and RPO/RTO remain BLOCKED after this documentation release.
+
+Signed-in follow-up verified plan/compute/backup entitlement, sole Owner membership,
+disabled MFA and absence of S3 keys directly in Dashboard. These close the former
+subscription-visibility gap; they do not activate a backup or satisfy operator
+separation. No paid upgrade or persistent credential creation was authorized. The
+owner must choose an approved independent backup path or review paid DB protection;
+both paths still require separate Storage backup and a genuine isolated restore.
