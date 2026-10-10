@@ -20,8 +20,7 @@ export function observe(state,observations,now=Date.now()) {
   else if(sample.failures===3&&sample.episode&&now-sample.lastNotice>=1800000)event='signal_persists';
   else if(sample.successes===2&&sample.episode){sample.episode=null;event='signal_cleared';}
   if(event){
-   // Terminal accepted entries can be removed; failed evidence is retained for operator action.
-   if(state.alerts.length>=100)state.alerts=state.alerts.filter(a=>a.state!=='accepted');
+   // No automatic expiry: preserve accepted and failed evidence until an approved archive policy.
    if(state.alerts.length>=100)throw new Error('monitor_ledger_full');
    state.alerts.push({id:randomUUID(),signal,event,observedAt:new Date(now).toISOString(),state:'pending',attempts:0,nextAt:now,category:'none'});sample.lastNotice=now;
   }

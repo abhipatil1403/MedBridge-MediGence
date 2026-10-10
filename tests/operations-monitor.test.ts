@@ -91,6 +91,11 @@ describe('persistent signal and alert processing',()=>{
   expect(stateSchema.safeParse({...firing(),document:'private'}).success).toBe(false);
   const s=firing();expect(stateSchema.safeParse({...s,alerts:[{...s.alerts[0],url:'signed'}]}).success).toBe(false);
  });
+ it('preserves accepted delivery evidence at the ledger limit without automatic expiry',()=>{
+  const s=firing();s.alerts=Array.from({length:100},()=>({...firing().alerts[0],state:'accepted' as const}));
+  const evidence=JSON.stringify(s.alerts);expect(()=>observe(s,{application:true},now+1800002)).toThrow('monitor_ledger_full');
+  expect(JSON.stringify(s.alerts)).toBe(evidence);
+ });
 });
 describe('actual HTTP probe failure contract',()=>{
  it('redacts malformed configured endpoints from worker errors before any outbound request',()=>{

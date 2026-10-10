@@ -47,8 +47,9 @@ it; unmeasured observations break streaks. Persistent signals receive a notice e
 
 The worker writes a strict, private JSON ledger before sending, retains stable alert
 IDs across restarts and enforces a single-worker lock. It refuses a damaged ledger,
-target mismatch or more than 100 unresolved entries rather than dropping failed evidence.
-Accepted entries may be pruned at the limit. Provision durable private disk/ACLs and
+target mismatch or a full 100-entry ledger rather than dropping any delivery evidence.
+No entry expires automatically. Approve an archive policy before extending this limit.
+Provision durable private disk/ACLs and
 backup the ledger under an approved operator policy. This is not disaster recovery
 assurance. A stale lock after a crash requires an operator to verify that the old worker
 has stopped before removing **only that lock**. Never delete the ledger to retry alerts.
