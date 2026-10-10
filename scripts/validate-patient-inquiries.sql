@@ -64,6 +64,12 @@ insert into storage.objects(bucket_id,name) select 'care-documents',(select id::
 select public.inquiry_commit_upload((select id from iq where k='patient'),(select id from iq where k='file'));
 select public.inquiry_commit_upload((select id from iq where k='patient'),(select id from iq where k='file'));
 set local role authenticated;
+select set_config('request.jwt.claim.sub',(select id::text from iq where k='patient'),true);
+select pg_temp.iq_denied(format('select public.inquiry_document_delivery(%L)',(select id from iq where k='file')),'DOCUMENT_SECURITY_BLOCKED');
+select pg_temp.iq_denied(format('select public.inquiry_command(''share_document'',%L)',pg_temp.iq_input(jsonb_build_object('documentId',(select id from iq where k='file'),'recipient','support','purpose','Answer the coordination question.','confirmed',true))::text),'DOCUMENT_SECURITY_BLOCKED');
+reset role;
+\ir pg-document-security-fixtures.sql
+set local role authenticated;
 select set_config('request.jwt.claim.sub',(select id::text from iq where k='agent'),true);
 select pg_temp.iq_assert((select count(*)=0 from public.support_case_documents),'private upload is invisible to assigned staff');
 select pg_temp.iq_assert(not exists(select 1 from public.audit_events where entity_id=(select id from iq where k='case') and event_name like 'inquiry.support_case_documents.%'),'private upload audit cannot leak metadata to assigned Support');

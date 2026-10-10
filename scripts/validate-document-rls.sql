@@ -44,7 +44,7 @@ set request.jwt.claim.sub='10000000-0000-4000-8000-000000000041';
 do $$ begin
  if (select count(*) from public.document_workspaces)<>1 then raise exception 'Owner workspace isolation';end if;
  if (select count(*) from public.document_coordination_audit)<>2 then raise exception 'Owner audit isolation';end if;
- if (select count(*) from storage.objects where bucket_id='care-documents')<>1 then raise exception 'Private storage owner/active-file isolation';end if;
+ if (select count(*) from storage.objects where bucket_id='care-documents')<>0 then raise exception 'Direct storage/signing is blocked; use the authenticated proxy';end if;
  if exists(select 1 from public.document_workspaces where owner_id<>'10000000-0000-4000-8000-000000000041') then raise exception 'Other owner leak';end if;
 end $$;
 reset role;
@@ -53,7 +53,7 @@ set request.jwt.claim.sub='10000000-0000-4000-8000-000000000042';
 do $$ begin
  if (select count(*) from public.document_workspaces)<>1 then raise exception 'Second account workspace isolation';end if;
  if (select count(*) from public.document_coordination_audit)<>1 then raise exception 'Second account audit isolation';end if;
- if (select count(*) from storage.objects where bucket_id='care-documents')<>1 then raise exception 'Second account storage isolation';end if;
+ if (select count(*) from storage.objects where bucket_id='care-documents')<>0 then raise exception 'Second account direct storage/signing is blocked';end if;
 end $$;
 reset role;
 rollback;

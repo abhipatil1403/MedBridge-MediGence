@@ -1,4 +1,5 @@
 import { validProviderFile } from "@/lib/portals/provider-file";
+import {registerScan,securityRpc,scannedDownload} from '@/lib/documents/security';
 import { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -65,7 +66,9 @@ export async function POST(request: NextRequest) {
       );
     const id = randomUUID();
     const path = `${org}/${id}`;
-    const storage = createAdminClient().storage.from("provider-documents");
+    const admin=createAdminClient();
+    const job=await registerScan(admin,'provider-documents',path,bytes,file.type,file.name);
+    const storage = admin.storage.from("provider-documents");
     const uploaded = await storage.upload(path, bytes, {
       contentType: file.type,
       upsert: false,
@@ -93,7 +96,8 @@ export async function POST(request: NextRequest) {
       await storage.remove([path]);
       checked(result);
     }
-    return portalResponse(result.data);
+    await securityRpc(admin,'document_security_ready',{p_id:job.id});
+    return portalResponse({...Object(result.data),securityStatus:job.state,notice:'Upload saved privately. Download requires successful security checks.'});
   } catch (error) {
     return portalFailure(error);
   }
@@ -112,13 +116,9 @@ export async function GET(request: NextRequest) {
     ) as import("@/types/database").Database["public"]["Tables"]["provider_documents"]["Row"];
     if (doc.status === "archived")
       throw new PortalError(404, "This document is archived.");
-    const file = await createAdminClient()
-      .storage.from("provider-documents")
-      .download(doc.storage_path);
-    if (file.error || !file.data)
-      throw new PortalError(404, "This file is unavailable.");
+    const bytes=await scannedDownload(createAdminClient(),'provider-documents',doc.storage_path);
     const filename = doc.name.replaceAll(/[\r\n"\\]/g, "_");
-    return new Response(await file.data.arrayBuffer(), {
+    return new Response(bytes, {
       headers: {
         "Content-Type": doc.mime_type,
         "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,

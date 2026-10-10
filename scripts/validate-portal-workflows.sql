@@ -21,6 +21,7 @@ insert into qa_ids(k,id) select 'package',(public.portal_command('save_record',j
 insert into qa_ids(k) values('document');
 reset role;
 insert into storage.objects(bucket_id,name) select 'provider-documents',(select id::text from qa_ids where k='org')||'/'||(select id::text from qa_ids where k='document');
+\ir pg-document-security-fixtures.sql
 set local role authenticated;
 select public.portal_command('register_document',jsonb_build_object('organizationId',(select id from qa_ids where k='org'),'documentId',(select id from qa_ids where k='document'),'recordId',(select id from qa_ids where k='facility'),'name','Local QA evidence.pdf','documentType','supporting_evidence','storagePath',(select id::text from qa_ids where k='org')||'/'||(select id::text from qa_ids where k='document'),'mimeType','application/pdf','sizeBytes',20));
 select public.portal_command('save_record',jsonb_build_object('organizationId',(select id from qa_ids where k='org'),'recordId',id,'kind',kind,'name',name,'data',data||jsonb_build_object('documentIds',jsonb_build_array((select id from qa_ids where k='document'))),'expectedRevision',revision)) from public.provider_records where id=(select id from qa_ids where k='facility');

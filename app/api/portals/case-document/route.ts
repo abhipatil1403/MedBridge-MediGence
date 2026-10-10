@@ -6,6 +6,7 @@ import {
   DOCUMENT_BUCKET,
 } from "@/lib/documents/schemas";
 import { documentPath } from "@/lib/documents/coordination";
+import {scannedDownload} from '@/lib/documents/security';
 import {
   checked,
   portalFailure,
@@ -51,11 +52,7 @@ export async function GET(request: NextRequest) {
     );
     if (!doc) throw new PortalError(404, "This file is unavailable.");
     const admin = createAdminClient();
-    const result = await admin.storage
-      .from(DOCUMENT_BUCKET)
-      .download(documentPath(selected.data.documents.id, doc));
-    if (result.error || !result.data)
-      throw new PortalError(404, "This file is unavailable.");
+    const bytes=await scannedDownload(admin,DOCUMENT_BUCKET,documentPath(selected.data.documents.id,doc));
     const audit = await admin.from("audit_events").insert({
       actor_id: user.id,
       actor_type: context.role ? "staff" : "patient",
@@ -70,7 +67,7 @@ export async function GET(request: NextRequest) {
         400,
         "This file download could not be recorded. Please try again.",
       );
-    return new Response(await result.data.arrayBuffer(), {
+    return new Response(bytes, {
       headers: {
         "Content-Type": doc.mimeType,
         "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(doc.filename)}`,

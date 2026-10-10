@@ -20,6 +20,7 @@ export const uploadedDocumentSchema = z.object({
   requirementId: z.uuid().optional(), suggestedRequirementIds: z.array(z.uuid()).max(30),
   matchStatus: z.enum(['matched', 'needs_confirmation', 'unmatched']), confirmedAt: z.iso.datetime().optional(),
   duplicateOf: z.uuid().optional(), replaces: z.uuid().optional(), sharingStatus: z.literal('not_shared'),
+  securityStatus:z.enum(['pending_scan','scanning','clean','quarantined','scan_failed','not_scanned']).optional(),
 }).strict().refine(d => d.matchStatus !== 'matched' || Boolean(d.requirementId && d.confirmedAt), 'A match requires user confirmation');
 export const documentPackageSchema = z.object({
   id: z.uuid(), revision: z.number().int().nonnegative(), preparedAt: z.iso.datetime(), confirmedBy: z.uuid(),

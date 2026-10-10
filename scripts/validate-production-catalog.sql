@@ -47,6 +47,7 @@ insert into qc(k,id) select 'facility',(public.portal_command('save_record',json
 insert into qc(k,id) select 'international',(public.portal_command('save_record',jsonb_build_object('organizationId',(select id from qc where k='org'),'kind','international_service','name','Local interpreter coordination','data','{"description":"Explicit local coordination service; package inclusion remains separate.","languages":["English"],"availability":"on_request"}'::jsonb))->>'id')::uuid;
 reset role;
 insert into storage.objects(bucket_id,name) select 'provider-documents',(select id::text from qc where k='org')||'/'||(select id::text from qc where k='document');
+\ir pg-document-security-fixtures.sql
 set local role authenticated;
 select public.portal_command('register_document',jsonb_build_object('organizationId',(select id from qc where k='org'),'documentId',(select id from qc where k='document'),'name','Local validation accreditation.pdf','documentType','accreditation','storagePath',(select id::text from qc where k='org')||'/'||(select id::text from qc where k='document'),'mimeType','application/pdf','sizeBytes',20));
 insert into qc(k,id) select 'accreditation',(public.portal_command('save_record',jsonb_build_object('organizationId',(select id from qc where k='org'),'kind','accreditation','name','LOCAL VALIDATION Accreditation','data',jsonb_build_object('body','Local validation body','documentId',(select id from qc where k='document'),'expiresOn',current_date+365)))->>'id')::uuid;

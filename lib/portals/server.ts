@@ -13,6 +13,7 @@ export class PortalError extends Error {
   }
 }
 const messages: Record<string, string> = {
+  DOCUMENT_SECURITY_BLOCKED: "This file is blocked until its security checks succeed. Download and sharing are unavailable.",
   OPERATIONS_RETRY_WAIT: 'Wait until the next eligible check and refresh before reconciling again.',
   PORTAL_ORGANIZATION_UNVERIFIED: "Current organization authority approval is required for operational access and first-party publication.",
   PORTAL_CONTACT_CONFIRMATION_REQUIRED: "Record the actual official-contact confirmation before approving organization authority.",

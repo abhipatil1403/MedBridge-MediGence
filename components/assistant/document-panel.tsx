@@ -74,7 +74,7 @@ export function DocumentPanel({token,conversationId,disabled,onResponse,contextu
   const available=(id:string)=>active.filter(d=>d.matchStatus==='matched'&&d.requirementId===id);
   const missing=w?.requirements.filter(r=>r.required&&!available(r.id).length).length??0;
   const locked=busy||disabled;
-  return <details className="assistant-documents" open={Boolean(w) && contextual}><summary><T>{"Documents for this request"}</T>{' '}{w ? ` · ${active.length} private files` : ' · checklist and uploads'}</summary>
+  return <details className="assistant-documents" open={Boolean(w) && contextual}><summary><T>{"Documents for this request"}</T>{' '}{w ? ` · ${active.length} private files` : ' · checklist and uploads'}</summary><p>Uploads are private and blocked until security scanning succeeds. An unavailable scanner does not clear a file. Refresh to check its security status.</p>
     <p><T>{"Organize explicitly requested documents. Files remain private. MedBridge does not interpret their content or determine treatment needs."}</T></p>
     {!w?<form className="assistant-document-target" onSubmit={event=>{event.preventDefault();void action('start',{hospitalId:hospital,serviceLabel:service,serviceId:serviceId||undefined});}}>
       <label><T>{"Selected hospital"}</T><select required value={hospital} disabled={locked} onChange={event=>setHospital(event.target.value)}><option value=""><T>{"Choose a hospital"}</T></option>{options.hospitals.map(h=><option key={h.id} value={h.id}>{h.name}<T>{h.source_kind==='synthetic'?' · demo':''}</T></option>)}</select></label>
@@ -109,13 +109,14 @@ export function DocumentPanel({token,conversationId,disabled,onResponse,contextu
       {!active.length&&<p><T>{"No uploaded documents."}</T></p>}
       <ul className="assistant-uploaded-documents">{active.map(d=><li key={d.id}>
         <strong>{d.filename}</strong><small><T>{d.mimeType==='application/pdf'?'PDF':d.mimeType==='image/png'?'PNG':'JPG'}</T> · {(d.size/1024).toFixed(1)} <T>{"KB · Uploaded"}</T>{' '}<LocalDateTime value={d.uploadedAt}/></small>
+        <small>Security: {(d.securityStatus??'not_scanned').replaceAll('_',' ')}</small>
         <span><T>{d.matchStatus==='matched'?'Confirmed by you':d.matchStatus==='needs_confirmation'?'Possible match · needs confirmation':'Not matched to a requested document.'}</T></span>
         {d.duplicateOf&&<p><T>{"Possible duplicate. Both uploads are retained; choose which file to include."}</T></p>}
         {d.replaces&&<small><T>{"Replacement version · confirm its mapping before inclusion."}</T></small>}
         <label><T>{"Requested document for"}</T>{' '}{d.filename}<select aria-label={`Requested document for ${d.filename}`} value={mappings[d.id]??d.requirementId??(d.suggestedRequirementIds.length===1?d.suggestedRequirementIds[0]:'')} disabled={locked} onChange={event=>setMappings({...mappings,[d.id]:event.target.value})}>
           <option value=""><T>{"Choose a requested document"}</T></option>{w.requirements.filter(r=>['required','optional'].includes(r.status)).map(r=><option key={r.id} value={r.id}>{r.label}</option>)}</select></label>
-        <div className="assistant-document-actions"><button type="button" disabled={locked||!(mappings[d.id]??d.requirementId??(d.suggestedRequirementIds.length===1?d.suggestedRequirementIds[0]:''))} onClick={()=>void action('match_document_to_requirement',{workspaceId:w.id,documentId:d.id,requirementId:mappings[d.id]??d.requirementId??d.suggestedRequirementIds[0],confirmed:true})}><T>{d.matchStatus==='matched'?'Confirm changed mapping':'Confirm match'}</T></button>
-          <button type="button" disabled={locked} onClick={()=>void download(d.id,d.filename)}><T>{"Review file"}</T></button>
+        <div className="assistant-document-actions"><button type="button" disabled={locked||d.securityStatus!=='clean'||!(mappings[d.id]??d.requirementId??(d.suggestedRequirementIds.length===1?d.suggestedRequirementIds[0]:''))} onClick={()=>void action('match_document_to_requirement',{workspaceId:w.id,documentId:d.id,requirementId:mappings[d.id]??d.requirementId??d.suggestedRequirementIds[0],confirmed:true})}><T>{d.matchStatus==='matched'?'Confirm changed mapping':'Confirm match'}</T></button>
+          <button type="button" disabled={locked||d.securityStatus!=='clean'} onClick={()=>void download(d.id,d.filename)}><T>{"Review file"}</T></button>
           <button type="button" disabled={locked} onClick={()=>{setReplacement(d.id);picker.current?.click();}}><T>{"Upload replacement"}</T></button>
           <button type="button" disabled={locked} onClick={()=>void action('remove_document',{workspaceId:w.id,documentId:d.id})}><T>{"Remove"}</T></button></div>
       </li>)}</ul>
@@ -127,7 +128,7 @@ export function DocumentPanel({token,conversationId,disabled,onResponse,contextu
         <p>{missing} <T>{"required document"}</T><T>{missing===1?'':'s'}</T> <T>{"missing."}</T></p>
         <ul>{w.requirements.flatMap(r=>available(r.id).map(d=><li key={d.id}>✓ {r.label} → {d.filename} <T>{"· Confirmed by you"}</T></li>))}</ul>
         {!w.package?<><label className="assistant-document-checkbox"><input type="checkbox" checked={reviewed} disabled={locked} onChange={event=>setReviewed(event.target.checked)} /><T>{"I reviewed these files, their mappings and requirement sources."}</T></label>
-          <button type="button" disabled={locked||!reviewed||missing>0||!w.requirements.length} onClick={()=>void action('prepare_document_package',{workspaceId:w.id,revision:w.revision,confirmed:true})}><T>{"Confirm & prepare package"}</T></button></>:<><strong><T>{"Ready to share"}</T></strong><p><T>{"This hospital does not have a connected submission channel in MedBridge. No documents have been sent. Use the hospital’s appropriate channel yourself."}</T></p>
+          <button type="button" disabled={locked||active.some(d=>d.securityStatus!=='clean')||!reviewed||missing>0||!w.requirements.length} onClick={()=>void action('prepare_document_package',{workspaceId:w.id,revision:w.revision,confirmed:true})}><T>{"Confirm & prepare package"}</T></button></>:<><strong><T>{"Ready to share"}</T></strong><p><T>{"This hospital does not have a connected submission channel in MedBridge. No documents have been sent. Use the hospital’s appropriate channel yourself."}</T></p>
           <small><T>{"Package prepared"}</T>{' '}<LocalDateTime value={w.package.preparedAt}/> <T>{"· Revision"}</T>{' '}{w.package.revision}</small>
           <button type="button" disabled={locked} onClick={()=>void action('get_document_package',{workspaceId:w.id})}><T>{"Review sharing status"}</T></button></>}
       </section>

@@ -11,26 +11,35 @@ import { SupabaseVerificationStore } from '@/lib/verification/store';
 import { verifiedServiceSources } from '@/lib/verification/integration';
 import { ageVerificationReport } from '@/lib/verification/service';
 import { configuredFreshnessPolicy } from '@/lib/verification/policy';
+import {registerScan,securityRpc,assertClean,scannedDownload} from './security';
 
 export interface DocumentStore {
   load(id: string, ownerId: string): Promise<DocumentWorkspace>;
   save(workspace: DocumentWorkspace, expectedRevision: number, action: string): Promise<void>;
   put(w: DocumentWorkspace, d: UploadedDocument, bytes: Uint8Array): Promise<void>;
   discard(w: DocumentWorkspace, d: UploadedDocument): Promise<void>;
+  assertClean(w: DocumentWorkspace, d: UploadedDocument): Promise<void>;
 }
 export class SupabaseDocumentStore implements DocumentStore {
   constructor(private admin: SupabaseClient<Database>, private user: SupabaseClient<Database>) {}
+  private async securityProjection(w:DocumentWorkspace) {
+    const states=await securityRpc(this.admin,'document_security_states',{p_bucket:DOCUMENT_BUCKET,p_paths:w.documents.map(d=>documentPath(w.id,d))});
+    const parsed=z.record(z.string(),z.enum(['pending_scan','scanning','clean','quarantined','scan_failed'])).parse(states);
+    for(const d of w.documents)d.securityStatus=parsed[documentPath(w.id,d)]??'not_scanned';
+    if(w.documents.some(d=>d.uploadStatus==='uploaded'&&d.securityStatus!=='clean'))delete w.package;
+    return w;
+  }
   async load(id: string, ownerId: string) {
     const { data, error } = await this.user.from('document_workspaces').select('data').eq('id',id).eq('owner_id',ownerId).maybeSingle();
     if (error || !data) throw new AgentError('DOCUMENT_ACCESS_DENIED','This document workspace is unavailable to your account.');
     const w = documentWorkspaceSchema.parse(data.data);
     if (w.ownerId !== ownerId) throw new AgentError('DOCUMENT_ACCESS_DENIED','This document workspace is unavailable.');
-    return w;
+    return this.securityProjection(w);
   }
   async byConversation(conversationId: string, ownerId: string) {
     const { data, error } = await this.user.from('document_workspaces').select('data').eq('conversation_id',conversationId).eq('owner_id',ownerId).maybeSingle();
     if (error) throw new AgentError('DOCUMENT_CONFIGURATION','Document coordination needs its database migration.');
-    return data ? documentWorkspaceSchema.parse(data.data) : undefined;
+    return data ? this.securityProjection(documentWorkspaceSchema.parse(data.data)) : undefined;
   }
   async start(ownerId: string, conversationId: string, raw: unknown) {
     const input = startDocumentsSchema.parse(raw);
@@ -70,10 +79,14 @@ export class SupabaseDocumentStore implements DocumentStore {
     if (error) throw new AgentError('DOCUMENT_SAVE_CONFLICT','The document workspace changed or could not be saved. Refresh and retry; your existing files are preserved.');
   }
   async put(w: DocumentWorkspace,d: UploadedDocument,bytes: Uint8Array) {
+    const job=await registerScan(this.admin,DOCUMENT_BUCKET,documentPath(w.id,d),bytes,d.mimeType,d.filename);
     const result = await this.admin.storage.from(DOCUMENT_BUCKET).upload(documentPath(w.id,d),bytes,{contentType:d.mimeType,upsert:false,cacheControl:'0'});
     if (result.error) throw new AgentError('DOCUMENT_UPLOAD_FAILED','Upload failed. Your existing documents are preserved. Retry the selected file.');
+    await securityRpc(this.admin,'document_security_ready',{p_id:job.id});
   }
+  async assertClean(w:DocumentWorkspace,d:UploadedDocument) {await assertClean(this.admin,DOCUMENT_BUCKET,documentPath(w.id,d));}
   async discard(w: DocumentWorkspace,d: UploadedDocument) {
+    await securityRpc(this.admin,'document_security_retire',{p_bucket:DOCUMENT_BUCKET,p_path:documentPath(w.id,d)});
     const result = await this.admin.storage.from(DOCUMENT_BUCKET).remove([documentPath(w.id,d)]);
     if (result.error) throw new AgentError('DOCUMENT_STORAGE_FAILED','The file could not be removed. Retry removal; it is no longer included in the package.');
   }
@@ -81,8 +94,6 @@ export class SupabaseDocumentStore implements DocumentStore {
     const d = w.documents.find(d => d.id === documentId && d.uploadStatus === 'uploaded');
     if (!d) throw new AgentError('DOCUMENT_ACCESS_DENIED','This file is unavailable.');
     // Authenticated proxy avoids exposing storage paths or signed bearer links in UI/logs.
-    const result = await this.user.storage.from(DOCUMENT_BUCKET).download(documentPath(w.id,d));
-    if (result.error || !result.data) throw new AgentError('DOCUMENT_ACCESS_DENIED','This file is unavailable to your account.');
-    return {document:d,bytes:await result.data.arrayBuffer()};
+    return {document:d,bytes:await scannedDownload(this.admin,DOCUMENT_BUCKET,documentPath(w.id,d))};
   }
 }

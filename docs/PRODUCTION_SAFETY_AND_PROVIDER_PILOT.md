@@ -4,6 +4,13 @@ Audit date: 10 October 2026. Baseline: `97e3aa890d70efaa235f46a9b4525e0b7f98a585
 Read alongside [the acceptance plan](PRODUCTION_ACCEPTANCE_AND_PROVIDER_PILOT.md).
 **Decision: NO-GO. No real provider has confirmed participation.**
 
+Scanner follow-up (10 October): [document security and setup](DOCUMENT_SECURITY_AND_SCANNER_SETUP.md)
+records the new fail-closed quarantine control, genuine isolated ClamAV evidence and
+blocked production activation. No approved scanner host exists. The assessment and
+validation counts below describe the preceding `a87b2df` release; they are retained as
+historical evidence. The follow-up does not satisfy retention, historical signed-link
+revocation, operational coverage or real-provider acceptance requirements.
+
 ## Assessment and evidence boundaries
 
 PASS below means the stated technical control is implemented and tested. It does not

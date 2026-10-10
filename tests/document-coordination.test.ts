@@ -27,6 +27,7 @@ function memory(initial=workspace()) {
   const store:DocumentStore={load:async(id,uid)=>{if(uid!==saved.ownerId||id!==saved.id)throw new Error('access denied');return structuredClone(saved);},
     save:async(w,revision,action)=>{if(failedSave||revision!==saved.revision)throw new Error('save conflict');saved=structuredClone(w);audit.push(action);},
     put:async(w,d,bytes)=>{if(failedPut)throw new Error('storage failed');objects.set(documentPath(w.id,d),bytes);},
+    assertClean:async()=>{}, // explicit clean-fixture contract; real scanner tests are separate
     discard:async(w,d)=>{if(failedRemove)throw new Error('remove failed');objects.delete(documentPath(w.id,d));}};
   const auth:DocumentAuthorization={ownerId:owner,conversationId:conversation,workspaceId:initial.id};
   const call=async(tool:keyof typeof documentToolSchemas,args:Record<string,unknown>={},file?:typeof pdf)=>{
@@ -69,6 +70,15 @@ describe('secure upload metadata and lifecycle',()=>{
   it('removal preserves audit metadata but excludes the file',async()=>{const m=memory();const w=await m.call('upload_document',{},pdf);const removed=await m.call('remove_document',{documentId:w.documents[0].id});expect(removed.documents[0].uploadStatus).toBe('removed');expect(m.objects.size).toBe(0);expect(m.audit).toContain('remove_document');});
 });
 describe('non-clinical matching and package confirmation',()=>{
+  it('does not persist matching or preparation when the authoritative scan is blocked',async()=>{
+    const m=memory();const uploaded=await m.call('upload_document',{},pdf);const before=m.get();
+    m.store.assertClean=async()=>{throw new Error('DOCUMENT_SECURITY_BLOCKED');};
+    await expect(m.call('match_document_to_requirement',{documentId:uploaded.documents[0].id,requirementId:uploaded.requirements[0].id,confirmed:true})).rejects.toThrow('DOCUMENT_SECURITY_BLOCKED');
+    await expect(m.call('prepare_document_package',{revision:uploaded.revision,confirmed:true})).rejects.toThrow('DOCUMENT_SECURITY_BLOCKED');
+    expect(m.get()).toEqual(before);expect(m.audit).toEqual(['upload_document']);
+    // Retirement remains possible for a blocked file.
+    expect((await m.call('remove_document',{documentId:uploaded.documents[0].id})).documents[0].uploadStatus).toBe('removed');
+  });
   it('filename hints never establish an available document',()=>{const w=workspace();w.documents.push(newUpload(w,pdf));expect(checklist(w)[0].status).toBe('needs_review');expect(missingRequired(w)).toBe(1);});
   it('unrelated filenames stay unmatched and retained',()=>{const w=workspace();const d=newUpload(w,{...pdf,filename:'unrelated.pdf'});expect(d.matchStatus).toBe('unmatched');expect(d.suggestedRequirementIds).toEqual([]);});
   it('ambiguous hints retain all candidates',()=>{const requirements=[requirement('Consultation report'),requirement('Consultation letter')];expect(suggestRequirements('consultation.pdf',requirements)).toHaveLength(2);});

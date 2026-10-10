@@ -28,6 +28,7 @@ select pg_temp.n_denied(format('select public.portal_network_command(''review_or
 insert into net(k,id) select 'draft',(public.portal_command('save_record',jsonb_build_object('organizationId',(select id from net where k='org'),'kind','organization','name','LOCAL NETWORK Draft','data',jsonb_build_object('cityId',(select id from public.cities where slug='mumbai'),'description','Local private draft.','email','authority@qa.invalid','phone','00000000')))->>'id')::uuid;
 reset role;
 insert into storage.objects(bucket_id,name) select 'provider-documents',(select id::text from net where k='org')||'/'||id::text from net where k='document';
+\ir pg-document-security-fixtures.sql
 set local role authenticated;
 select public.portal_command('register_document',jsonb_build_object('organizationId',(select id from net where k='org'),'documentId',(select id from net where k='document'),'name','LOCAL NETWORK authority.pdf','documentType','supporting_evidence','storagePath',(select id::text from net where k='org')||'/'||(select id::text from net where k='document'),'mimeType','application/pdf','sizeBytes',20));
 insert into net(k,v) values('submit',pg_temp.n_input(jsonb_build_object('documentId',(select id from net where k='document'),'hospitalId',(select id from net where k='hospital'),'legalName','Local authorized organization','contactName','Local representative','contactEmail','authority@qa.invalid','contactPhone','00000000','declaration','Local QA declaration, no real organization represented.')));

@@ -56,7 +56,7 @@ export function newUpload(w: DocumentWorkspace, file: { filename: string; mimeTy
     checksum, uploadedAt: new Date().toISOString(), uploadStatus: 'uploaded', suggestedRequirementIds,
     matchStatus: suggestedRequirementIds.length ? 'needs_confirmation' : 'unmatched',
     duplicateOf: w.documents.find(d => d.checksum === checksum && d.uploadStatus === 'uploaded')?.id,
-    replaces, sharingStatus: 'not_shared' };
+    replaces, sharingStatus: 'not_shared',securityStatus:'pending_scan' };
 }
 export function nextRevision(w: DocumentWorkspace) { w.revision++; w.updatedAt = new Date().toISOString(); return documentWorkspaceSchema.parse(w); }
 export function documentPath(workspaceId: string, d: UploadedDocument) { return `${d.ownerId}/${workspaceId}/${d.id}.${d.mimeType === 'application/pdf' ? 'pdf' : d.mimeType === 'image/png' ? 'png' : 'jpg'}`; }

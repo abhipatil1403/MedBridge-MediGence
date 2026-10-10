@@ -38,6 +38,9 @@ export async function coordinateDocument(tool: DocumentTool, raw: unknown, owner
   }
   if (tool === 'match_document_to_requirement') {
     const args = documentToolSchemas.match_document_to_requirement.parse(input);
+    const file=w.documents.find(d=>d.id===args.documentId&&d.uploadStatus==='uploaded');
+    if(!file)throw new AgentError('DOCUMENT_ACCESS_DENIED','This file is unavailable.');
+    await store.assertClean(w,file);
     confirmMatch(w,args.documentId,args.requirementId);
   } else if (tool === 'remove_document') {
     const args = documentToolSchemas.remove_document.parse(input);
@@ -47,6 +50,7 @@ export async function coordinateDocument(tool: DocumentTool, raw: unknown, owner
     await store.save(nextRevision(w),revision,tool);
     await store.discard(w,d); return w;
   } else if (tool === 'prepare_document_package') {
+    for(const file of w.documents.filter(d=>d.uploadStatus==='uploaded'))await store.assertClean(w,file);
     preparePackage(w,documentToolSchemas.prepare_document_package.parse(input).revision);
   } else if (tool === 'add_document_requirement') {
     const args = documentToolSchemas.add_document_requirement.parse(input);

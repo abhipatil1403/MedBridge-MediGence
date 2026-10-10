@@ -6,6 +6,7 @@ import { validateUpload } from '@/lib/documents/coordination';
 import { DOCUMENT_BUCKET,MAX_DOCUMENT_BYTES } from '@/lib/documents/schemas';
 import { portalSession,checked,PortalError,portalResponse,portalFailure } from '@/lib/portals/server';
 import { AgentError } from '@/lib/agents/errors';
+import {registerScan,securityRpc,scannedDownload} from '@/lib/documents/security';
 export const runtime='nodejs';
 const meta=z.object({id:z.uuid(),owner_id:z.uuid(),case_id:z.uuid(),filename:z.string(),mime_type:z.enum(['application/pdf','image/png','image/jpeg'])});
 function path(d:z.infer<typeof meta>){return `${d.owner_id}/${d.case_id}/${d.id}.${d.mime_type==='application/pdf'?'pdf':d.mime_type==='image/png'?'png':'jpg'}`;}
@@ -20,6 +21,7 @@ export async function POST(request:NextRequest){try{
   const reserved=meta.parse(checked(await db.rpc('inquiry_command',{p_action:'reserve_upload',p_input:input})));
   if(reserved.owner_id!==user.id||reserved.case_id!==input.caseId)throw new PortalError(403,'This upload is unavailable.');
   const admin=createAdminClient(),storage=admin.storage.from(DOCUMENT_BUCKET);
+  const job=await registerScan(admin,DOCUMENT_BUCKET,path(reserved),bytes,file.type,file.name);
   const upload=await storage.upload(path(reserved),bytes,{contentType:file.type,upsert:false});
   if(upload.error){
     // A retry may find bytes already stored. Verify equality before completing it.
@@ -29,13 +31,13 @@ export async function POST(request:NextRequest){try{
   const committed=checked(await admin.rpc('inquiry_commit_upload',{p_actor:user.id,p_document:reserved.id}));
   const status=z.object({status:z.string()}).parse(committed).status;
   if(status==='withdrawn')throw new PortalError(409,'This previous upload has been withdrawn. Choose a new upload rather than retrying the withdrawn file.');
-  return portalResponse({document:committed});
+  await securityRpc(admin,'document_security_ready',{p_id:job.id});
+  return portalResponse({document:committed,securityStatus:job.state,notice:'Upload saved privately. Download and sharing require successful security checks.'});
 }catch(error){return portalFailure(error instanceof AgentError?new PortalError(400,error.publicMessage):error);}}
 export async function GET(request:NextRequest){try{
   const {db}=await portalSession(request);
   const document=meta.parse(checked(await db.rpc('inquiry_document_delivery',{p_document_id:z.uuid().parse(request.nextUrl.searchParams.get('id'))})));
-  const download=await createAdminClient().storage.from(DOCUMENT_BUCKET).download(path(document));
-  if(download.error||!download.data)throw new PortalError(503,'This file could not be downloaded. Please retry.');
+  const bytes=await scannedDownload(createAdminClient(),DOCUMENT_BUCKET,path(document));
   // Buffer the private response; no durable URL or bucket path is returned to the browser.
-  return new NextResponse(await download.data.arrayBuffer(),{headers:{'Content-Type':document.mime_type,'Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(document.filename)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+  return new NextResponse(bytes,{headers:{'Content-Type':document.mime_type,'Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(document.filename)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
 }catch(error){return portalFailure(error);}}
