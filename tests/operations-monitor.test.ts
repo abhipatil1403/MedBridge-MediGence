@@ -105,7 +105,8 @@ describe('actual HTTP probe failure contract',()=>{
  it('bounds a genuine HTTP alert timeout and keeps an uncertain receipt for the same alert ID',async()=>{
   let requests=0;const server=createServer(req=>{requests++;req.resume();});
   await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));const address=server.address();if(!address||typeof address==='string')throw new Error('server');
-  try{const s=firing(),id=s.alerts[0].id;await deliver(s,{url:`http://127.0.0.1:${address.port}`,token,timeoutMs:50},async()=>{},fetch,now+3);
+  // Give the local request time to arrive before testing its unanswered response.
+  try{const s=firing(),id=s.alerts[0].id;await deliver(s,{url:`http://127.0.0.1:${address.port}`,token,timeoutMs:1000},async()=>{},fetch,now+3);
    expect(requests).toBe(1);expect(s.alerts[0]).toMatchObject({id,state:'unknown',attempts:1,category:'timeout_or_network'});
   }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
  });

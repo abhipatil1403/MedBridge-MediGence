@@ -2,6 +2,7 @@ import {it,expect,vi,describe} from 'vitest';
 import {randomUUID,createHash} from 'node:crypto';
 import {NextRequest} from 'next/server';
 import {createServer} from 'node:net';
+import {spawnSync} from 'node:child_process';
 vi.mock('server-only',()=>({}));
 import {scanResult} from '@/lib/documents/scanner-protocol';
 import {scannedDownload,registerScan} from '@/lib/documents/security';
@@ -11,6 +12,13 @@ import type {Database} from '@/types/database';
 // The actual ClamAV engine integration is a separate explicit local test.
 import {parseVerdict,parseStreamVerdict,scanBytes,scanStream} from '../scripts/document-scanner/engine.mjs';
 const bytes=Buffer.from('%PDF-1.7\nQA harmless fixture\n%%EOF'),checksum=createHash('sha256').update(bytes).digest('hex');
+it.each(['malformed-private-qa-marker','https://example.invalid/?private-qa-marker'])('redacts rejected scanner startup configuration %s',origin=>{
+ const result=spawnSync(process.execPath,['scripts/document-scanner/worker.mjs','--once'],{encoding:'utf8',env:{...process.env,MEDBRIDGE_SCANNER_ORIGIN:origin}});
+ expect(result.status).toBe(1);
+ expect(result.stderr).toMatch(/Scanner configuration unavailable|Use a bare approved origin/);
+ expect(result.stderr).not.toContain('private-qa-marker');
+ expect(result.stdout).toBe('');
+});
 function db(clean=true,content=bytes){const download=vi.fn(async()=>({data:new Blob([content]),error:null}));const rpc=vi.fn(async()=>({data:clean?{checksum,size:bytes.length,mime:'application/pdf'}:null,error:clean?null:{code:'DOCUMENT_SECURITY_BLOCKED'}}));return {client:{rpc,storage:{from:()=>({download})}} as unknown as SupabaseClient<Database>,download,rpc};}
 describe('authoritative file boundary',()=>{
  it.each(['pending_scan','scanning','quarantined','scan_failed','missing'])('blocks %s before downloading any bytes',async()=>{const d=db(false);await expect(scannedDownload(d.client,'care-documents','opaque')).rejects.toMatchObject({code:'DOCUMENT_SECURITY_BLOCKED'});expect(d.download).not.toHaveBeenCalled();});
@@ -37,7 +45,8 @@ it.each(['timeout','malformed'] as const)('blocks a %s scanner transport',async(
  const server=createServer(socket=>{sockets.add(socket);socket.on('error',()=>{});socket.on('close',()=>sockets.delete(socket));socket.resume();if(category==='malformed')socket.once('data',()=>socket.end('unsupported response'));});
  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));const address=server.address();if(!address||typeof address==='string')throw new Error('test server');
  process.env.CLAMD_PORT=String(address.port);delete process.env.CLAMD_SOCKET;
- try{expect(await scanStream(bytes,50)).toMatchObject({state:'scan_failed',category});}
+ // Allow the malformed-response fixture to answer under load; only the silent fixture tests the short timeout.
+ try{expect(await scanStream(bytes,category==='timeout'?50:2000)).toMatchObject({state:'scan_failed',category});}
  finally{for(const socket of sockets)socket.destroy();await new Promise<void>(resolve=>server.close(()=>resolve()));if(before.port===undefined)delete process.env.CLAMD_PORT;else process.env.CLAMD_PORT=before.port;if(before.socket!==undefined)process.env.CLAMD_SOCKET=before.socket;}
 });
 it('does not allow ordinary sessions to read a scan payload or submit a verdict',async()=>{

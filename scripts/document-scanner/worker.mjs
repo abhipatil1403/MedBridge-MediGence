@@ -1,7 +1,9 @@
 // Private outbound-only worker. No Supabase or patient credentials required.
 import {scanBytes} from './engine.mjs';
 import {createHash} from 'node:crypto';
-const origin=new URL(process.env.MEDBRIDGE_SCANNER_ORIGIN??'');
+let origin;
+try{origin=new URL(process.env.MEDBRIDGE_SCANNER_ORIGIN??'');}
+catch{throw new Error('Scanner configuration unavailable.');}
 if(origin.protocol!=='https:'&&!(origin.protocol==='http:'&&origin.hostname==='127.0.0.1'))throw new Error('HTTPS scanner origin required.');
 if(origin.username||origin.password||origin.search||origin.hash||origin.pathname!=='/')throw new Error('Use a bare approved origin.');
 const token=process.env.MEDBRIDGE_DOCUMENT_SCANNER_TOKEN;if(!token||token.length<32)throw new Error('Server-side scanner credential required.');

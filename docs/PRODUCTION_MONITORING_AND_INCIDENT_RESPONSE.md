@@ -2,6 +2,11 @@
 
 ## Status and reused controls — 10 October 2026
 
+See the follow-up [external integration activation audit](EXTERNAL_INTEGRATION_ACTIVATION.md)
+for the actual configuration matrix, isolated QA results, remaining external setup and
+pending named operational responsibilities. No production integration is activated by
+the follow-up scanner startup redaction fix.
+
 The existing Admin Operations dashboard, scoped Support **Needs attention**, immutable
 audit, role-checked incidents, inquiry escalation and receipt reconciliation remain
 authoritative. In-app notification rows represent persisted creation/read state; they
