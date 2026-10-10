@@ -11,8 +11,12 @@ export function documentExecution(tool: DocumentTool, input: unknown, authorizat
     diagnostics:{workflow:'document_coordination'},
     synthesis:{summary:'Document coordination records your administrative checklist and confirmations. No document content is interpreted or shared.',nextSteps:[],question:null},
     finalize:async(response,results)=>{
+      if(response.status!=='completed')return response;
       const w = results.at(-1)?.result.documents;
       if (!w) return response;
+      if(tool==='remove_document')return {...response,documents:w,
+        summary:'Stored-file deletion is confirmed. Coordination metadata and audit history remain. Any backup or recipient copies are separate.',
+        nextSteps:['Review the remaining documents and their sources.']};
       const missing = missingRequired(w);
       const blocked=w.documents.filter(d=>d.uploadStatus==='uploaded'&&d.securityStatus&&d.securityStatus!=='clean').length;
       return {...response,documents:w,summary:blocked?`${blocked} file${blocked===1?' is':'s are'} saved privately and blocked pending successful security checks. Download and sharing are unavailable.`:!w.requirements.length?'Document requirements are not available for this hospital/service.'

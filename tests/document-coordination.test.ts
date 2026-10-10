@@ -51,6 +51,26 @@ describe('explicit document requirements',()=>{
   it('user-supplied additions preserve explicit provenance',async()=>{const m=memory(workspace([]));const w=await m.call('add_document_requirement',{label:'Discharge summary',required:false,confirmed:true});expect(w.requirements[0]).toMatchObject({label:'Discharge summary',status:'optional',source:{kind:'user',id:owner}});});
 });
 describe('secure upload metadata and lifecycle',()=>{
+  it('never replaces a failed outcome with completion from an earlier document snapshot',async()=>{
+    const m=memory(),response={status:'failed',summary:'Storage cleanup is unconfirmed.'};
+    const finish=documentExecution('remove_document',{},m.auth).finalize!;
+    expect(await finish(response as never,[{tool:'remove_document',result:{documents:m.get(),findings:[]}}])).toEqual(response);
+  });
+  it('the runtime reports interrupted removal as failed while retaining a blocked persisted removal',async()=>{
+    const m=memory(),h=harness();const w=await m.call('upload_document',{},pdf);m.failRemove();
+    const input={workspaceId:w.id,documentId:w.documents[0].id};
+    const response=await runAgent({content:'Remove selected file.',conversationId:conversation},{userId:owner,store:{...h.store,assertConversation:async()=>{}},caseAccess:{readContext:async()=>({}),readDocumentMetadata:async()=>[]},provider:{generateStructured:vi.fn()},tools:{...defaultToolDependencies,documentStore:m.store},execution:documentExecution('remove_document',input,{...m.auth,command:{tool:'remove_document',input}})});
+    expect(response.status).toBe('failed');expect(response.summary).not.toContain('deletion is confirmed');
+    expect(m.get().documents[0].uploadStatus).toBe('removed');expect(m.objects.size).toBe(1);
+  });
+  it('retries interrupted removal without duplicating the persisted revision or audit',async()=>{
+    const m=memory();const w=await m.call('upload_document',{},pdf);m.failRemove();
+    await expect(m.call('remove_document',{documentId:w.documents[0].id})).rejects.toThrow('remove failed');
+    const removed=m.get();expect(removed.documents[0].uploadStatus).toBe('removed');expect(m.objects.size).toBe(1);
+    m.failRemove(false);await m.call('remove_document',{documentId:w.documents[0].id});
+    await m.call('remove_document',{documentId:w.documents[0].id});
+    expect(m.get().revision).toBe(removed.revision);expect(m.audit.filter(a=>a==='remove_document')).toHaveLength(1);expect(m.objects.size).toBe(0);
+  });
   it('accepts a PDF and computes SHA256',()=>expect(validateUpload(pdf.filename,pdf.mimeType,pdf.bytes)).toMatch(/^[a-f0-9]{64}$/));
   it('accepts JPEG signature and extension',()=>expect(validateUpload('report.jpeg','image/jpeg',Buffer.from([255,216,255,224,0]))).toHaveLength(64));
   it('accepts PNG signature and extension',()=>expect(validateUpload('report.png','image/png',Buffer.from([137,80,78,71,13,10,26,10,0]))).toHaveLength(64));

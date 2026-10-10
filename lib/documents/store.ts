@@ -12,6 +12,7 @@ import { verifiedServiceSources } from '@/lib/verification/integration';
 import { ageVerificationReport } from '@/lib/verification/service';
 import { configuredFreshnessPolicy } from '@/lib/verification/policy';
 import {registerScan,securityRpc,assertClean,scannedDownload} from './security';
+import {requestDeletion,completeDeletion} from './deletion';
 
 export interface DocumentStore {
   load(id: string, ownerId: string): Promise<DocumentWorkspace>;
@@ -76,19 +77,22 @@ export class SupabaseDocumentStore implements DocumentStore {
   async save(w: DocumentWorkspace, expectedRevision: number, action: string) {
     const valid = documentWorkspaceSchema.parse(w);
     const { error } = await this.admin.rpc('save_document_workspace',{p_workspace:JSON.parse(JSON.stringify(valid)) as Json,p_expected_revision:expectedRevision,p_action:action});
+    if (error?.message.includes('DOCUMENT_RETENTION_HOLD')) throw new AgentError('DOCUMENT_RETENTION_HOLD','Removal is blocked by a retention hold. Ask Support for an authorized review.');
     if (error) throw new AgentError('DOCUMENT_SAVE_CONFLICT','The document workspace changed or could not be saved. Refresh and retry; your existing files are preserved.');
   }
   async put(w: DocumentWorkspace,d: UploadedDocument,bytes: Uint8Array) {
     const job=await registerScan(this.admin,DOCUMENT_BUCKET,documentPath(w.id,d),bytes,d.mimeType,d.filename);
-    const result = await this.admin.storage.from(DOCUMENT_BUCKET).upload(documentPath(w.id,d),bytes,{contentType:d.mimeType,upsert:false,cacheControl:'0'});
-    if (result.error) throw new AgentError('DOCUMENT_UPLOAD_FAILED','Upload failed. Your existing documents are preserved. Retry the selected file.');
-    await securityRpc(this.admin,'document_security_ready',{p_id:job.id});
+    try {
+      const result = await this.admin.storage.from(DOCUMENT_BUCKET).upload(documentPath(w.id,d),bytes,{contentType:d.mimeType,upsert:false,cacheControl:'0'});
+      if (result.error) throw new AgentError('DOCUMENT_UPLOAD_FAILED','Upload failed. Your existing documents are preserved. Retry the selected file.');
+      await securityRpc(this.admin,'document_security_ready',{p_id:job.id});
+    }
+    catch(error) { await this.discard(w,d).catch(()=>{}); throw error; }
   }
   async assertClean(w:DocumentWorkspace,d:UploadedDocument) {await assertClean(this.admin,DOCUMENT_BUCKET,documentPath(w.id,d));}
   async discard(w: DocumentWorkspace,d: UploadedDocument) {
-    await securityRpc(this.admin,'document_security_retire',{p_bucket:DOCUMENT_BUCKET,p_path:documentPath(w.id,d)});
-    const result = await this.admin.storage.from(DOCUMENT_BUCKET).remove([documentPath(w.id,d)]);
-    if (result.error) throw new AgentError('DOCUMENT_STORAGE_FAILED','The file could not be removed. Retry removal; it is no longer included in the package.');
+    const job=await requestDeletion(this.admin,w.id,d.id,w.ownerId);
+    if(job.state!=='deleted')await completeDeletion(this.admin,job.id);
   }
   async download(w: DocumentWorkspace,documentId: string) {
     const d = w.documents.find(d => d.id === documentId && d.uploadStatus === 'uploaded');

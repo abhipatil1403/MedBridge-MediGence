@@ -4,6 +4,13 @@ Audit date: 10 October 2026. Baseline: `97e3aa890d70efaa235f46a9b4525e0b7f98a585
 Read alongside [the acceptance plan](PRODUCTION_ACCEPTANCE_AND_PROVIDER_PILOT.md).
 **Decision: NO-GO. No real provider has confirmed participation.**
 
+Retention follow-up (10 October): [data lifecycle and restore assurance](DATA_RETENTION_DELETION_AND_RESTORE.md)
+adds durable cleanup to existing explicit assistant-file removal, protected holds,
+fail-closed restoration checks and genuine isolated DB/file restoration evidence.
+No retention policy or RPO/RTO is approved. Production backups returned no available
+snapshots and PITR disabled; separate Storage backup and current-change ledger remain
+unverified. Production recovery assurance and the provider pilot remain NO-GO.
+
 Scanner follow-up (10 October): [document security and setup](DOCUMENT_SECURITY_AND_SCANNER_SETUP.md)
 records the new fail-closed quarantine control, genuine isolated ClamAV evidence and
 blocked production activation. No approved scanner host exists. The assessment and

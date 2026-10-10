@@ -43,7 +43,7 @@ export function localSqlClient(url:string,role:'postgres'|'service_role'|'authen
     }
   }
   const client={from:(table:string)=>new Query(table),rpc:async(name:string,args:Record<string,unknown>={})=>{
-    try{return {data:sql(`select to_json(public.${identifier(name)}(${Object.entries(args).map(([k,v])=>`${identifier(k)}=>${literal(v)}`).join(',')}))`),error:null};}
+    try{return {data:sql(`select to_json(public.${identifier(name)}(${Object.entries(args).map(([k,v])=>`${identifier(k)}=>${k==='p_paths'&&Array.isArray(v)?`array[${v.map(literal).join(',')}]::text[]`:literal(v)}`).join(',')}))`),error:null};}
     catch{return {data:null,error:{message:'Local PostgreSQL fixture RPC failed'}};}
   }};
   return {db:client as unknown as SupabaseClient<Database>,sql};

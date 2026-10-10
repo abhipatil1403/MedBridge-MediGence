@@ -46,8 +46,10 @@ export async function coordinateDocument(tool: DocumentTool, raw: unknown, owner
     const args = documentToolSchemas.remove_document.parse(input);
     const d = w.documents.find(d => d.id === args.documentId);
     if (!d) throw new AgentError('DOCUMENT_ACCESS_DENIED','This document is unavailable.');
-    d.uploadStatus = 'removed'; delete w.package;
-    await store.save(nextRevision(w),revision,tool);
+    if(d.uploadStatus!=='removed') {
+      d.uploadStatus = 'removed'; delete w.package;
+      await store.save(nextRevision(w),revision,tool);
+    }
     await store.discard(w,d); return w;
   } else if (tool === 'prepare_document_package') {
     for(const file of w.documents.filter(d=>d.uploadStatus==='uploaded'))await store.assertClean(w,file);
