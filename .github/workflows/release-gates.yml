@@ -1,0 +1,132 @@
+name: Release CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  quality:
+    name: Application checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        id: install
+        run: npm ci
+      - name: Dependency security
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm audit --audit-level=high
+      - name: TypeScript
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run typecheck
+      - name: Lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run lint
+      - name: Complete existing regression suite
+        id: tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MEDBRIDGE_CI_VITEST_REPORT: ${{ runner.temp }}/vitest.json
+        run: npm test
+      - name: Report results and reject unexpected skips
+        if: ${{ always() && steps.install.outcome == 'success' }}
+        env:
+          REPORT: ${{ runner.temp }}/vitest.json
+        run: node scripts/ci/report-vitest.mjs "$REPORT"
+      - name: Production build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run build
+      - name: Preserve regression evidence
+        if: ${{ always() && steps.tests.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: regression-results
+          path: ${{ runner.temp }}/vitest.json
+          if-no-files-found: error
+          retention-days: 7
+
+  sql-security:
+    name: Isolated SQL and RLS
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Provision PostgreSQL 17 from the official signed repository
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --silent --show-error --location \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          printf '%s\n' \
+            'Types: deb' \
+            'URIs: https://apt.postgresql.org/pub/repos/apt' \
+            'Suites: noble-pgdg' \
+            'Components: main' \
+            'Signed-By: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc' \
+            | sudo tee /etc/apt/sources.list.d/pgdg.sources > /dev/null
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-17
+      - name: Run existing SQL/RLS and isolated persistence gates
+        env:
+          MEDBRIDGE_CI_SQL: '1'
+          MEDBRIDGE_CI_PG_BIN: /usr/lib/postgresql/17/bin
+          TMPDIR: ${{ runner.temp }}
+        run: node scripts/ci/sql-gate.mjs
+      - name: Preserve isolated results only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sql-security-results
+          path: |
+            ${{ runner.temp }}/medbridge-ci-pg-*/results.json
+            ${{ runner.temp }}/medbridge-ci-pg-*/isolated-vitest.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  release-gates:
+    name: Release gates
+    needs: [quality, sql-security]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require both jobs to succeed
+        shell: bash
+        env:
+          APPLICATION_RESULT: ${{ needs.quality.result }}
+          SQL_RESULT: ${{ needs.sql-security.result }}
+        run: |
+          printf 'Application checks: %s\nIsolated SQL and RLS: %s\n' "$APPLICATION_RESULT" "$SQL_RESULT"
+          test "$APPLICATION_RESULT" = success
+          test "$SQL_RESULT" = success

@@ -1,0 +1,128 @@
+{
+  "baseline": "5279eafe39b72c2bc4b9df0b48e5efa61464695c",
+  "files": [
+    {
+      "file": "tests/agent-live.test.ts",
+      "reason": "Approved catalog fixture and Cloudflare/Supabase credentials; some cases additionally require explicit discovery/remote-persistence opt-ins.",
+      "tests": [
+        "reads an isolated fixture package through the approved tool",
+        "reads isolated Mumbai fixtures through the approved tool",
+        "reads a seeded India cardiology clinician through the approved tool",
+        "Cloudflare plans real Supabase hospital and package searches",
+        "Cloudflare chooses doctor search over the isolated fixture catalog",
+        "Cloudflare asks for the missing surgery type",
+        "persists a real model and tool run to the remote Supabase workspace",
+        "loads one isolated fixture interpretation",
+        "live discovery reliability: Find hospitals for underwater brain surgery in Mumbai",
+        "live discovery reliability: Find me a hospital for surgery",
+        "live discovery reliability: I need a heart doctor in Mumbai",
+        "live discovery reliability: Find knee replacement hospitals in Mumbai",
+        "live discovery reliability: Find knee replacement hospitals in Mumbai and show me relevant packages",
+        "live discovery reliability: Find cardiologists in Mumbai",
+        "live discovery reliability: Find cancer doctors in Mumbai",
+        "live discovery reliability: Find hospitals in Pune"
+      ]
+    },
+    {
+      "file": "tests/agentic-live.test.ts",
+      "reason": "Explicit RUN_AGENTIC_LIVE and disposable hosted Supabase users/persistence; forbidden on production CI.",
+      "tests": [
+        "persists real execution records, reloads owner activity, enforces RLS and avoids duplicate retry actions"
+      ]
+    },
+    {
+      "file": "tests/case-intake-live.test.ts",
+      "reason": "Explicit RUN_CASE_INTAKE_LIVE and disposable hosted Supabase accounts/cases; forbidden on production CI.",
+      "tests": [
+        "persists A–H case intake and denies another authenticated account at every storage/API boundary"
+      ]
+    },
+    {
+      "file": "tests/cloudflare-live.test.ts",
+      "reason": "Actual Cloudflare credentials and model inference; external service not configured in release CI.",
+      "tests": [
+        "validates a real Cloudflare model response"
+      ]
+    },
+    {
+      "file": "tests/document-restore-local.test.ts",
+      "reason": "Dedicated retention restore opt-in, database tools and fixed approved QA artifact directory; not a production restore.",
+      "tests": [
+        "genuine local pg_dump/pg_restore and file backup with deletion and consent delta reconciliation"
+      ]
+    },
+    {
+      "file": "tests/document-scanner-pipeline-local.test.ts",
+      "reason": "Approved real ClamAV engine and isolated SQL/HTTP scanner setup; release CI provisions no scanner.",
+      "tests": [
+        "real local PostgreSQL + HTTP worker + ClamAV: clean delivery, quarantine and no signing bypass"
+      ]
+    },
+    {
+      "file": "tests/document-scanner-real.test.ts",
+      "reason": "Real ClamAV engine/current signatures and explicit opt-in; release CI provisions no scanner.",
+      "tests": [
+        "real local ClamAV: harmless PDF clean and EICAR detected"
+      ]
+    },
+    {
+      "file": "tests/governed-packages-production-live.test.ts",
+      "reason": "Explicit RUN_GOVERNED_PRODUCTION_LIVE creates hosted disposable accounts/workflows; never enabled in release CI.",
+      "tests": [
+        "executes published health check discovery with actual hosted persistence"
+      ]
+    },
+    {
+      "file": "tests/inquiry-safety-local.test.ts",
+      "reason": "Isolated loopback SQL fixture; separately executed by the SQL CI job, not counted as a default-suite pass.",
+      "tests": [
+        "real local PostgreSQL: genuine response, atomic failure, retry, missing evidence and consent withdrawal"
+      ]
+    },
+    {
+      "file": "tests/planning-live.test.ts",
+      "reason": "Explicit RUN_PLANNING_LIVE and disposable hosted Supabase planning/account fixtures; forbidden on production CI.",
+      "tests": [
+        "persists and restores an authenticated multi-turn care plan with owner isolation"
+      ]
+    },
+    {
+      "file": "tests/production-catalog.test.ts",
+      "reason": "Explicit RUN_PUBLIC_CATALOG_LIVE and approved local HTTP/PostgREST catalog adapter; SQL publication checks run separately.",
+      "tests": [
+        "real anonymous production boundary in isolated PostgreSQL returns only the explicitly published non-QA provider",
+        "real anonymous production boundary in isolated PostgreSQL resolves both directions of hospital and doctor relationship",
+        "real anonymous production boundary in isolated PostgreSQL resolves both directions of hospital and package relationship",
+        "real anonymous production boundary in isolated PostgreSQL Discovery searches the same anonymous canonical catalog",
+        "real anonymous production boundary in isolated PostgreSQL Requirement Matching uses the actual published package evidence",
+        "real anonymous production boundary in isolated PostgreSQL Comparison consumes only published canonical records",
+        "real anonymous production boundary in isolated PostgreSQL direct anonymous reads reject QA and private evidence",
+        "real anonymous production boundary in isolated PostgreSQL an entirely synthetic catalog is truly empty under real RLS"
+      ]
+    },
+    {
+      "file": "tests/reference-public-catalog.test.ts",
+      "reason": "Explicit RUN_REFERENCE_CATALOG_LIVE and approved sourced local HTTP/PostgREST fixture; SQL reference checks run separately.",
+      "tests": [
+        "real anonymous sourced starter catalog contains five governed references and five doctors with no synthetic fallback",
+        "real anonymous sourced starter catalog has two real treatment identities and zero invented packages or prices",
+        "real anonymous sourced starter catalog preserves unknown doctor mode and experience",
+        "real anonymous sourced starter catalog matches knee replacement at the sourced Mumbai branch",
+        "real anonymous sourced starter catalog matches knee replacement at the sourced Pune branch",
+        "real anonymous sourced starter catalog matches knee replacement at the sourced Bengaluru branch",
+        "real anonymous sourced starter catalog matches knee replacement at the sourced Chennai branch",
+        "real anonymous sourced starter catalog retains every public claim source without private evidence or operator IDs",
+        "real anonymous sourced starter catalog keeps private reference evidence unreadable to anonymous users",
+        "real anonymous sourced starter catalog handles the requested hospital, package and comparison turns using published data"
+      ]
+    },
+    {
+      "file": "tests/workflow-persistence-local.test.ts",
+      "reason": "Isolated loopback SQL fixture; both cases separately executed by the SQL CI job, not counted as default-suite passes.",
+      "tests": [
+        "real local PostgreSQL: canonical comparison replay keeps one action, output and assistant message",
+        "real local PostgreSQL: recover dependent catalog reads, persist retry failure, preserve evidence and enforce owner RLS"
+      ]
+    }
+  ]
+}
