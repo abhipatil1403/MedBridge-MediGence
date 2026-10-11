@@ -91,6 +91,43 @@ server's data directory, and removes inherited libpq configuration. Trust auth i
 limited to this runner-owned, loopback-only QA cluster. Production credentials are
 never needed. Do not run it with production environment secrets or as root.
 
+### PostgreSQL 17 startup and diagnostic evidence
+
+The cluster is an owned process, not a service or container. PGDG PostgreSQL 17
+defaults to `/var/run/postgresql` for Unix sockets. The ordinary runner cannot
+write its socket lock there. The disposable cluster explicitly disables Unix
+sockets (`unix_socket_directories = ''`); all existing clients use loopback TCP.
+No permissions on a shared directory, credentials, ports or production settings
+are changed. `pg_ctl -w -t 60` must succeed, `pg_isready` must report accepting
+connections, and the existing data-directory identity check must pass before
+any database, migration or test is executed.
+
+`startup-diagnostics.json` records bounded, redacted process status, health
+results and a snapshot of the server log taken **before** migrations/fixture SQL.
+It is exported alongside the existing synthetic results even when startup fails.
+It never dumps environment variables, the data directory or post-migration logs.
+Failed startup prints the same diagnostics, exits unsuccessfully, records zero
+unexecuted migrations/tests, and still attempts owned-cluster shutdown. Never
+substitute service provisioning success for SQL/RLS execution evidence.
+
+On 11 October 2026, the unchanged launcher from PR #1 commit `3847214` reproduced
+the first hosted failure on Ubuntu 24.04 with PGDG PostgreSQL **17.11** and Node
+22.23.3 as an ordinary user. The server log showed loopback TCP listening followed
+by `FATAL: could not create lock file "/var/run/postgresql/.s.PGSQL.34541.lock":
+Permission denied`. The original hosted run did not export its server log, so this
+root-cause evidence comes from the equivalent local reproduction, not a recovered
+hosted log. See [the original failed run](https://github.com/abhipatil1403/MedBridge-MediGence/actions/runs/38137776701).
+
+The corrected local PostgreSQL 17.11 gate completed 42 migrations, the existing
+reapplication/seed checks, all 23 SQL scripts and all three persistence/lifecycle
+tests (zero failures or skips); the owned cluster stopped. Seven new startup,
+readiness and diagnostic-redaction regressions passed on Linux and Windows.
+Restoring the unwritable socket setting **only in an isolated test copy** produced
+exit 1, status 3 (stopped), health 2 (no response), the permission-denied diagnostic,
+zero migrations/tests and confirmed shutdown. The existing 23 report/SQL/aggregate
+failure controls and actionlint also passed. This local evidence does not replace
+the next actual GitHub run or waive the unresolved dependency security block.
+
 The runner reuses the existing Auth/Storage bootstrap and fixtures, ordered
 migrations and seed. Nineteen independent SQL scripts run against the fresh base.
 A separate package clone commits the explicitly isolated publication fixture for

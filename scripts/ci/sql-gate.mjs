@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import {resolve,join} from 'node:path';
 import {createServer} from 'node:net';
 import {randomUUID} from 'node:crypto';
+import {startOwnedCluster} from './postgres-startup.mjs';
 
 if(process.env.MEDBRIDGE_CI_SQL!=='1')throw new Error('Explicit isolated CI SQL opt-in required.');
 if(process.argv.length!==2)throw new Error('Database URLs and command arguments are not supported.');
@@ -15,7 +16,7 @@ const executable=name=>bin?join(bin,name+(process.platform==='win32'?'.exe':''))
 // Ignore libpq environment/service configuration: every target is created below.
 const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!/^PG/i.test(key)));
 let initialized=false,failed=false;
-const evidence={postgres:null,migrations:0,sql:[],integration:null,clusterStopped:false};
+const evidence={postgres:null,ready:false,migrations:0,sql:[],integration:null,clusterStopped:false};
 function run(name,args,options={}){
   return execFileSync(executable(name),args,{env,cwd:root,windowsHide:true,encoding:'utf8',timeout:180000,maxBuffer:16*1024*1024,...options});
 }
@@ -43,10 +44,11 @@ try{
   run('initdb',['-D',data,'-U','postgres','--auth-local=trust','--auth-host=trust','--encoding=UTF8','--locale=C']);
   initialized=true;
   // A random port, private temporary data directory and loopback bind. No shared server.
-  // Do not leave captured pipes inherited by a long-running Windows server.
-  run('pg_ctl',['-D',data,'-l',log,'-o',`-h 127.0.0.1 -p ${port}`,'-w','start'],{stdio:'ignore'});
+  const secrets=Object.entries(process.env).filter(([key])=>/SECRET|TOKEN|PASSWORD|API_KEY|PRIVATE_KEY/i.test(key)).map(([,value])=>value);
+  startOwnedCluster({run,data,log,directory,port,secrets});
   const actual=run('psql',[...connection('postgres'),'-At','-c','show data_directory']).trim();
   if(realpathSync(actual)!==realpathSync(data))throw new Error('Cluster identity mismatch.');
+  evidence.ready=true;
   run('psql',[...connection('postgres'),'-c',`create database ${base}`]);
   sql(base,'scripts/pg-validation-bootstrap.sql');
   sql(base,'scripts/pg-document-storage-bootstrap.sql');

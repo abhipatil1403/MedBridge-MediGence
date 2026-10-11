@@ -103,7 +103,7 @@ jobs:
           MEDBRIDGE_CI_PG_BIN: /usr/lib/postgresql/17/bin
           TMPDIR: ${{ runner.temp }}
         run: node scripts/ci/sql-gate.mjs
-      - name: Preserve isolated results only
+      - name: Preserve isolated results and redacted startup diagnostics
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -111,6 +111,7 @@ jobs:
           path: |
             ${{ runner.temp }}/medbridge-ci-pg-*/results.json
             ${{ runner.temp }}/medbridge-ci-pg-*/isolated-vitest.json
+            ${{ runner.temp }}/medbridge-ci-pg-*/startup-diagnostics.json
           if-no-files-found: warn
           retention-days: 7
 
